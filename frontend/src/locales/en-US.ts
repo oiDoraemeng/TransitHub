@@ -153,13 +153,22 @@ export default {
         members: 'Member routes', models: 'Model catalog', modelsPending: 'The model catalog is syncing automatically.',
         modelCapacity: 'Effective concurrency {count}', entryKey: 'Regular durable entry key', addMember: 'Add member'
       },
-      table: { route: 'Route', binding: 'Site / group', concurrency: 'Concurrency', models: 'Models', status: 'Status', actions: 'Actions' },
-      form: { name: 'Name', site: 'Sub2API site', group: 'Group', concurrency: 'Concurrency limit', enabled: 'Enable immediately', selectSite: 'Select site', selectGroup: 'Select group' },
-      actions: { reveal: 'Reveal key', rotate: 'Rotate key', edit: 'Edit', delete: 'Delete', copy: 'Copy', addMember: 'Add member', removeMember: 'Remove member' },
+      proxies: {
+        tab: 'IP management', heading: 'Model egress proxies', description: 'Manage model-request egress IPs. Routes without a selected proxy always connect directly.',
+        add: 'Add proxy', edit: 'Edit proxy', count: 'proxies', empty: 'No model egress proxies yet.',
+        name: 'Name', endpoint: 'Proxy endpoint', routes: 'Linked routes', testResult: 'Connectivity', direct: 'Direct (no proxy)',
+        url: 'Proxy URL', urlPlaceholder: 'http://username:password@host:port', urlKeep: 'Leave blank to keep the current proxy URL',
+        urlHelp: 'HTTP, HTTPS, SOCKS5, and SOCKS5H are supported. Credentials are encrypted and never displayed.',
+        formHelp: 'The proxy is used only for model listing, responses, and chat completions. Key creation, lookup, and deletion stay direct.',
+        testStatus: { untested: 'Untested', healthy: 'Available', failed: 'Unavailable' }
+      },
+      table: { route: 'Route', binding: 'Site / group', proxy: 'Model egress', concurrency: 'Concurrency', models: 'Models', status: 'Status', actions: 'Actions' },
+      form: { name: 'Name', site: 'Sub2API site', group: 'Group', proxy: 'Model egress proxy (optional)', proxyHelp: 'Only model requests use this proxy. A disabled or unavailable proxy fails closed instead of falling back to a direct connection.', concurrency: 'Concurrency limit', enabled: 'Enable immediately', selectSite: 'Select site', selectGroup: 'Select group' },
+      actions: { reveal: 'Reveal key', rotate: 'Rotate key', edit: 'Edit', delete: 'Delete', test: 'Test proxy', copy: 'Copy', addMember: 'Add member', removeMember: 'Remove member' },
       cleanup: { pending: '{count} temporary keys pending cleanup', retrying: '{count} retrying automatically', routePending: '{count} pending cleanup' },
       key: { newRoute: 'New proxy route key', newGroup: 'New smart group key', storeSafely: 'This key can be revealed here again. Do not share it with untrusted clients.' },
-      confirm: { deleteRoute: 'Delete proxy route “{name}”?', deleteGroup: 'Delete smart group “{name}”?', removeMember: 'Remove “{name}” from this smart group?', rotateKey: 'The old key stops working immediately after rotation. Continue?' },
-      notices: { routeUpdated: 'Proxy route updated', groupUpdated: 'Smart group updated', copied: 'Key copied' },
+      confirm: { deleteRoute: 'Delete proxy route “{name}”?', deleteGroup: 'Delete smart group “{name}”?', deleteProxy: 'Delete model egress proxy “{name}”?', removeMember: 'Remove “{name}” from this smart group?', rotateKey: 'The old key stops working immediately after rotation. Continue?' },
+      notices: { routeUpdated: 'Proxy route updated', groupUpdated: 'Smart group updated', proxyCreated: 'Model egress proxy created', proxyUpdated: 'Model egress proxy updated', proxyTested: 'Proxy test passed. Exit IP: {ip}', copied: 'Key copied' },
       errors: { network: 'Network connection failed.', request: 'Model proxy request failed.' }
     },
     leaderboard: {

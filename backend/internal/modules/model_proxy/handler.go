@@ -27,6 +27,11 @@ func RegisterRoutes(mux *http.ServeMux, service *Service) {
 	mux.HandleFunc("GET /api/proxy-routes/sites", h.listSites)
 	mux.HandleFunc("GET /api/proxy-routes/sites/{siteId}/groups", h.listGroups)
 	mux.HandleFunc("GET /api/proxy-routes/cleanup-status", h.cleanupStatus)
+	mux.HandleFunc("GET /api/model-proxies", h.listEgressProxies)
+	mux.HandleFunc("POST /api/model-proxies", h.createEgressProxy)
+	mux.HandleFunc("PATCH /api/model-proxies/{id}", h.updateEgressProxy)
+	mux.HandleFunc("DELETE /api/model-proxies/{id}", h.deleteEgressProxy)
+	mux.HandleFunc("POST /api/model-proxies/{id}/test", h.testEgressProxy)
 
 	mux.HandleFunc("GET /api/proxy-smart-groups", h.listSmartGroups)
 	mux.HandleFunc("POST /api/proxy-smart-groups", h.createSmartGroup)
@@ -36,6 +41,82 @@ func RegisterRoutes(mux *http.ServeMux, service *Service) {
 	mux.HandleFunc("DELETE /api/proxy-smart-groups/{id}/members/{routeId}", h.removeMember)
 	mux.HandleFunc("GET /api/proxy-smart-groups/{id}/key", h.revealSmartGroupKey)
 	mux.HandleFunc("POST /api/proxy-smart-groups/{id}/rotate-key", h.rotateSmartGroupKey)
+}
+
+func (h *Handler) listEgressProxies(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.userID(w, r)
+	if !ok {
+		return
+	}
+	proxies, err := h.service.ListEgressProxies(r.Context(), userID)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, proxies)
+}
+
+func (h *Handler) createEgressProxy(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	userID, ok := h.userID(w, r)
+	if !ok {
+		return
+	}
+	var input CreateEgressProxyRequest
+	if err := httpjson.Decode(r, &input); err != nil {
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	proxy, err := h.service.CreateEgressProxy(r.Context(), userID, input)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusCreated, proxy)
+}
+
+func (h *Handler) updateEgressProxy(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	userID, ok := h.userID(w, r)
+	if !ok {
+		return
+	}
+	var input UpdateEgressProxyRequest
+	if err := httpjson.Decode(r, &input); err != nil {
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	proxy, err := h.service.UpdateEgressProxy(r.Context(), userID, r.PathValue("id"), input)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, proxy)
+}
+
+func (h *Handler) deleteEgressProxy(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.userID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.service.DeleteEgressProxy(r.Context(), userID, r.PathValue("id")); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+func (h *Handler) testEgressProxy(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.userID(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.service.TestEgressProxy(r.Context(), userID, r.PathValue("id"))
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, result)
 }
 
 func (h *Handler) userID(w http.ResponseWriter, r *http.Request) (string, bool) {

@@ -3,22 +3,27 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Activity, Check, ChevronDown, ChevronRight, Clipboard, Eye, KeyRound, Layers3,
-  Loader2, Pencil, Plus, RefreshCw, Route, Trash2, Users, X,
+  Loader2, Network, Pencil, PlugZap, Plus, RefreshCw, Route, Trash2, Users, X,
 } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
 import {
-  addProxySmartGroupMember, createProxyRoute, createProxySmartGroup, deleteProxyRoute,
-  deleteProxySmartGroup, getProxyCleanupStatus, listProxyGroups, listProxyRoutes,
-  listProxySites, listProxySmartGroups, removeProxySmartGroupMember, revealProxyRouteKey,
-  revealProxySmartGroupKey, rotateProxyRouteKey, rotateProxySmartGroupKey,
-  updateProxyRoute, updateProxySmartGroup,
+  addProxySmartGroupMember, createModelEgressProxy, createProxyRoute, createProxySmartGroup,
+  deleteModelEgressProxy, deleteProxyRoute, deleteProxySmartGroup, getProxyCleanupStatus,
+  listModelEgressProxies, listProxyGroups, listProxyRoutes, listProxySites, listProxySmartGroups,
+  removeProxySmartGroupMember, revealProxyRouteKey, revealProxySmartGroupKey,
+  rotateProxyRouteKey, rotateProxySmartGroupKey, testModelEgressProxy,
+  updateModelEgressProxy, updateProxyRoute, updateProxySmartGroup,
 } from '../api/modelProxy'
-import type { CleanupStatus, ProxyGroup, ProxyRoute, ProxyRouteInput, ProxySite, ProxySmartGroup } from '../types/modelProxy'
+import type {
+  CleanupStatus, ModelEgressProxy, ModelEgressProxyInput, ProxyGroup, ProxyRoute,
+  ProxyRouteInput, ProxySite, ProxySmartGroup,
+} from '../types/modelProxy'
 
 const { t } = useI18n()
-const activeTab = ref<'routes' | 'groups'>('routes')
+const activeTab = ref<'routes' | 'groups' | 'proxies'>('routes')
 const routes = ref<ProxyRoute[]>([])
 const smartGroups = ref<ProxySmartGroup[]>([])
+const proxies = ref<ModelEgressProxy[]>([])
 const sites = ref<ProxySite[]>([])
 const availableGroups = ref<ProxyGroup[]>([])
 const cleanup = ref<CleanupStatus>({ pending: 0, retrying: 0, lastError: '' })
@@ -32,7 +37,12 @@ let pollTimer: number | undefined
 
 const routeModalOpen = ref(false)
 const editingRouteId = ref('')
-const routeForm = reactive<ProxyRouteInput>({ name: '', siteId: '', groupId: '', groupName: '', concurrencyLimit: 50, enabled: true })
+const routeForm = reactive<ProxyRouteInput>({ name: '', siteId: '', groupId: '', groupName: '', concurrencyLimit: 50, proxyId: '', enabled: true })
+
+const proxyModalOpen = ref(false)
+const editingProxyId = ref('')
+const testingProxyId = ref('')
+const proxyForm = reactive<ModelEgressProxyInput & { url: string }>({ name: '', url: '', enabled: true })
 
 const smartModalOpen = ref(false)
 const editingSmartGroupId = ref('')
@@ -61,11 +71,12 @@ const loadAll = async (quiet = false) => {
   if (!quiet) loading.value = true
   errorMessage.value = ''
   try {
-    const [routeRows, groupRows, siteRows, cleanupStatus] = await Promise.all([
-      listProxyRoutes(), listProxySmartGroups(), listProxySites(), getProxyCleanupStatus(),
+    const [routeRows, groupRows, proxyRows, siteRows, cleanupStatus] = await Promise.all([
+      listProxyRoutes(), listProxySmartGroups(), listModelEgressProxies(), listProxySites(), getProxyCleanupStatus(),
     ])
     routes.value = routeRows
     smartGroups.value = groupRows
+    proxies.value = proxyRows
     sites.value = siteRows
     cleanup.value = cleanupStatus
   } catch (error) {
@@ -98,14 +109,14 @@ watch(() => routeForm.siteId, async (siteId, previous) => {
 
 const openCreateRoute = () => {
   editingRouteId.value = ''
-  Object.assign(routeForm, { name: '', siteId: sites.value[0]?.id ?? '', groupId: '', groupName: '', concurrencyLimit: 50, enabled: true })
+  Object.assign(routeForm, { name: '', siteId: sites.value[0]?.id ?? '', groupId: '', groupName: '', concurrencyLimit: 50, proxyId: '', enabled: true })
   routeModalOpen.value = true
   void loadGroups(routeForm.siteId)
 }
 
 const openEditRoute = async (route: ProxyRoute) => {
   editingRouteId.value = route.id
-  Object.assign(routeForm, { name: route.name, siteId: route.siteId, groupId: route.groupId, groupName: route.groupName, concurrencyLimit: route.concurrencyLimit, enabled: route.enabled })
+  Object.assign(routeForm, { name: route.name, siteId: route.siteId, groupId: route.groupId, groupName: route.groupName, concurrencyLimit: route.concurrencyLimit, proxyId: route.proxyId, enabled: route.enabled })
   routeModalOpen.value = true
   await loadGroups(route.siteId)
   routeForm.groupId = route.groupId
@@ -149,6 +160,80 @@ const removeRoute = async (route: ProxyRoute) => {
     await loadAll(true)
   } catch (error) { errorMessage.value = friendlyError(error) }
 }
+
+const openCreateProxy = () => {
+  editingProxyId.value = ''
+  Object.assign(proxyForm, { name: '', url: '', enabled: true })
+  proxyModalOpen.value = true
+}
+
+const openEditProxy = (proxy: ModelEgressProxy) => {
+  editingProxyId.value = proxy.id
+  Object.assign(proxyForm, { name: proxy.name, url: '', enabled: proxy.enabled })
+  proxyModalOpen.value = true
+}
+
+const submitProxy = async () => {
+  saving.value = true
+  errorMessage.value = ''
+  try {
+    if (editingProxyId.value) {
+      const input: Partial<ModelEgressProxyInput> = { name: proxyForm.name.trim(), enabled: proxyForm.enabled }
+      if (proxyForm.url.trim()) input.url = proxyForm.url.trim()
+      await updateModelEgressProxy(editingProxyId.value, input)
+      flash(t('admin.modelProxy.notices.proxyUpdated'))
+    } else {
+      await createModelEgressProxy({ name: proxyForm.name.trim(), url: proxyForm.url.trim(), enabled: proxyForm.enabled })
+      flash(t('admin.modelProxy.notices.proxyCreated'))
+    }
+    proxyModalOpen.value = false
+    await loadAll(true)
+  } catch (error) {
+    errorMessage.value = friendlyError(error)
+  } finally {
+    saving.value = false
+  }
+}
+
+const toggleProxy = async (proxy: ModelEgressProxy) => {
+  try {
+    await updateModelEgressProxy(proxy.id, { enabled: !proxy.enabled })
+    await loadAll(true)
+  } catch (error) { errorMessage.value = friendlyError(error) }
+}
+
+const testProxy = async (proxy: ModelEgressProxy) => {
+  testingProxyId.value = proxy.id
+  errorMessage.value = ''
+  try {
+    const result = await testModelEgressProxy(proxy.id)
+    if (result.success) flash(t('admin.modelProxy.notices.proxyTested', { ip: result.exitIp }))
+    else errorMessage.value = result.message
+    await loadAll(true)
+  } catch (error) {
+    errorMessage.value = friendlyError(error)
+  } finally {
+    testingProxyId.value = ''
+  }
+}
+
+const removeProxy = async (proxy: ModelEgressProxy) => {
+  if (!window.confirm(t('admin.modelProxy.confirm.deleteProxy', { name: proxy.name }))) return
+  try {
+    await deleteModelEgressProxy(proxy.id)
+    await loadAll(true)
+  } catch (error) { errorMessage.value = friendlyError(error) }
+}
+
+const openActiveCreate = () => {
+  if (activeTab.value === 'routes') openCreateRoute()
+  else if (activeTab.value === 'groups') openCreateSmart()
+  else openCreateProxy()
+}
+
+const activeCreateLabel = computed(() => activeTab.value === 'routes'
+  ? t('admin.modelProxy.routes.add')
+  : activeTab.value === 'groups' ? t('admin.modelProxy.groups.add') : t('admin.modelProxy.proxies.add'))
 
 const openCreateSmart = () => {
   editingSmartGroupId.value = ''
@@ -271,7 +356,7 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
         <div class="flex flex-wrap items-center gap-3 text-sm">
           <span class="inline-flex items-center gap-2 text-muted-foreground"><Activity class="h-4 w-4 text-signal" />{{ t('admin.modelProxy.cleanup.pending', { count: cleanup.pending }) }}</span>
           <span v-if="cleanup.retrying" class="inline-flex items-center gap-2 text-warning"><RefreshCw class="h-4 w-4" />{{ t('admin.modelProxy.cleanup.retrying', { count: cleanup.retrying }) }}</span>
-          <Button @click="activeTab === 'routes' ? openCreateRoute() : openCreateSmart()"><Plus class="h-4 w-4" />{{ activeTab === 'routes' ? t('admin.modelProxy.routes.add') : t('admin.modelProxy.groups.add') }}</Button>
+          <Button @click="openActiveCreate"><Plus class="h-4 w-4" />{{ activeCreateLabel }}</Button>
         </div>
       </div>
     </section>
@@ -285,6 +370,7 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
       <div class="mb-5 inline-flex h-10 items-center border border-border bg-surface p-1" role="tablist">
         <button class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'routes' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click="activeTab = 'routes'"><Route class="h-4 w-4" />{{ t('admin.modelProxy.routes.tab') }}</button>
         <button class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'groups' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click="activeTab = 'groups'"><Layers3 class="h-4 w-4" />{{ t('admin.modelProxy.groups.tab') }}</button>
+        <button class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'proxies' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click="activeTab = 'proxies'"><Network class="h-4 w-4" />{{ t('admin.modelProxy.proxies.tab') }}</button>
       </div>
 
       <div v-if="loading" class="flex min-h-64 items-center justify-center text-muted-foreground"><Loader2 class="mr-2 h-5 w-5 animate-spin" />{{ t('admin.modelProxy.loading') }}</div>
@@ -293,12 +379,13 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
         <div class="mb-3 flex items-end justify-between"><div><h3 id="proxy-routes-heading" class="font-semibold">{{ t('admin.modelProxy.routes.heading') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.routes.description') }}</p></div><span class="text-xs text-muted-foreground">{{ routes.length }} {{ t('admin.modelProxy.routes.count') }}</span></div>
         <div v-if="!routes.length" class="border border-dashed border-border py-16 text-center text-sm text-muted-foreground">{{ t('admin.modelProxy.routes.empty') }}</div>
         <div v-else class="overflow-x-auto border border-border">
-          <table class="w-full min-w-[920px] text-left text-sm">
-            <thead class="bg-surface text-xs uppercase text-muted-foreground"><tr><th class="px-4 py-3">{{ t('admin.modelProxy.table.route') }}</th><th class="px-4 py-3">{{ t('admin.modelProxy.table.binding') }}</th><th class="px-4 py-3">{{ t('admin.modelProxy.table.concurrency') }}</th><th class="px-4 py-3">{{ t('admin.modelProxy.table.models') }}</th><th class="px-4 py-3">Key</th><th class="px-4 py-3">{{ t('admin.modelProxy.table.status') }}</th><th class="px-4 py-3 text-right">{{ t('admin.modelProxy.table.actions') }}</th></tr></thead>
+          <table class="w-full min-w-[1040px] text-left text-sm">
+            <thead class="bg-surface text-xs uppercase text-muted-foreground"><tr><th class="px-4 py-3">{{ t('admin.modelProxy.table.route') }}</th><th class="px-4 py-3">{{ t('admin.modelProxy.table.binding') }}</th><th class="px-4 py-3">{{ t('admin.modelProxy.table.proxy') }}</th><th class="px-4 py-3">{{ t('admin.modelProxy.table.concurrency') }}</th><th class="px-4 py-3">{{ t('admin.modelProxy.table.models') }}</th><th class="px-4 py-3">Key</th><th class="px-4 py-3">{{ t('admin.modelProxy.table.status') }}</th><th class="px-4 py-3 text-right">{{ t('admin.modelProxy.table.actions') }}</th></tr></thead>
             <tbody class="divide-y divide-border/60">
               <tr v-for="routeItem in routes" :key="routeItem.id" class="hover:bg-surface/40">
                 <td class="px-4 py-3"><div class="font-medium">{{ routeItem.name }}</div><div class="mt-1 text-xs text-muted-foreground">{{ formatDate(routeItem.modelSyncedAt) }}</div></td>
                 <td class="px-4 py-3"><div>{{ routeItem.siteName }}</div><div class="text-xs text-muted-foreground">{{ routeItem.groupName }}</div></td>
+                <td class="px-4 py-3"><span class="inline-flex items-center gap-2"><Network class="h-4 w-4 text-muted-foreground" />{{ routeItem.proxyName || t('admin.modelProxy.proxies.direct') }}</span></td>
                 <td class="px-4 py-3"><span class="font-mono">{{ routeItem.activeConcurrency }} / {{ routeItem.concurrencyLimit }}</span><div class="mt-1 h-1.5 w-24 bg-surface-line"><div class="h-full bg-primary" :style="{ width: `${Math.min(100, routeItem.activeConcurrency / routeItem.concurrencyLimit * 100)}%` }" /></div></td>
                 <td class="px-4 py-3"><span>{{ routeItem.modelCount }}</span><span v-if="routeItem.modelSyncError" class="ml-2 text-xs text-warning" :title="routeItem.modelSyncError">{{ t('admin.modelProxy.stale') }}</span></td>
                 <td class="px-4 py-3 font-mono text-xs text-muted-foreground">{{ routeItem.keyPreview }}</td>
@@ -310,7 +397,7 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
         </div>
       </section>
 
-      <section v-else aria-labelledby="proxy-groups-heading">
+      <section v-else-if="activeTab === 'groups'" aria-labelledby="proxy-groups-heading">
         <div class="mb-3"><h3 id="proxy-groups-heading" class="font-semibold">{{ t('admin.modelProxy.groups.heading') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.description') }}</p></div>
         <div v-if="!smartGroups.length" class="border border-dashed border-border py-16 text-center text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.empty') }}</div>
         <div v-else class="divide-y divide-border border border-border">
@@ -328,10 +415,60 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
           </article>
         </div>
       </section>
+
+      <section v-else aria-labelledby="model-proxies-heading">
+        <div class="mb-3 flex items-end justify-between">
+          <div><h3 id="model-proxies-heading" class="font-semibold">{{ t('admin.modelProxy.proxies.heading') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.proxies.description') }}</p></div>
+          <span class="text-xs text-muted-foreground">{{ proxies.length }} {{ t('admin.modelProxy.proxies.count') }}</span>
+        </div>
+        <div v-if="!proxies.length" class="border border-dashed border-border py-16 text-center text-sm text-muted-foreground">{{ t('admin.modelProxy.proxies.empty') }}</div>
+        <div v-else class="overflow-x-auto border border-border">
+          <table class="w-full min-w-[900px] text-left text-sm">
+            <thead class="bg-surface text-xs uppercase text-muted-foreground"><tr><th class="px-4 py-3">{{ t('admin.modelProxy.proxies.name') }}</th><th class="px-4 py-3">{{ t('admin.modelProxy.proxies.endpoint') }}</th><th class="px-4 py-3">{{ t('admin.modelProxy.proxies.testResult') }}</th><th class="px-4 py-3">{{ t('admin.modelProxy.proxies.routes') }}</th><th class="px-4 py-3">{{ t('admin.modelProxy.table.status') }}</th><th class="px-4 py-3 text-right">{{ t('admin.modelProxy.table.actions') }}</th></tr></thead>
+            <tbody class="divide-y divide-border/60">
+              <tr v-for="proxy in proxies" :key="proxy.id" class="hover:bg-surface/40">
+                <td class="px-4 py-3"><div class="font-medium">{{ proxy.name }}</div><div class="mt-1 text-xs text-muted-foreground">{{ formatDate(proxy.lastTestedAt) }}</div></td>
+                <td class="px-4 py-3"><span class="mr-2 border border-border px-1.5 py-0.5 font-mono text-[11px] uppercase">{{ proxy.protocol }}</span><span class="font-mono text-xs">{{ proxy.address }}</span></td>
+                <td class="px-4 py-3"><div class="flex items-center gap-2"><span class="h-2 w-2 rounded-full" :class="proxy.lastTestStatus === 'healthy' ? 'bg-signal' : proxy.lastTestStatus === 'failed' ? 'bg-destructive' : 'bg-muted-foreground'" /><span>{{ t(`admin.modelProxy.proxies.testStatus.${proxy.lastTestStatus}`) }}</span></div><div v-if="proxy.lastTestStatus === 'healthy'" class="mt-1 text-xs text-muted-foreground">{{ proxy.lastTestExitIp }} · {{ proxy.lastTestLatencyMs }} ms</div><div v-else-if="proxy.lastTestError" class="mt-1 max-w-xs truncate text-xs text-destructive" :title="proxy.lastTestError">{{ proxy.lastTestError }}</div></td>
+                <td class="px-4 py-3 font-mono">{{ proxy.routeCount }}</td>
+                <td class="px-4 py-3"><button class="inline-flex items-center gap-2" @click="toggleProxy(proxy)"><span class="h-2 w-2 rounded-full" :class="proxy.enabled ? 'bg-signal' : 'bg-muted-foreground'" />{{ proxy.enabled ? t('admin.modelProxy.enabled') : t('admin.modelProxy.disabled') }}</button></td>
+                <td class="px-4 py-3"><div class="flex justify-end gap-1"><button class="icon-button" :disabled="testingProxyId === proxy.id" :title="t('admin.modelProxy.actions.test')" @click="testProxy(proxy)"><Loader2 v-if="testingProxyId === proxy.id" class="animate-spin" /><PlugZap v-else /></button><button class="icon-button" :title="t('admin.modelProxy.actions.edit')" @click="openEditProxy(proxy)"><Pencil /></button><button class="icon-button text-destructive" :title="t('admin.modelProxy.actions.delete')" @click="removeProxy(proxy)"><Trash2 /></button></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
 
     <Teleport to="body">
-      <div v-if="routeModalOpen" class="modal-backdrop" @click.self="routeModalOpen = false"><form class="modal-panel" @submit.prevent="submitRoute"><div class="modal-header"><div><h3 class="font-semibold">{{ editingRouteId ? t('admin.modelProxy.routes.edit') : t('admin.modelProxy.routes.add') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.routes.formHelp') }}</p></div><button type="button" @click="routeModalOpen = false"><X class="h-5 w-5" /></button></div><div class="grid gap-4 p-5 sm:grid-cols-2"><label class="field sm:col-span-2"><span>{{ t('admin.modelProxy.form.name') }}</span><input v-model="routeForm.name" required /></label><label class="field"><span>{{ t('admin.modelProxy.form.site') }}</span><select v-model="routeForm.siteId" required><option value="" disabled>{{ t('admin.modelProxy.form.selectSite') }}</option><option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option></select></label><label class="field"><span>{{ t('admin.modelProxy.form.group') }}</span><select v-model="routeForm.groupId" required :disabled="groupsLoading" @change="onGroupSelected"><option value="" disabled>{{ groupsLoading ? t('admin.modelProxy.loading') : t('admin.modelProxy.form.selectGroup') }}</option><option v-for="group in availableGroups" :key="group.id" :value="group.id">{{ group.name }}</option></select></label><label class="field"><span>{{ t('admin.modelProxy.form.concurrency') }}</span><input v-model.number="routeForm.concurrencyLimit" type="number" min="1" max="100000" required /></label><label class="flex items-center gap-3 self-end pb-2 text-sm"><input v-model="routeForm.enabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.form.enabled') }}</label></div><div class="modal-actions"><Button type="button" variant="ghost" @click="routeModalOpen = false">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div></form></div>
+      <div v-if="routeModalOpen" class="modal-backdrop" @click.self="routeModalOpen = false">
+        <form class="modal-panel" @submit.prevent="submitRoute">
+          <div class="modal-header"><div><h3 class="font-semibold">{{ editingRouteId ? t('admin.modelProxy.routes.edit') : t('admin.modelProxy.routes.add') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.routes.formHelp') }}</p></div><button type="button" @click="routeModalOpen = false"><X class="h-5 w-5" /></button></div>
+          <div class="grid gap-4 p-5 sm:grid-cols-2">
+            <label class="field sm:col-span-2"><span>{{ t('admin.modelProxy.form.name') }}</span><input v-model="routeForm.name" required /></label>
+            <label class="field"><span>{{ t('admin.modelProxy.form.site') }}</span><select v-model="routeForm.siteId" required><option value="" disabled>{{ t('admin.modelProxy.form.selectSite') }}</option><option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option></select></label>
+            <label class="field"><span>{{ t('admin.modelProxy.form.group') }}</span><select v-model="routeForm.groupId" required :disabled="groupsLoading" @change="onGroupSelected"><option value="" disabled>{{ groupsLoading ? t('admin.modelProxy.loading') : t('admin.modelProxy.form.selectGroup') }}</option><option v-for="group in availableGroups" :key="group.id" :value="group.id">{{ group.name }}</option></select></label>
+            <label class="field"><span>{{ t('admin.modelProxy.form.concurrency') }}</span><input v-model.number="routeForm.concurrencyLimit" type="number" min="1" max="100000" required /></label>
+            <label class="field"><span>{{ t('admin.modelProxy.form.proxy') }}</span><select v-model="routeForm.proxyId"><option value="">{{ t('admin.modelProxy.proxies.direct') }}</option><option v-for="proxy in proxies" :key="proxy.id" :value="proxy.id" :disabled="!proxy.enabled">{{ proxy.name }} · {{ proxy.address }}{{ proxy.enabled ? '' : ` (${t('admin.modelProxy.disabled')})` }}</option></select></label>
+            <p class="sm:col-span-2 text-xs leading-5 text-muted-foreground">{{ t('admin.modelProxy.form.proxyHelp') }}</p>
+            <label class="flex items-center gap-3 text-sm"><input v-model="routeForm.enabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.form.enabled') }}</label>
+          </div>
+          <div class="modal-actions"><Button type="button" variant="ghost" @click="routeModalOpen = false">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div>
+        </form>
+      </div>
+
+      <div v-if="proxyModalOpen" class="modal-backdrop" @click.self="proxyModalOpen = false">
+        <form class="modal-panel" @submit.prevent="submitProxy">
+          <div class="modal-header"><div><h3 class="font-semibold">{{ editingProxyId ? t('admin.modelProxy.proxies.edit') : t('admin.modelProxy.proxies.add') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.proxies.formHelp') }}</p></div><button type="button" @click="proxyModalOpen = false"><X class="h-5 w-5" /></button></div>
+          <div class="grid gap-4 p-5">
+            <label class="field"><span>{{ t('admin.modelProxy.proxies.name') }}</span><input v-model="proxyForm.name" required /></label>
+            <label class="field"><span>{{ t('admin.modelProxy.proxies.url') }}</span><input v-model="proxyForm.url" type="password" :required="!editingProxyId" autocomplete="new-password" :placeholder="editingProxyId ? t('admin.modelProxy.proxies.urlKeep') : t('admin.modelProxy.proxies.urlPlaceholder')" /></label>
+            <p class="text-xs leading-5 text-muted-foreground">{{ t('admin.modelProxy.proxies.urlHelp') }}</p>
+            <label class="flex items-center gap-3 text-sm"><input v-model="proxyForm.enabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.form.enabled') }}</label>
+          </div>
+          <div class="modal-actions"><Button type="button" variant="ghost" @click="proxyModalOpen = false">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div>
+        </form>
+      </div>
 
       <div v-if="smartModalOpen" class="modal-backdrop" @click.self="smartModalOpen = false"><form class="modal-panel max-w-2xl" @submit.prevent="submitSmart"><div class="modal-header"><div><h3 class="font-semibold">{{ editingSmartGroupId ? t('admin.modelProxy.groups.edit') : t('admin.modelProxy.groups.add') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.formHelp') }}</p></div><button type="button" @click="smartModalOpen = false"><X class="h-5 w-5" /></button></div><div class="space-y-5 p-5"><label class="field"><span>{{ t('admin.modelProxy.form.name') }}</span><input v-model="smartName" required /></label><label class="flex items-center gap-3 text-sm"><input v-model="smartEnabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.form.enabled') }}</label><template v-if="!editingSmartGroupId"><fieldset><legend class="mb-2 text-sm font-medium">{{ t('admin.modelProxy.groups.selectRoutes') }}</legend><div class="max-h-48 divide-y divide-border overflow-y-auto border border-border"><label v-for="routeItem in enabledRoutes" :key="routeItem.id" class="flex items-center justify-between gap-3 px-3 py-2 text-sm"><span><span class="font-medium">{{ routeItem.name }}</span><span class="ml-2 text-muted-foreground">{{ routeItem.keyPreview }}</span></span><input v-model="selectedRouteIds" type="checkbox" :value="routeItem.id" class="h-4 w-4" /></label></div></fieldset><label class="field"><span>{{ t('admin.modelProxy.groups.pasteKeys') }}</span><textarea v-model="pastedMemberKeys" rows="3" :placeholder="t('admin.modelProxy.groups.pastePlaceholder')" /></label></template></div><div class="modal-actions"><Button type="button" variant="ghost" @click="smartModalOpen = false">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving || (!editingSmartGroupId && !selectedRouteIds.length && !pastedMemberKeys.trim())"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div></form></div>
 

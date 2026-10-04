@@ -15,6 +15,15 @@ func TestProtectedPathIncludesMassEmailPrefix(t *testing.T) {
 	}
 }
 
+func TestProtectedPathIncludesModelProxyManagement(t *testing.T) {
+	server := &Server{}
+	for _, path := range []string{"/api/model-proxies", "/api/model-proxies/proxy-1/test"} {
+		if !server.protectedPath(path) {
+			t.Fatalf("expected %s to be protected", path)
+		}
+	}
+}
+
 func TestProtectedPathDoesNotOvermatchMassEmailLookalikes(t *testing.T) {
 	server := &Server{}
 	if server.protectedPath("/api/public-mass-email") {

@@ -19,11 +19,32 @@ type Route struct {
 	ConcurrencyLimit  int        `json:"concurrencyLimit"`
 	ActiveConcurrency int64      `json:"activeConcurrency"`
 	Enabled           bool       `json:"enabled"`
+	ProxyID           string     `json:"proxyId"`
+	ProxyName         string     `json:"proxyName"`
 	KeyPreview        string     `json:"keyPreview"`
 	ModelCount        int        `json:"modelCount"`
 	CleanupPending    int        `json:"cleanupPending"`
 	ModelSyncedAt     *time.Time `json:"modelSyncedAt"`
 	ModelSyncError    string     `json:"modelSyncError"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
+}
+
+type EgressProxy struct {
+	ID                string     `json:"id"`
+	UserID            string     `json:"-"`
+	AdminAccountID    string     `json:"-"`
+	Name              string     `json:"name"`
+	Protocol          string     `json:"protocol"`
+	Address           string     `json:"address"`
+	URLCiphertext     string     `json:"-"`
+	Enabled           bool       `json:"enabled"`
+	RouteCount        int        `json:"routeCount"`
+	LastTestStatus    string     `json:"lastTestStatus"`
+	LastTestLatencyMS *int64     `json:"lastTestLatencyMs"`
+	LastTestExitIP    string     `json:"lastTestExitIp"`
+	LastTestError     string     `json:"lastTestError"`
+	LastTestedAt      *time.Time `json:"lastTestedAt"`
 	CreatedAt         time.Time  `json:"createdAt"`
 	UpdatedAt         time.Time  `json:"updatedAt"`
 }
@@ -76,6 +97,7 @@ type CreateRouteRequest struct {
 	GroupID          string `json:"groupId"`
 	GroupName        string `json:"groupName"`
 	ConcurrencyLimit int    `json:"concurrencyLimit"`
+	ProxyID          string `json:"proxyId"`
 	Enabled          *bool  `json:"enabled,omitempty"`
 }
 
@@ -85,7 +107,27 @@ type UpdateRouteRequest struct {
 	GroupID          *string `json:"groupId,omitempty"`
 	GroupName        *string `json:"groupName,omitempty"`
 	ConcurrencyLimit *int    `json:"concurrencyLimit,omitempty"`
+	ProxyID          *string `json:"proxyId,omitempty"`
 	Enabled          *bool   `json:"enabled,omitempty"`
+}
+
+type CreateEgressProxyRequest struct {
+	Name    string `json:"name"`
+	URL     string `json:"url"`
+	Enabled *bool  `json:"enabled,omitempty"`
+}
+
+type UpdateEgressProxyRequest struct {
+	Name    *string `json:"name,omitempty"`
+	URL     *string `json:"url,omitempty"`
+	Enabled *bool   `json:"enabled,omitempty"`
+}
+
+type EgressProxyTestResult struct {
+	Success   bool   `json:"success"`
+	LatencyMS int64  `json:"latencyMs"`
+	ExitIP    string `json:"exitIp"`
+	Message   string `json:"message"`
 }
 
 type CreateSmartGroupRequest struct {

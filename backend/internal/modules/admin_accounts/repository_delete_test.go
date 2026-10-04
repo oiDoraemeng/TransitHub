@@ -11,6 +11,7 @@ func TestWorkspaceDeleteStatementsCoverAllWorkspaceTables(t *testing.T) {
 		"proxy_access_keys",
 		"proxy_smart_groups",
 		"proxy_routes",
+		"model_egress_proxies",
 		"lottery_reward_jobs",
 		"lottery_winners",
 		"lottery_draws",
@@ -113,6 +114,7 @@ func TestWorkspaceDeleteStatementsDeleteChildrenBeforeParents(t *testing.T) {
 	assertBefore("ticket_attachments", "ticket_messages")
 	assertBefore("ticket_messages", "tickets")
 	assertBefore("mass_email_batch_items", "mass_email_batches")
+	assertBefore("proxy_routes", "model_egress_proxies")
 	assertBefore("group_rate_campaign_items", "group_rate_campaigns")
 	assertBefore("connection_health_group_policy_assignments", "connection_health_policies")
 	assertBefore("connection_health_policy_assignments", "connection_health_policies")

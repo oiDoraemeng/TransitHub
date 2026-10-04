@@ -2,6 +2,9 @@ import { authUnauthorizedErrorKey, getAccessToken, handleAuthExpired, isUnauthor
 import type {
   CleanupStatus,
   KeyResponse,
+  ModelEgressProxy,
+  ModelEgressProxyInput,
+  ModelEgressProxyTestResult,
   ProxyGroup,
   ProxyRoute,
   ProxyRouteInput,
@@ -55,6 +58,12 @@ export const deleteProxyRoute = (id: string) => request<{ success: boolean }>(`/
 export const revealProxyRouteKey = (id: string) => request<KeyResponse>(`/proxy-routes/${id}/key`)
 export const rotateProxyRouteKey = (id: string) => request<KeyResponse>(`/proxy-routes/${id}/rotate-key`, { method: 'POST' })
 export const getProxyCleanupStatus = () => request<CleanupStatus>('/proxy-routes/cleanup-status')
+
+export const listModelEgressProxies = () => request<ModelEgressProxy[]>('/model-proxies')
+export const createModelEgressProxy = (input: ModelEgressProxyInput & { url: string }) => request<ModelEgressProxy>('/model-proxies', { method: 'POST', body: JSON.stringify(input) })
+export const updateModelEgressProxy = (id: string, input: Partial<ModelEgressProxyInput>) => request<ModelEgressProxy>(`/model-proxies/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+export const deleteModelEgressProxy = (id: string) => request<{ success: boolean }>(`/model-proxies/${id}`, { method: 'DELETE' })
+export const testModelEgressProxy = (id: string) => request<ModelEgressProxyTestResult>(`/model-proxies/${id}/test`, { method: 'POST' })
 
 export const listProxySmartGroups = () => request<ProxySmartGroup[]>('/proxy-smart-groups')
 export const createProxySmartGroup = (input: SmartGroupInput) => request<{ group: ProxySmartGroup; key: string }>('/proxy-smart-groups', { method: 'POST', body: JSON.stringify(input) })

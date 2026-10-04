@@ -153,13 +153,22 @@ export default {
         members: '成员路由', models: '模型目录', modelsPending: '模型目录正在后台自动同步。',
         modelCapacity: '有效并发 {count}', entryKey: '普通长期入口 Key', addMember: '添加成员'
       },
-      table: { route: '路由', binding: '站点 / 分组', concurrency: '并发', models: '模型', status: '状态', actions: '操作' },
-      form: { name: '名称', site: 'Sub2API 站点', group: '分组', concurrency: '并发额度', enabled: '创建后立即启用', selectSite: '选择站点', selectGroup: '选择分组' },
-      actions: { reveal: '查看 Key', rotate: '轮换 Key', edit: '编辑', delete: '删除', copy: '复制', addMember: '添加成员', removeMember: '移除成员' },
+      proxies: {
+        tab: 'IP 管理', heading: '模型出口代理', description: '集中管理模型请求使用的出口 IP；未选择代理的路由始终直连。',
+        add: '新增代理', edit: '编辑代理', count: '个代理', empty: '还没有模型出口代理。',
+        name: '名称', endpoint: '代理地址', routes: '关联路由', testResult: '连通性', direct: '直连（不使用代理）',
+        url: '代理 URL', urlPlaceholder: 'http://用户名:密码@主机:端口', urlKeep: '留空则保留现有代理 URL',
+        urlHelp: '支持 HTTP、HTTPS、SOCKS5 和 SOCKS5H。凭据会加密保存，页面只显示不含凭据的地址。',
+        formHelp: '代理仅用于模型列表、响应和聊天补全请求；Key 创建、查询和删除仍然直连。',
+        testStatus: { untested: '未测试', healthy: '可用', failed: '不可用' }
+      },
+      table: { route: '路由', binding: '站点 / 分组', proxy: '模型出口', concurrency: '并发', models: '模型', status: '状态', actions: '操作' },
+      form: { name: '名称', site: 'Sub2API 站点', group: '分组', proxy: '模型出口代理（可选）', proxyHelp: '仅模型请求使用此代理。代理停用或不可用时请求会失败，不会回退到直连。', concurrency: '并发额度', enabled: '创建后立即启用', selectSite: '选择站点', selectGroup: '选择分组' },
+      actions: { reveal: '查看 Key', rotate: '轮换 Key', edit: '编辑', delete: '删除', test: '测试代理', copy: '复制', addMember: '添加成员', removeMember: '移除成员' },
       cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个正在自动重试', routePending: '{count} 个待清理' },
       key: { newRoute: '新代理路由 Key', newGroup: '新智能分组 Key', storeSafely: '此 Key 可随时在管理页再次查看，请勿发送给不可信客户端。' },
-      confirm: { deleteRoute: '删除代理路由“{name}”？', deleteGroup: '删除智能分组“{name}”？', removeMember: '从智能分组移除“{name}”？', rotateKey: '轮换后旧 Key 会立即失效，确认继续？' },
-      notices: { routeUpdated: '代理路由已更新', groupUpdated: '智能分组已更新', copied: 'Key 已复制' },
+      confirm: { deleteRoute: '删除代理路由“{name}”？', deleteGroup: '删除智能分组“{name}”？', deleteProxy: '删除模型出口代理“{name}”？', removeMember: '从智能分组移除“{name}”？', rotateKey: '轮换后旧 Key 会立即失效，确认继续？' },
+      notices: { routeUpdated: '代理路由已更新', groupUpdated: '智能分组已更新', proxyCreated: '模型出口代理已创建', proxyUpdated: '模型出口代理已更新', proxyTested: '代理测试成功，出口 IP：{ip}', copied: 'Key 已复制' },
       errors: { network: '网络连接失败。', request: '模型代理请求失败。' }
     },
     leaderboard: {

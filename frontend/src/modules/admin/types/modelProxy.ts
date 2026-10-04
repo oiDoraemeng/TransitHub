@@ -10,6 +10,8 @@ export interface ProxyRoute {
   concurrencyLimit: number
   activeConcurrency: number
   enabled: boolean
+  proxyId: string
+  proxyName: string
   keyPreview: string
   modelCount: number
   cleanupPending: number
@@ -44,7 +46,37 @@ export interface ProxyRouteInput {
   groupId: string
   groupName: string
   concurrencyLimit: number
+  proxyId: string
   enabled: boolean
+}
+
+export interface ModelEgressProxy {
+  id: string
+  name: string
+  protocol: string
+  address: string
+  enabled: boolean
+  routeCount: number
+  lastTestStatus: 'untested' | 'healthy' | 'failed'
+  lastTestLatencyMs: number | null
+  lastTestExitIp: string
+  lastTestError: string
+  lastTestedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ModelEgressProxyInput {
+  name: string
+  url?: string
+  enabled: boolean
+}
+
+export interface ModelEgressProxyTestResult {
+  success: boolean
+  latencyMs: number
+  exitIp: string
+  message: string
 }
 
 export interface SmartGroupInput {

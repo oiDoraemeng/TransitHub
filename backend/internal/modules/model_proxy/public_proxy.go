@@ -208,6 +208,10 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 }
 
 func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error)) (*http.Response, bool, error) {
+	client, err := s.dataClientForRoute(incoming.Context(), route)
+	if err != nil {
+		return nil, true, err
+	}
 	secret, cleanupJob, err := s.createRemoteKey(incoming.Context(), route)
 	if err != nil {
 		return nil, true, err
@@ -232,7 +236,7 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 	copyRequestHeaders(request.Header, incoming.Header)
 	request.Header.Set("Authorization", "Bearer "+secret)
 	request.Header.Set("User-Agent", upstream.BrowserUserAgent)
-	response, err := s.dataClient.Do(request)
+	response, err := client.Do(request)
 	if err != nil {
 		s.beginDelete(cleanupJob)
 		return nil, true, err

@@ -10,7 +10,6 @@ import (
 	"log"
 	"math"
 	mathrand "math/rand/v2"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -42,6 +41,8 @@ type Service struct {
 	cipher          *KeyCipher
 	limiter         *Limiter
 	dataClient      *http.Client
+	egressClientsMu sync.Mutex
+	egressClients   map[string]cachedEgressClient
 	refreshInterval time.Duration
 	maxRequestBytes int64
 	sessionRefresh  singleflight.Group
@@ -57,21 +58,14 @@ func NewService(repository *Repository, accounts AccountResolver, sites Upstream
 	if refreshInterval <= 0 {
 		refreshInterval = 5 * time.Minute
 	}
-	transport := &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
-		DialContext:           (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          512,
-		MaxIdleConnsPerHost:   256,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ResponseHeaderTimeout: 90 * time.Second,
-		ExpectContinueTimeout: time.Second,
+	dataClient, err := newModelHTTPClient("")
+	if err != nil {
+		panic(err)
 	}
 	return &Service{
 		repository: repository, accounts: accounts, sites: sites, platform: platform,
 		cipher: cipher, limiter: limiter, maxRequestBytes: maxRequestBytes, refreshInterval: refreshInterval,
-		dataClient: &http.Client{Transport: transport, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }},
+		dataClient: dataClient, egressClients: make(map[string]cachedEgressClient),
 	}
 }
 
@@ -88,6 +82,16 @@ func (s *Service) Stop() {
 		s.cancel()
 	}
 	s.wg.Wait()
+	if s.dataClient != nil {
+		s.dataClient.CloseIdleConnections()
+	}
+	s.egressClientsMu.Lock()
+	defer s.egressClientsMu.Unlock()
+	for _, cached := range s.egressClients {
+		if cached.client != nil {
+			cached.client.CloseIdleConnections()
+		}
+	}
 }
 
 func (s *Service) currentWorkspace(ctx context.Context, userID string) (string, error) {
@@ -152,6 +156,7 @@ func (s *Service) CreateRoute(ctx context.Context, userID string, input CreateRo
 	input.SiteID = strings.TrimSpace(input.SiteID)
 	input.GroupID = strings.TrimSpace(input.GroupID)
 	input.GroupName = strings.TrimSpace(input.GroupName)
+	input.ProxyID = strings.TrimSpace(input.ProxyID)
 	if input.Name == "" || input.SiteID == "" || input.GroupID == "" {
 		return Route{}, "", &requestError{Status: 400, Message: "name, siteId and groupId are required"}
 	}
@@ -164,6 +169,9 @@ func (s *Service) CreateRoute(ctx context.Context, userID string, input CreateRo
 	site, err := s.sites.GetSite(ctx, input.SiteID)
 	if err != nil || site == nil || site.UserID != userID || site.AdminAccountID != accountID || site.Platform != upstream.PlatformSub2API || site.Session == nil {
 		return Route{}, "", &requestError{Status: 400, Message: "a connected Sub2API site is required"}
+	}
+	if err := s.validateEgressProxy(ctx, userID, accountID, input.ProxyID); err != nil {
+		return Route{}, "", err
 	}
 	if input.GroupName == "" {
 		for _, group := range site.Metrics.Groups {
@@ -188,7 +196,7 @@ func (s *Service) CreateRoute(ctx context.Context, userID string, input CreateRo
 	if err != nil {
 		return Route{}, "", err
 	}
-	route := Route{ID: routeID, UserID: userID, AdminAccountID: accountID, Name: input.Name, SiteID: input.SiteID, SiteName: site.Name, GroupID: input.GroupID, GroupName: input.GroupName, ConcurrencyLimit: input.ConcurrencyLimit, Enabled: enabled, KeyPreview: preview}
+	route := Route{ID: routeID, UserID: userID, AdminAccountID: accountID, Name: input.Name, SiteID: input.SiteID, SiteName: site.Name, GroupID: input.GroupID, GroupName: input.GroupName, ConcurrencyLimit: input.ConcurrencyLimit, Enabled: enabled, ProxyID: input.ProxyID, KeyPreview: preview}
 	if err := s.repository.CreateRoute(ctx, route, keyID, hash, ciphertext, preview); err != nil {
 		return Route{}, "", err
 	}
@@ -230,12 +238,22 @@ func (s *Service) UpdateRoute(ctx context.Context, userID, routeID string, input
 	if input.Enabled != nil {
 		route.Enabled = *input.Enabled
 	}
+	if input.ProxyID != nil {
+		proxyID := strings.TrimSpace(*input.ProxyID)
+		if proxyID != route.ProxyID {
+			route.ProxyID = proxyID
+			refreshModels = true
+		}
+	}
 	if route.Name == "" || route.SiteID == "" || route.GroupID == "" || route.ConcurrencyLimit < 1 || route.ConcurrencyLimit > 100000 {
 		return Route{}, &requestError{Status: 400, Message: "invalid proxy route"}
 	}
 	site, siteErr := s.sites.GetSite(ctx, route.SiteID)
 	if siteErr != nil || site == nil || site.UserID != userID || site.AdminAccountID != accountID || site.Platform != upstream.PlatformSub2API || site.Session == nil {
 		return Route{}, &requestError{Status: 400, Message: "a connected Sub2API site is required"}
+	}
+	if err := s.validateEgressProxy(ctx, userID, accountID, route.ProxyID); err != nil {
+		return Route{}, err
 	}
 	if err := s.repository.UpdateRoute(ctx, *route); err != nil {
 		return Route{}, err
@@ -640,6 +658,11 @@ func (s *Service) refreshRouteModels(ctx context.Context, routeID string) error 
 		if err != nil || route == nil || !route.Enabled {
 			return nil, err
 		}
+		client, err := s.dataClientForRoute(ctx, *route)
+		if err != nil {
+			_ = s.repository.SetModelSyncError(ctx, routeID, err)
+			return nil, err
+		}
 		secret, job, err := s.createRemoteKey(ctx, *route)
 		if err != nil {
 			_ = s.repository.SetModelSyncError(ctx, routeID, err)
@@ -651,7 +674,7 @@ func (s *Service) refreshRouteModels(ctx context.Context, routeID string) error 
 			return nil, err
 		}
 		request.Header.Set("Authorization", "Bearer "+secret)
-		response, err := s.dataClient.Do(request)
+		response, err := client.Do(request)
 		if err != nil {
 			s.beginDelete(job)
 			_ = s.repository.SetModelSyncError(ctx, routeID, err)
