@@ -1433,6 +1433,7 @@ func (s *PlatformService) CreateSub2APIKey(session Session, name string, groupID
 		Body: map[string]any{
 			"name":     name,
 			"group_id": groupID,
+			"quota":    100,
 		},
 	})
 	if err != nil {
