@@ -6,14 +6,16 @@ import (
 	"testing"
 )
 
-func TestIsModelProxyPathIncludesCompatibilityAliases(t *testing.T) {
-	for _, path := range []string{"/v1/models", "/v1/responses/compact", "/v1beta/models"} {
+func TestIsModelProxyPathIncludesSupportedProtocols(t *testing.T) {
+	for _, path := range []string{"/v1/models", "/v1/responses/compact", "/v1/messages"} {
 		if !isModelProxyPath(path) {
 			t.Fatalf("expected %s to enter model proxy handler", path)
 		}
 	}
-	if isModelProxyPath("/v1betaish/models") {
-		t.Fatal("must not route unrelated v1beta prefix to model proxy")
+	for _, path := range []string{"/v1beta/models", "/v1betaish/models"} {
+		if isModelProxyPath(path) {
+			t.Fatalf("unexpected model proxy match for %s", path)
+		}
 	}
 }
 

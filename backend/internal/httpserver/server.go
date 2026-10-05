@@ -448,7 +448,7 @@ func (s *Server) Handler() http.Handler {
 }
 
 func isModelProxyPath(path string) bool {
-	return path == "/v1" || strings.HasPrefix(path, "/v1/") || path == "/v1beta" || strings.HasPrefix(path, "/v1beta/")
+	return path == "/v1" || strings.HasPrefix(path, "/v1/")
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {

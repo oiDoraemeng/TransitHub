@@ -25,21 +25,9 @@ func (s *Service) PublicHandler() http.Handler {
 }
 
 func (s *Service) handlePublic(w http.ResponseWriter, r *http.Request) {
-	canonicalPath, ok := canonicalPublicPath(r.Method, r.URL.Path)
-	if !ok {
-		writeOpenAIError(w, http.StatusNotFound, "unsupported_endpoint", "only /v1/models, /v1/responses and /v1/chat/completions are supported")
+	if !supportedPublicEndpoint(r.Method, r.URL.Path) {
+		writeOpenAIError(w, http.StatusNotFound, "unsupported_endpoint", "only /v1/models, /v1/chat/completions, /v1/responses, /v1/responses/compact and /v1/messages are supported")
 		return
-	}
-	// Keep the public compatibility aliases out of the upstream request. The
-	// supported upstream contract is intentionally small and uses the canonical
-	// OpenAI-compatible paths.
-	if canonicalPath != r.URL.Path {
-		requestURL := *r.URL
-		requestURL.Path = canonicalPath
-		requestURL.RawPath = ""
-		request := r.Clone(r.Context())
-		request.URL = &requestURL
-		r = request
 	}
 	token := bearerToken(r.Header.Get("Authorization"))
 	if token == "" {
@@ -68,26 +56,16 @@ func (s *Service) handlePublic(w http.ResponseWriter, r *http.Request) {
 }
 
 func supportedPublicEndpoint(method, path string) bool {
-	_, ok := canonicalPublicPath(method, path)
-	return ok
-}
-
-func canonicalPublicPath(method, path string) (string, bool) {
 	if method == http.MethodGet {
-		switch path {
-		case "/v1/models", "/v1beta/models":
-			return "/v1/models", true
-		}
+		return path == "/v1/models"
 	}
 	if method == http.MethodPost {
 		switch path {
-		case "/v1/responses", "/v1/responses/compact":
-			return "/v1/responses", true
-		case "/v1/chat/completions":
-			return path, true
+		case "/v1/chat/completions", "/v1/responses", "/v1/responses/compact", "/v1/messages":
+			return true
 		}
 	}
-	return "", false
+	return false
 }
 
 func (s *Service) writeGroupModels(w http.ResponseWriter, group *SmartGroup) {
@@ -257,7 +235,7 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 		s.beginDelete(cleanupJob)
 		return nil, true, errors.New("upstream site is unavailable")
 	}
-	request, err := http.NewRequestWithContext(incoming.Context(), incoming.Method, strings.TrimRight(baseURL, "/")+incoming.URL.RequestURI(), body)
+	request, err := http.NewRequestWithContext(incoming.Context(), incoming.Method, upstreamRequestURL(baseURL, incoming), body)
 	if err != nil {
 		body.Close()
 		s.beginDelete(cleanupJob)
@@ -275,6 +253,13 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 	s.beginDelete(cleanupJob)
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
 	return response, retryable, nil
+}
+
+// upstreamRequestURL keeps the public protocol endpoint and query string
+// intact. The Sub2API upstream is responsible for deriving provider-specific
+// endpoints such as Gemini /v1beta/models or Anthropic /v1/messages.
+func upstreamRequestURL(baseURL string, incoming *http.Request) string {
+	return strings.TrimRight(baseURL, "/") + incoming.URL.RequestURI()
 }
 
 func (s *Service) writeUpstreamResponse(w http.ResponseWriter, response *http.Response) {

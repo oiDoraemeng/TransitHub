@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -16,10 +17,11 @@ func TestSupportedPublicEndpoint(t *testing.T) {
 		want   bool
 	}{
 		{http.MethodGet, "/v1/models", true},
-		{http.MethodGet, "/v1beta/models", true},
 		{http.MethodPost, "/v1/responses", true},
 		{http.MethodPost, "/v1/responses/compact", true},
 		{http.MethodPost, "/v1/chat/completions", true},
+		{http.MethodPost, "/v1/messages", true},
+		{http.MethodGet, "/v1beta/models", false},
 		{http.MethodGet, "/v1/chat/completions", false},
 		{http.MethodPost, "/v1/embeddings", false},
 	}
@@ -30,26 +32,12 @@ func TestSupportedPublicEndpoint(t *testing.T) {
 	}
 }
 
-func TestCanonicalPublicPath(t *testing.T) {
-	tests := []struct {
-		method string
-		path   string
-		want   string
-		ok     bool
-	}{
-		{http.MethodGet, "/v1/models", "/v1/models", true},
-		{http.MethodGet, "/v1beta/models", "/v1/models", true},
-		{http.MethodPost, "/v1/responses", "/v1/responses", true},
-		{http.MethodPost, "/v1/responses/compact", "/v1/responses", true},
-		{http.MethodPost, "/v1/chat/completions", "/v1/chat/completions", true},
-		{http.MethodGet, "/v1/responses/compact", "", false},
-		{http.MethodPost, "/v1beta/models", "", false},
-	}
-	for _, test := range tests {
-		got, ok := canonicalPublicPath(test.method, test.path)
-		if got != test.want || ok != test.ok {
-			t.Errorf("canonicalPublicPath(%q, %q)=(%q, %v), want (%q, %v)", test.method, test.path, got, ok, test.want, test.ok)
-		}
+func TestUpstreamRequestURLPreservesInboundProtocolPath(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/messages?beta=true", nil)
+	got := upstreamRequestURL("https://upstream.example/api/", request)
+	want := "https://upstream.example/api/v1/messages?beta=true"
+	if got != want {
+		t.Fatalf("upstreamRequestURL()=%q want %q", got, want)
 	}
 }
 
