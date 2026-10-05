@@ -25,9 +25,21 @@ func (s *Service) PublicHandler() http.Handler {
 }
 
 func (s *Service) handlePublic(w http.ResponseWriter, r *http.Request) {
-	if !supportedPublicEndpoint(r.Method, r.URL.Path) {
+	canonicalPath, ok := canonicalPublicPath(r.Method, r.URL.Path)
+	if !ok {
 		writeOpenAIError(w, http.StatusNotFound, "unsupported_endpoint", "only /v1/models, /v1/responses and /v1/chat/completions are supported")
 		return
+	}
+	// Keep the public compatibility aliases out of the upstream request. The
+	// supported upstream contract is intentionally small and uses the canonical
+	// OpenAI-compatible paths.
+	if canonicalPath != r.URL.Path {
+		requestURL := *r.URL
+		requestURL.Path = canonicalPath
+		requestURL.RawPath = ""
+		request := r.Clone(r.Context())
+		request.URL = &requestURL
+		r = request
 	}
 	token := bearerToken(r.Header.Get("Authorization"))
 	if token == "" {
@@ -56,8 +68,26 @@ func (s *Service) handlePublic(w http.ResponseWriter, r *http.Request) {
 }
 
 func supportedPublicEndpoint(method, path string) bool {
-	return (method == http.MethodGet && path == "/v1/models") ||
-		(method == http.MethodPost && (path == "/v1/responses" || path == "/v1/chat/completions"))
+	_, ok := canonicalPublicPath(method, path)
+	return ok
+}
+
+func canonicalPublicPath(method, path string) (string, bool) {
+	if method == http.MethodGet {
+		switch path {
+		case "/v1/models", "/v1beta/models":
+			return "/v1/models", true
+		}
+	}
+	if method == http.MethodPost {
+		switch path {
+		case "/v1/responses", "/v1/responses/compact":
+			return "/v1/responses", true
+		case "/v1/chat/completions":
+			return path, true
+		}
+	}
+	return "", false
 }
 
 func (s *Service) writeGroupModels(w http.ResponseWriter, group *SmartGroup) {

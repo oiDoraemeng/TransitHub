@@ -6,6 +6,17 @@ import (
 	"testing"
 )
 
+func TestIsModelProxyPathIncludesCompatibilityAliases(t *testing.T) {
+	for _, path := range []string{"/v1/models", "/v1/responses/compact", "/v1beta/models"} {
+		if !isModelProxyPath(path) {
+			t.Fatalf("expected %s to enter model proxy handler", path)
+		}
+	}
+	if isModelProxyPath("/v1betaish/models") {
+		t.Fatal("must not route unrelated v1beta prefix to model proxy")
+	}
+}
+
 func TestProtectedPathIncludesMassEmailPrefix(t *testing.T) {
 	server := &Server{}
 	for _, path := range []string{"/api/mass-email", "/api/mass-email/users", "/api/mass-email/batches/batch-1/items"} {
