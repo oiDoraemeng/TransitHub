@@ -74,10 +74,10 @@ const loadAll = async (quiet = false) => {
     const [routeRows, groupRows, proxyRows, siteRows, cleanupStatus] = await Promise.all([
       listProxyRoutes(), listProxySmartGroups(), listModelEgressProxies(), listProxySites(), getProxyCleanupStatus(),
     ])
-    routes.value = routeRows
-    smartGroups.value = groupRows
-    proxies.value = proxyRows
-    sites.value = siteRows
+    routes.value = routeRows ?? []
+    smartGroups.value = groupRows ?? []
+    proxies.value = proxyRows ?? []
+    sites.value = siteRows ?? []
     cleanup.value = cleanupStatus
   } catch (error) {
     errorMessage.value = friendlyError(error)
@@ -235,6 +235,10 @@ const activeCreateLabel = computed(() => activeTab.value === 'routes'
   ? t('admin.modelProxy.routes.add')
   : activeTab.value === 'groups' ? t('admin.modelProxy.groups.add') : t('admin.modelProxy.proxies.add'))
 
+const selectTab = (tab: 'routes' | 'groups' | 'proxies') => {
+  activeTab.value = tab
+}
+
 const openCreateSmart = () => {
   editingSmartGroupId.value = ''
   smartName.value = ''
@@ -368,9 +372,9 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
       <div v-if="noticeMessage" class="mb-4 flex items-center gap-2 border border-signal/30 bg-signal/10 px-4 py-3 text-sm text-signal"><Check class="h-4 w-4" />{{ noticeMessage }}</div>
 
       <div class="mb-5 inline-flex h-10 items-center border border-border bg-surface p-1" role="tablist">
-        <button class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'routes' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click="activeTab = 'routes'"><Route class="h-4 w-4" />{{ t('admin.modelProxy.routes.tab') }}</button>
-        <button class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'groups' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click="activeTab = 'groups'"><Layers3 class="h-4 w-4" />{{ t('admin.modelProxy.groups.tab') }}</button>
-        <button class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'proxies' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click="activeTab = 'proxies'"><Network class="h-4 w-4" />{{ t('admin.modelProxy.proxies.tab') }}</button>
+        <button type="button" role="tab" :aria-selected="activeTab === 'routes'" class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'routes' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click.stop="selectTab('routes')"><Route class="h-4 w-4" />{{ t('admin.modelProxy.routes.tab') }}</button>
+        <button type="button" role="tab" :aria-selected="activeTab === 'groups'" class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'groups' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click.stop="selectTab('groups')"><Layers3 class="h-4 w-4" />{{ t('admin.modelProxy.groups.tab') }}</button>
+        <button type="button" role="tab" :aria-selected="activeTab === 'proxies'" class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'proxies' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click.stop="selectTab('proxies')"><Network class="h-4 w-4" />{{ t('admin.modelProxy.proxies.tab') }}</button>
       </div>
 
       <div v-if="loading" class="flex min-h-64 items-center justify-center text-muted-foreground"><Loader2 class="mr-2 h-5 w-5 animate-spin" />{{ t('admin.modelProxy.loading') }}</div>

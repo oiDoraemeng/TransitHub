@@ -20,7 +20,7 @@ func (r *Repository) ListEgressProxies(ctx context.Context, userID, accountID st
 		return nil, err
 	}
 	defer rows.Close()
-	var result []EgressProxy
+	result := make([]EgressProxy, 0)
 	for rows.Next() {
 		proxy, scanErr := scanEgressProxy(rows)
 		if scanErr != nil {

@@ -228,7 +228,7 @@ func (r *Repository) ListSmartGroups(ctx context.Context, userID, accountID stri
 		return nil, err
 	}
 	defer rows.Close()
-	var groups []SmartGroup
+	groups := make([]SmartGroup, 0)
 	for rows.Next() {
 		var group SmartGroup
 		if err := rows.Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt); err != nil {
