@@ -523,11 +523,20 @@ func (s *Service) beginDelete(job CleanupJob) {
 }
 
 func (s *Service) processCleanupJob(ctx context.Context, job CleanupJob) {
+	if err := s.deleteCleanupJob(ctx, job); err != nil {
+		s.retryCleanup(ctx, job, err)
+		return
+	}
+	_ = s.repository.CompleteCleanupJob(ctx, job.ID)
+}
+
+// deleteCleanupJob performs one cleanup attempt and leaves retry scheduling to
+// the caller. A missing remote key is already in the desired terminal state.
+func (s *Service) deleteCleanupJob(ctx context.Context, job CleanupJob) error {
 	if job.RemoteKeyID == "" {
 		session, err := s.freshSession(ctx, job.SiteID)
 		if err != nil {
-			s.retryCleanup(ctx, job, err)
-			return
+			return err
 		}
 		key, err := s.platform.FindSub2APIKeyByName(session, job.RemoteKeyName)
 		if isUpstreamUnauthorized(err) {
@@ -537,15 +546,13 @@ func (s *Service) processCleanupJob(ctx context.Context, job CleanupJob) {
 			}
 		}
 		if err != nil {
-			s.retryCleanup(ctx, job, err)
-			return
+			return err
 		}
 		if key != nil {
 			job.RemoteKeyID = key.ID
 		}
 		if job.RemoteKeyID == "" {
-			_ = s.repository.CompleteCleanupJob(ctx, job.ID)
-			return
+			return nil
 		}
 	}
 	session, err := s.freshSession(ctx, job.SiteID)
@@ -559,10 +566,22 @@ func (s *Service) processCleanupJob(ctx context.Context, job CleanupJob) {
 		}
 	}
 	if err == nil || isUpstreamNotFound(err) {
-		_ = s.repository.CompleteCleanupJob(ctx, job.ID)
-		return
+		return nil
 	}
-	s.retryCleanup(ctx, job, err)
+	return err
+}
+
+// deleteCleanupJobNow is used by the SSE gate. It completes the remote-key
+// deletion before the first response event is released downstream.
+func (s *Service) deleteCleanupJobNow(job CleanupJob) error {
+	_ = s.repository.MarkCleanupPending(context.Background(), job.ID)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := s.deleteCleanupJob(ctx, job); err != nil {
+		s.retryCleanup(context.Background(), job, err)
+		return err
+	}
+	return s.repository.CompleteCleanupJob(context.Background(), job.ID)
 }
 
 func (s *Service) retryCleanup(ctx context.Context, job CleanupJob, cleanupErr error) {

@@ -1,6 +1,7 @@
 package model_proxy
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -10,14 +11,16 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"transithub/backend/internal/modules/upstream"
 )
 
 const (
-	memoryReplayLimit = 1 << 20
-	directMaxAttempts = 3
+	memoryReplayLimit  = 1 << 20
+	directMaxAttempts  = 3
+	firstSSEEventLimit = 1 << 20
 )
 
 func (s *Service) PublicHandler() http.Handler {
@@ -241,10 +244,91 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 		s.beginDelete(cleanupJob)
 		return nil, true, err
 	}
-	// http.Client.Do returns after response headers are available. Trigger deletion before any header/body is sent downstream.
-	s.beginDelete(cleanupJob)
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
+	// http.Client.Do returns after response headers are available. For a successful
+	// SSE response, defer cleanup until the first complete event has arrived, then
+	// delete synchronously before the event is exposed to the downstream client.
+	// This removes the timing dependency on downstream/TCP buffering when testing
+	// an in-flight streaming request. Retryable and non-streaming responses retain
+	// the asynchronous cleanup path.
+	if !retryable && isEventStream(response.Header) {
+		response.Body = newCleanupGateBody(response.Body, func() error {
+			return s.deleteCleanupJobNow(cleanupJob)
+		})
+	} else {
+		s.beginDelete(cleanupJob)
+	}
 	return response, retryable, nil
+}
+
+func isEventStream(header http.Header) bool {
+	return strings.Contains(strings.ToLower(header.Get("Content-Type")), "text/event-stream")
+}
+
+var errSSEEventTooLarge = errors.New("first SSE event exceeds limit")
+
+// cleanupGateBody holds the first complete SSE event in the proxy until the
+// cleanup callback succeeds. The response headers may already be visible to
+// the client, but no response body bytes are written before the callback.
+type cleanupGateBody struct {
+	source      *bufio.Reader
+	close       io.Closer
+	onGate      func() error
+	once        sync.Once
+	gateErr     error
+	pending     []byte
+	terminalErr error
+}
+
+func newCleanupGateBody(source io.ReadCloser, onGate func() error) io.ReadCloser {
+	return &cleanupGateBody{
+		source: bufio.NewReaderSize(source, 32*1024),
+		close:  source,
+		onGate: onGate,
+	}
+}
+
+func (b *cleanupGateBody) Read(p []byte) (int, error) {
+	b.once.Do(func() {
+		b.pending, b.terminalErr = readFirstSSEEvent(b.source)
+		b.gateErr = b.onGate()
+	})
+	if b.gateErr != nil {
+		return 0, b.gateErr
+	}
+	if b.terminalErr != nil && !errors.Is(b.terminalErr, io.EOF) {
+		return 0, b.terminalErr
+	}
+	if len(b.pending) > 0 {
+		n := copy(p, b.pending)
+		b.pending = b.pending[n:]
+		return n, nil
+	}
+	if b.terminalErr != nil {
+		err := b.terminalErr
+		b.terminalErr = nil
+		return 0, err
+	}
+	return b.source.Read(p)
+}
+
+func (b *cleanupGateBody) Close() error {
+	return b.close.Close()
+}
+
+func readFirstSSEEvent(source *bufio.Reader) ([]byte, error) {
+	var event []byte
+	for len(event) < firstSSEEventLimit {
+		line, err := source.ReadBytes('\n')
+		event = append(event, line...)
+		if bytes.HasSuffix(event, []byte("\n\n")) || bytes.HasSuffix(event, []byte("\r\n\r\n")) {
+			return event, nil
+		}
+		if err != nil {
+			return event, err
+		}
+	}
+	return event, errSSEEventTooLarge
 }
 
 func (s *Service) writeUpstreamResponse(w http.ResponseWriter, response *http.Response) {

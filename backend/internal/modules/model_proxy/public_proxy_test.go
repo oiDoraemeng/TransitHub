@@ -1,6 +1,7 @@
 package model_proxy
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"net/http"
@@ -83,4 +84,53 @@ func TestReplayBodySpoolsAndLimits(t *testing.T) {
 		t.Fatalf("size error=%v", err)
 	}
 	_ = name
+}
+
+func TestCleanupGateBodyDeletesBeforeFirstEventIsReleased(t *testing.T) {
+	var cleanupCalls int
+	body := newCleanupGateBody(
+		io.NopCloser(strings.NewReader("data: first\n\n"+"data: second\n\n")),
+		func() error {
+			cleanupCalls++
+			return nil
+		},
+	)
+
+	first := make([]byte, len("data: first\n\n"))
+	n, err := body.Read(first)
+	if err != nil {
+		t.Fatalf("first Read error: %v", err)
+	}
+	if string(first[:n]) != "data: first\n\n" {
+		t.Fatalf("first event = %q", first[:n])
+	}
+	if cleanupCalls != 1 {
+		t.Fatalf("cleanup calls after first event = %d, want 1", cleanupCalls)
+	}
+
+	rest, err := io.ReadAll(body)
+	if err != nil {
+		t.Fatalf("remaining Read error: %v", err)
+	}
+	if string(rest) != "data: second\n\n" {
+		t.Fatalf("remaining events = %q", rest)
+	}
+}
+
+func TestReadFirstSSEEventPreservesBufferedBytes(t *testing.T) {
+	reader := bufio.NewReader(strings.NewReader("event: message\r\ndata: {}\r\n\r\nrest"))
+	event, err := readFirstSSEEvent(reader)
+	if err != nil {
+		t.Fatalf("readFirstSSEEvent error: %v", err)
+	}
+	if string(event) != "event: message\r\ndata: {}\r\n\r\n" {
+		t.Fatalf("event = %q", event)
+	}
+	rest, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("remaining reader error: %v", err)
+	}
+	if string(rest) != "rest" {
+		t.Fatalf("remaining reader = %q", rest)
+	}
 }
