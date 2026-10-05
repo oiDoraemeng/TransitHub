@@ -157,7 +157,7 @@ export default {
         tab: 'IP 管理', heading: '模型出口代理', description: '集中管理模型请求使用的出口 IP；未选择代理的路由始终直连。',
         add: '新增代理', edit: '编辑代理', count: '个代理', empty: '还没有模型出口代理。',
         name: '名称', endpoint: '代理地址', routes: '关联路由', testResult: '连通性', direct: '直连（不使用代理）',
-        url: '代理 URL', urlPlaceholder: 'http://用户名:密码@主机:端口', urlKeep: '留空则保留现有代理 URL',
+        url: '代理 URL', urlPlaceholder: "http://用户名:密码{'@'}主机:端口", urlKeep: '留空则保留现有代理 URL',
         urlHelp: '支持 HTTP、HTTPS、SOCKS5 和 SOCKS5H。凭据会加密保存，页面只显示不含凭据的地址。',
         formHelp: '代理仅用于模型列表、响应和聊天补全请求；Key 创建、查询和删除仍然直连。',
         testStatus: { untested: '未测试', healthy: '可用', failed: '不可用' }

@@ -157,7 +157,7 @@ export default {
         tab: 'IP management', heading: 'Model egress proxies', description: 'Manage model-request egress IPs. Routes without a selected proxy always connect directly.',
         add: 'Add proxy', edit: 'Edit proxy', count: 'proxies', empty: 'No model egress proxies yet.',
         name: 'Name', endpoint: 'Proxy endpoint', routes: 'Linked routes', testResult: 'Connectivity', direct: 'Direct (no proxy)',
-        url: 'Proxy URL', urlPlaceholder: 'http://username:password@host:port', urlKeep: 'Leave blank to keep the current proxy URL',
+        url: 'Proxy URL', urlPlaceholder: "http://username:password{'@'}host:port", urlKeep: 'Leave blank to keep the current proxy URL',
         urlHelp: 'HTTP, HTTPS, SOCKS5, and SOCKS5H are supported. Credentials are encrypted and never displayed.',
         formHelp: 'The proxy is used only for model listing, responses, and chat completions. Key creation, lookup, and deletion stay direct.',
         testStatus: { untested: 'Untested', healthy: 'Available', failed: 'Unavailable' }
