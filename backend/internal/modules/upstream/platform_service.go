@@ -1,6 +1,8 @@
 package upstream
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -1426,26 +1428,58 @@ func (s *PlatformService) CreateSub2APIKey(session Session, name string, groupID
 	if session.Platform != PlatformSub2API || strings.TrimSpace(session.AccessToken) == "" {
 		return "", "", newRequestError(ErrorAuth, PlatformSub2API)
 	}
-	response, err := s.httpClient.requestJSON(session.BaseURL+"/api/v1/keys", requestOptions{
+	customKey, err := generateSub2APICustomKey()
+	if err != nil {
+		return "", "", err
+	}
+	body := map[string]any{
+		"name":       name,
+		"group_id":   groupID,
+		"quota":      100,
+		"custom_key": customKey,
+	}
+	options := requestOptions{
 		AccessToken: session.AccessToken,
 		TokenType:   session.TokenType,
 		Method:      http.MethodPost,
-		Body: map[string]any{
-			"name":     name,
-			"group_id": groupID,
-			"quota":    100,
-		},
-	})
+		Body:        body,
+	}
+	response, err := s.httpClient.requestJSON(session.BaseURL+"/api/v1/keys", options)
+	usedCustomKey := true
+	if isSub2APICustomKeyValidationError(err) {
+		delete(body, "custom_key")
+		response, err = s.httpClient.requestJSON(session.BaseURL+"/api/v1/keys", options)
+		usedCustomKey = false
+	}
 	if err != nil {
 		return "", "", err
 	}
 	data := dataRecord(response.Payload)
 	keyID := groupID2(data)
-	key := firstString(data, []string{"key", "token", "api_key", "apiKey"})
-	if key == nil || *key == "" {
+	if returnedKey := firstString(data, []string{"key", "token", "api_key", "apiKey"}); returnedKey != nil && *returnedKey != "" && !isMaskedSub2APIKey(*returnedKey) {
+		return keyID, *returnedKey, nil
+	}
+	if !usedCustomKey {
 		return "", "", newRequestError(ErrorInvalidResponse, PlatformSub2API)
 	}
-	return keyID, *key, nil
+	return keyID, customKey, nil
+}
+
+func isSub2APICustomKeyValidationError(err error) bool {
+	requestErr, ok := err.(*RequestError)
+	return ok && (requestErr.StatusCode == http.StatusBadRequest || requestErr.StatusCode == http.StatusUnprocessableEntity)
+}
+
+func isMaskedSub2APIKey(value string) bool {
+	return strings.ContainsAny(value, "*•") || strings.Contains(value, "...")
+}
+
+func generateSub2APICustomKey() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate Sub2API custom key: %w", err)
+	}
+	return "th_" + base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
 // groupID2 从响应记录中提取 ID 并转为字符串，复用 groupID 的逻辑。
