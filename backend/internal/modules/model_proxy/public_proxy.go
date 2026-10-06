@@ -290,13 +290,19 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 		s.beginDelete(cleanupJob)
 		return nil, true, err
 	}
+	protocolRequest, err := adaptUpstreamProtocol(incoming, body)
+	if err != nil {
+		s.beginDelete(cleanupJob)
+		return nil, true, err
+	}
+	body = protocolRequest.body
 	baseURL := s.mustSiteBaseURL(incoming.Context(), route.SiteID)
 	if baseURL == "" {
 		body.Close()
 		s.beginDelete(cleanupJob)
 		return nil, true, errors.New("upstream site is unavailable")
 	}
-	request, err := http.NewRequestWithContext(incoming.Context(), incoming.Method, upstreamRequestURL(baseURL, incoming), body)
+	request, err := http.NewRequestWithContext(incoming.Context(), incoming.Method, strings.TrimRight(baseURL, "/")+protocolRequest.requestURI, body)
 	if err != nil {
 		body.Close()
 		s.beginDelete(cleanupJob)
@@ -311,6 +317,13 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 		return nil, true, err
 	}
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
+	if !retryable && protocolRequest.responseAdapter != nil {
+		if err := protocolRequest.responseAdapter(response); err != nil {
+			response.Body.Close()
+			s.beginDelete(cleanupJob)
+			return nil, true, err
+		}
+	}
 	// http.Client.Do returns after response headers are available. For a successful
 	// SSE response, defer cleanup until the first complete event has arrived, then
 	// delete synchronously before the event is exposed to the downstream client.
@@ -395,13 +408,6 @@ func readFirstSSEEvent(source *bufio.Reader) ([]byte, error) {
 		}
 	}
 	return event, errSSEEventTooLarge
-}
-
-// upstreamRequestURL keeps the public protocol endpoint and query string
-// intact. The Sub2API upstream is responsible for deriving provider-specific
-// endpoints such as Gemini /v1beta/models or Anthropic /v1/messages.
-func upstreamRequestURL(baseURL string, incoming *http.Request) string {
-	return strings.TrimRight(baseURL, "/") + incoming.URL.RequestURI()
 }
 
 func (s *Service) writeUpstreamResponse(w http.ResponseWriter, response *http.Response) {

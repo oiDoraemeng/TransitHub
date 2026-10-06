@@ -3,6 +3,7 @@ package model_proxy
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -41,12 +42,95 @@ func TestSupportedPublicEndpoint(t *testing.T) {
 	}
 }
 
-func TestUpstreamRequestURLPreservesInboundProtocolPath(t *testing.T) {
+func TestAdaptUpstreamProtocolConvertsGeminiGenerateContentToChat(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-pro:generateContent", nil)
+	adapted, err := adaptUpstreamProtocol(request, io.NopCloser(strings.NewReader(`{
+		"systemInstruction":{"parts":[{"text":"Be concise"}]},
+		"contents":[{"role":"user","parts":[{"text":"Hello"}]}],
+		"generationConfig":{"temperature":0.2,"maxOutputTokens":128}
+	}`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer adapted.body.Close()
+	if adapted.requestURI != "/v1/chat/completions" {
+		t.Fatalf("request URI=%q", adapted.requestURI)
+	}
+	var payload map[string]any
+	if err := json.NewDecoder(adapted.body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["model"] != "gemini-2.5-pro" || payload["stream"] != false {
+		t.Fatalf("converted payload=%#v", payload)
+	}
+	messages, ok := payload["messages"].([]any)
+	if !ok || len(messages) != 2 {
+		t.Fatalf("converted messages=%#v", payload["messages"])
+	}
+	if adapted.responseAdapter == nil {
+		t.Fatal("Gemini request must install response adapter")
+	}
+}
+
+func TestAdaptUpstreamProtocolKeepsGeminiStreamingNative(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse", nil)
-	got := upstreamRequestURL("https://upstream.example/api/", request)
-	want := "https://upstream.example/api/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse"
-	if got != want {
-		t.Fatalf("upstreamRequestURL()=%q want %q", got, want)
+	adapted, err := adaptUpstreamProtocol(request, io.NopCloser(strings.NewReader(`{"contents":[]}`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer adapted.body.Close()
+	want := "/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse"
+	if adapted.requestURI != want || adapted.responseAdapter != nil {
+		t.Fatalf("adapted request URI=%q adapter=%v", adapted.requestURI, adapted.responseAdapter != nil)
+	}
+}
+
+func TestAdaptUpstreamProtocolKeepsChatCompletionsForSub2API(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions?trace=true", nil)
+	adapted, err := adaptUpstreamProtocol(request, io.NopCloser(strings.NewReader(`{"model":"gemini-2.5-pro","messages":[]}`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer adapted.body.Close()
+	if adapted.requestURI != "/v1/chat/completions?trace=true" || adapted.responseAdapter != nil {
+		t.Fatalf("adapted request URI=%q adapter=%v", adapted.requestURI, adapted.responseAdapter != nil)
+	}
+}
+
+func TestChatCompletionsToGeminiResponse(t *testing.T) {
+	response := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     make(http.Header),
+		Body: io.NopCloser(strings.NewReader(`{
+			"id":"chatcmpl-1","model":"gemini-2.5-pro",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"Hello"},"finish_reason":"stop"}],
+			"usage":{"prompt_tokens":4,"completion_tokens":2,"total_tokens":6}
+		}`)),
+	}
+	if err := chatCompletionsToGemini(response, "fallback-model"); err != nil {
+		t.Fatal(err)
+	}
+	var payload struct {
+		Candidates []struct {
+			FinishReason string `json:"finishReason"`
+			Content      struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+		Usage struct {
+			Total int `json:"totalTokenCount"`
+		} `json:"usageMetadata"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Candidates) != 1 || payload.Candidates[0].FinishReason != "STOP" || payload.Candidates[0].Content.Parts[0].Text != "Hello" {
+		t.Fatalf("Gemini response=%#v", payload)
+	}
+	if payload.Usage.Total != 6 {
+		t.Fatalf("total tokens=%d", payload.Usage.Total)
 	}
 }
 
