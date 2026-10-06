@@ -427,7 +427,7 @@ func (s *Server) Handler() http.Handler {
 
 	return s.logRequests(s.cors(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.setSecurityHeaders(w, r)
-		if r.URL.Path == "/v1" || strings.HasPrefix(r.URL.Path, "/v1/") {
+		if isModelProxyPath(r.URL.Path) {
 			s.modelProxyHandler.ServeHTTP(w, r)
 			return
 		}
@@ -445,6 +445,10 @@ func (s *Server) Handler() http.Handler {
 		}
 		s.mux.ServeHTTP(w, r)
 	})))
+}
+
+func isModelProxyPath(path string) bool {
+	return path == "/v1" || strings.HasPrefix(path, "/v1/") || path == "/v1beta" || strings.HasPrefix(path, "/v1beta/")
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {

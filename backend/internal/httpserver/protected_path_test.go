@@ -6,6 +6,19 @@ import (
 	"testing"
 )
 
+func TestIsModelProxyPathIncludesSupportedProtocols(t *testing.T) {
+	for _, path := range []string{"/v1/models", "/v1/responses/compact", "/v1/messages", "/v1beta/models/gemini-2.5-pro:generateContent"} {
+		if !isModelProxyPath(path) {
+			t.Fatalf("expected %s to enter model proxy handler", path)
+		}
+	}
+	for _, path := range []string{"/v1betaish/models", "/v2/models"} {
+		if isModelProxyPath(path) {
+			t.Fatalf("unexpected model proxy match for %s", path)
+		}
+	}
+}
+
 func TestProtectedPathIncludesMassEmailPrefix(t *testing.T) {
 	server := &Server{}
 	for _, path := range []string{"/api/mass-email", "/api/mass-email/users", "/api/mass-email/batches/batch-1/items"} {

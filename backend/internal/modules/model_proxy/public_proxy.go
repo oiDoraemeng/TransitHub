@@ -29,12 +29,12 @@ func (s *Service) PublicHandler() http.Handler {
 
 func (s *Service) handlePublic(w http.ResponseWriter, r *http.Request) {
 	if !supportedPublicEndpoint(r.Method, r.URL.Path) {
-		writeOpenAIError(w, http.StatusNotFound, "unsupported_endpoint", "only /v1/models, /v1/responses and /v1/chat/completions are supported")
+		writeOpenAIError(w, http.StatusNotFound, "unsupported_endpoint", "only /v1/models, /v1/chat/completions, /v1/responses, /v1/responses/compact, /v1/messages and /v1beta/models/* are supported")
 		return
 	}
-	token := bearerToken(r.Header.Get("Authorization"))
+	token := publicAPIKey(r.Header)
 	if token == "" {
-		writeOpenAIError(w, http.StatusUnauthorized, "invalid_api_key", "missing Bearer API key")
+		writeOpenAIError(w, http.StatusUnauthorized, "invalid_api_key", "missing API key")
 		return
 	}
 	target, err := s.ResolvePublicTarget(r.Context(), token)
@@ -51,6 +51,10 @@ func (s *Service) handlePublic(w http.ResponseWriter, r *http.Request) {
 		s.writeGroupModels(w, target.Group)
 		return
 	}
+	if r.Method == http.MethodGet && r.URL.Path == "/v1beta/models" && target.Group != nil {
+		s.writeGroupGeminiModels(w, target.Group)
+		return
+	}
 	if target.Route != nil {
 		s.proxyDirect(w, r, *target.Route)
 		return
@@ -59,8 +63,41 @@ func (s *Service) handlePublic(w http.ResponseWriter, r *http.Request) {
 }
 
 func supportedPublicEndpoint(method, path string) bool {
-	return (method == http.MethodGet && path == "/v1/models") ||
-		(method == http.MethodPost && (path == "/v1/responses" || path == "/v1/chat/completions"))
+	if strings.HasPrefix(path, "/v1beta/") {
+		return supportedGeminiEndpoint(method, path)
+	}
+	if method == http.MethodGet {
+		return path == "/v1/models"
+	}
+	if method == http.MethodPost {
+		switch path {
+		case "/v1/chat/completions", "/v1/responses", "/v1/responses/compact", "/v1/messages":
+			return true
+		}
+	}
+	return false
+}
+
+func supportedGeminiEndpoint(method, path string) bool {
+	const modelsPath = "/v1beta/models"
+	if path == modelsPath {
+		return method == http.MethodGet
+	}
+	if !strings.HasPrefix(path, modelsPath+"/") {
+		return false
+	}
+	modelAction := strings.TrimPrefix(path, modelsPath+"/")
+	if modelAction == "" || strings.Contains(modelAction, "/") {
+		return false
+	}
+	if method == http.MethodGet {
+		return !strings.Contains(modelAction, ":")
+	}
+	model, action, ok := strings.Cut(modelAction, ":")
+	if method != http.MethodPost || !ok || strings.TrimSpace(model) == "" {
+		return false
+	}
+	return action == "generateContent" || action == "streamGenerateContent"
 }
 
 func (s *Service) writeGroupModels(w http.ResponseWriter, group *SmartGroup) {
@@ -79,6 +116,21 @@ func (s *Service) writeGroupModels(w http.ResponseWriter, group *SmartGroup) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(ModelsResponse{Object: "list", Data: data})
+}
+
+func (s *Service) writeGroupGeminiModels(w http.ResponseWriter, group *SmartGroup) {
+	models := make([]map[string]any, 0, len(group.Models))
+	for _, model := range group.Models {
+		id := strings.TrimPrefix(model.ID, "models/")
+		models = append(models, map[string]any{
+			"name":                       "models/" + id,
+			"baseModelId":                id,
+			"displayName":                id,
+			"supportedGenerationMethods": []string{"generateContent", "streamGenerateContent"},
+		})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"models": models})
 }
 
 func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, route Route) {
@@ -155,7 +207,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		return
 	}
 	defer replay.Close()
-	modelID, err := replay.ModelID()
+	modelID, err := requestModelID(incoming, replay)
 	if err != nil || strings.TrimSpace(modelID) == "" {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "model is required")
 		return
@@ -210,6 +262,20 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	writeOpenAIError(w, http.StatusTooManyRequests, "smart_group_concurrency_exceeded", "all eligible smart group members are at capacity")
 }
 
+func requestModelID(incoming *http.Request, replay *replayBody) (string, error) {
+	const geminiModelsPrefix = "/v1beta/models/"
+	if strings.HasPrefix(incoming.URL.Path, geminiModelsPrefix) {
+		modelAction := strings.TrimPrefix(incoming.URL.Path, geminiModelsPrefix)
+		if separator := strings.IndexByte(modelAction, ':'); separator >= 0 {
+			modelAction = modelAction[:separator]
+		}
+		if modelID := strings.TrimSpace(strings.Trim(modelAction, "/")); modelID != "" {
+			return modelID, nil
+		}
+	}
+	return replay.ModelID()
+}
+
 func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error)) (*http.Response, bool, error) {
 	client, err := s.dataClientForRoute(incoming.Context(), route)
 	if err != nil {
@@ -230,7 +296,7 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 		s.beginDelete(cleanupJob)
 		return nil, true, errors.New("upstream site is unavailable")
 	}
-	request, err := http.NewRequestWithContext(incoming.Context(), incoming.Method, strings.TrimRight(baseURL, "/")+incoming.URL.RequestURI(), body)
+	request, err := http.NewRequestWithContext(incoming.Context(), incoming.Method, upstreamRequestURL(baseURL, incoming), body)
 	if err != nil {
 		body.Close()
 		s.beginDelete(cleanupJob)
@@ -331,6 +397,13 @@ func readFirstSSEEvent(source *bufio.Reader) ([]byte, error) {
 	return event, errSSEEventTooLarge
 }
 
+// upstreamRequestURL keeps the public protocol endpoint and query string
+// intact. The Sub2API upstream is responsible for deriving provider-specific
+// endpoints such as Gemini /v1beta/models or Anthropic /v1/messages.
+func upstreamRequestURL(baseURL string, incoming *http.Request) string {
+	return strings.TrimRight(baseURL, "/") + incoming.URL.RequestURI()
+}
+
 func (s *Service) writeUpstreamResponse(w http.ResponseWriter, response *http.Response) {
 	defer response.Body.Close()
 	copyResponseHeaders(w.Header(), response.Header)
@@ -370,13 +443,19 @@ var hopHeaders = map[string]struct{}{
 
 func copyRequestHeaders(destination, source http.Header) {
 	for key, values := range source {
-		if _, skip := hopHeaders[http.CanonicalHeaderKey(key)]; skip || strings.EqualFold(key, "Authorization") || strings.EqualFold(key, "Host") {
+		if _, skip := hopHeaders[http.CanonicalHeaderKey(key)]; skip || isCredentialHeader(key) || strings.EqualFold(key, "Host") {
 			continue
 		}
 		for _, value := range values {
 			destination.Add(key, value)
 		}
 	}
+}
+
+func isCredentialHeader(key string) bool {
+	return strings.EqualFold(key, "Authorization") ||
+		strings.EqualFold(key, "x-api-key") ||
+		strings.EqualFold(key, "x-goog-api-key")
 }
 
 func copyResponseHeaders(destination, source http.Header) {
@@ -396,6 +475,16 @@ func bearerToken(header string) string {
 		return ""
 	}
 	return parts[1]
+}
+
+func publicAPIKey(header http.Header) string {
+	if token := bearerToken(header.Get("Authorization")); token != "" {
+		return token
+	}
+	if token := strings.TrimSpace(header.Get("x-api-key")); token != "" {
+		return token
+	}
+	return strings.TrimSpace(header.Get("x-goog-api-key"))
 }
 
 func writeOpenAIError(w http.ResponseWriter, status int, code, message string) {
