@@ -21,7 +21,15 @@ func TestSupportedPublicEndpoint(t *testing.T) {
 		{http.MethodPost, "/v1/responses/compact", true},
 		{http.MethodPost, "/v1/chat/completions", true},
 		{http.MethodPost, "/v1/messages", true},
-		{http.MethodGet, "/v1beta/models", false},
+		{http.MethodGet, "/v1beta/models", true},
+		{http.MethodGet, "/v1beta/models/gemini-2.5-pro", true},
+		{http.MethodPost, "/v1beta/models/gemini-2.5-pro:generateContent", true},
+		{http.MethodPost, "/v1beta/models/gemini-2.5-pro:streamGenerateContent", true},
+		{http.MethodPost, "/v1beta/models", false},
+		{http.MethodPost, "/v1beta/models/gemini-2.5-pro", false},
+		{http.MethodPost, "/v1beta/models/gemini-2.5-pro:delete", false},
+		{http.MethodPost, "/v1beta/models/gemini-2.5-pro/other:generateContent", false},
+		{http.MethodPost, "/v1beta/files", false},
 		{http.MethodGet, "/v1/chat/completions", false},
 		{http.MethodPost, "/v1/embeddings", false},
 	}
@@ -33,11 +41,60 @@ func TestSupportedPublicEndpoint(t *testing.T) {
 }
 
 func TestUpstreamRequestURLPreservesInboundProtocolPath(t *testing.T) {
-	request := httptest.NewRequest(http.MethodPost, "/v1/messages?beta=true", nil)
+	request := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse", nil)
 	got := upstreamRequestURL("https://upstream.example/api/", request)
-	want := "https://upstream.example/api/v1/messages?beta=true"
+	want := "https://upstream.example/api/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse"
 	if got != want {
 		t.Fatalf("upstreamRequestURL()=%q want %q", got, want)
+	}
+}
+
+func TestRequestModelIDSupportsGeminiPath(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-pro:generateContent", nil)
+	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"contents":[]}`)), 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replay.Close()
+	modelID, err := requestModelID(request, replay)
+	if err != nil || modelID != "gemini-2.5-pro" {
+		t.Fatalf("requestModelID()=%q err=%v", modelID, err)
+	}
+}
+
+func TestPublicAPIKeySupportsNativeProtocolHeaders(t *testing.T) {
+	tests := []struct {
+		name   string
+		header http.Header
+		want   string
+	}{
+		{name: "openai", header: http.Header{"Authorization": []string{"Bearer openai-key"}}, want: "openai-key"},
+		{name: "anthropic", header: http.Header{"X-Api-Key": []string{"claude-key"}}, want: "claude-key"},
+		{name: "gemini", header: http.Header{"X-Goog-Api-Key": []string{"gemini-key"}}, want: "gemini-key"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := publicAPIKey(test.header); got != test.want {
+				t.Fatalf("publicAPIKey()=%q want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestCopyRequestHeadersRemovesClientCredentials(t *testing.T) {
+	source := http.Header{
+		"Authorization":  []string{"Bearer client-key"},
+		"X-Api-Key":      []string{"claude-key"},
+		"X-Goog-Api-Key": []string{"gemini-key"},
+		"Anthropic-Beta": []string{"feature"},
+	}
+	destination := make(http.Header)
+	copyRequestHeaders(destination, source)
+	if destination.Get("Authorization") != "" || destination.Get("X-Api-Key") != "" || destination.Get("X-Goog-Api-Key") != "" {
+		t.Fatal("client credentials must not be forwarded upstream")
+	}
+	if got := destination.Get("Anthropic-Beta"); got != "feature" {
+		t.Fatalf("protocol header=%q want feature", got)
 	}
 }
 
