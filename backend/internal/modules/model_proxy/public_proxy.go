@@ -312,31 +312,46 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 	if err != nil {
 		return nil, true, err
 	}
-	secret, cleanupJob, err := s.createRemoteKey(incoming.Context(), route)
+	var secret string
+	var cleanupJob CleanupJob
+	needsCleanup := !route.UseProvidedKey
+	if route.UseProvidedKey {
+		if s.cipher == nil || !s.cipher.Available() || strings.TrimSpace(route.UpstreamKeyCiphertext) == "" {
+			return nil, true, errors.New("prepared upstream key is unavailable")
+		}
+		secret, err = s.cipher.Decrypt(route.UpstreamKeyCiphertext)
+	} else {
+		secret, cleanupJob, err = s.createRemoteKey(incoming.Context(), route)
+	}
 	if err != nil {
 		return nil, true, err
 	}
+	cleanup := func() {
+		if needsCleanup {
+			s.beginDelete(cleanupJob)
+		}
+	}
 	body, err := bodyFactory()
 	if err != nil {
-		s.beginDelete(cleanupJob)
+		cleanup()
 		return nil, true, err
 	}
 	protocolRequest, err := adaptUpstreamProtocol(incoming, body)
 	if err != nil {
-		s.beginDelete(cleanupJob)
+		cleanup()
 		return nil, true, err
 	}
 	body = protocolRequest.body
 	baseURL := s.mustSiteBaseURL(incoming.Context(), route.SiteID)
 	if baseURL == "" {
 		body.Close()
-		s.beginDelete(cleanupJob)
+		cleanup()
 		return nil, true, errors.New("upstream site is unavailable")
 	}
 	request, err := http.NewRequestWithContext(incoming.Context(), incoming.Method, strings.TrimRight(baseURL, "/")+protocolRequest.requestURI, body)
 	if err != nil {
 		body.Close()
-		s.beginDelete(cleanupJob)
+		cleanup()
 		return nil, true, err
 	}
 	copyRequestHeaders(request.Header, incoming.Header)
@@ -344,14 +359,14 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 	request.Header.Set("User-Agent", upstream.BrowserUserAgent)
 	response, err := client.Do(request)
 	if err != nil {
-		s.beginDelete(cleanupJob)
+		cleanup()
 		return nil, true, err
 	}
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
 	if !retryable && protocolRequest.responseAdapter != nil {
 		if err := protocolRequest.responseAdapter(response); err != nil {
 			response.Body.Close()
-			s.beginDelete(cleanupJob)
+			cleanup()
 			return nil, true, err
 		}
 	}
@@ -361,12 +376,12 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 	// This removes the timing dependency on downstream/TCP buffering when testing
 	// an in-flight streaming request. Retryable and non-streaming responses retain
 	// the asynchronous cleanup path.
-	if !retryable && isEventStream(response.Header) {
+	if !retryable && isEventStream(response.Header) && needsCleanup {
 		response.Body = newCleanupGateBody(response.Body, func() error {
 			return s.deleteCleanupJobNow(cleanupJob)
 		})
 	} else {
-		s.beginDelete(cleanupJob)
+		cleanup()
 	}
 	return response, retryable, nil
 }

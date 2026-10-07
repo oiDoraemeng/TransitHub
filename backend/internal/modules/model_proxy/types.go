@@ -26,14 +26,17 @@ type Route struct {
 	CleanupPending    int    `json:"cleanupPending"`
 	// Member policies are populated only when this route is loaded through a
 	// smart-group membership. They are intentionally not route-level settings.
-	StreamOnly        bool       `json:"streamOnly,omitempty"`
-	MinInputTokens    int        `json:"minInputTokens,omitempty"`
-	RequestsPerMinute int        `json:"requestsPerMinute,omitempty"`
-	Priority          int        `json:"priority,omitempty"`
-	ModelSyncedAt     *time.Time `json:"modelSyncedAt"`
-	ModelSyncError    string     `json:"modelSyncError"`
-	CreatedAt         time.Time  `json:"createdAt"`
-	UpdatedAt         time.Time  `json:"updatedAt"`
+	StreamOnly            bool       `json:"streamOnly,omitempty"`
+	MinInputTokens        int        `json:"minInputTokens,omitempty"`
+	RequestsPerMinute     int        `json:"requestsPerMinute,omitempty"`
+	Priority              int        `json:"priority,omitempty"`
+	UseProvidedKey        bool       `json:"useProvidedKey,omitempty"`
+	UpstreamKeyPreview    string     `json:"upstreamKeyPreview,omitempty"`
+	UpstreamKeyCiphertext string     `json:"-"`
+	ModelSyncedAt         *time.Time `json:"modelSyncedAt"`
+	ModelSyncError        string     `json:"modelSyncError"`
+	CreatedAt             time.Time  `json:"createdAt"`
+	UpdatedAt             time.Time  `json:"updatedAt"`
 }
 
 type EgressProxy struct {
@@ -138,7 +141,8 @@ type EgressProxyTestResult struct {
 
 type CreateSmartGroupRequest struct {
 	Name       string   `json:"name"`
-	MemberKeys []string `json:"memberKeys"`
+	MemberKeys []string `json:"memberKeys,omitempty"`
+	RouteIDs   []string `json:"routeIds,omitempty"`
 	Enabled    *bool    `json:"enabled,omitempty"`
 }
 
@@ -148,14 +152,17 @@ type UpdateSmartGroupRequest struct {
 }
 
 type AddMemberRequest struct {
-	EntryKey string `json:"entryKey"`
+	RouteID  string `json:"routeId,omitempty"`
+	EntryKey string `json:"entryKey,omitempty"`
 }
 
 type UpdateMemberPolicyRequest struct {
-	StreamOnly        *bool `json:"streamOnly,omitempty"`
-	MinInputTokens    *int  `json:"minInputTokens,omitempty"`
-	RequestsPerMinute *int  `json:"requestsPerMinute,omitempty"`
-	Priority          *int  `json:"priority,omitempty"`
+	StreamOnly        *bool  `json:"streamOnly,omitempty"`
+	MinInputTokens    *int   `json:"minInputTokens,omitempty"`
+	RequestsPerMinute *int   `json:"requestsPerMinute,omitempty"`
+	Priority          *int   `json:"priority,omitempty"`
+	UseProvidedKey    *bool  `json:"useProvidedKey,omitempty"`
+	UpstreamKey       string `json:"upstreamKey,omitempty"`
 }
 
 type KeyResponse struct {

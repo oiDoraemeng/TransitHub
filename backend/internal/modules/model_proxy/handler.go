@@ -330,11 +330,11 @@ func (h *Handler) addMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input AddMemberRequest
-	if err := httpjson.Decode(r, &input); err != nil || strings.TrimSpace(input.EntryKey) == "" {
-		httpjson.WriteError(w, 400, "entryKey is required")
+	if err := httpjson.Decode(r, &input); err != nil || (strings.TrimSpace(input.RouteID) == "" && strings.TrimSpace(input.EntryKey) == "") {
+		httpjson.WriteError(w, 400, "routeId or entryKey is required")
 		return
 	}
-	if err := h.service.AddMember(r.Context(), userID, r.PathValue("id"), input.EntryKey); err != nil {
+	if err := h.service.AddMember(r.Context(), userID, r.PathValue("id"), input.RouteID, input.EntryKey); err != nil {
 		h.writeError(w, err)
 		return
 	}

@@ -19,6 +19,8 @@ export interface ProxyRoute {
   minInputTokens?: number
   requestsPerMinute?: number
   priority?: number
+  useProvidedKey?: boolean
+  upstreamKeyPreview?: string
   modelSyncedAt: string | null
   modelSyncError: string
   createdAt: string
@@ -85,7 +87,8 @@ export interface ModelEgressProxyTestResult {
 
 export interface SmartGroupInput {
   name: string
-  memberKeys: string[]
+  memberKeys?: string[]
+  routeIds?: string[]
   enabled: boolean
 }
 
@@ -94,6 +97,8 @@ export interface SmartGroupMemberPolicyInput {
   minInputTokens: number
   requestsPerMinute: number
   priority: number
+  useProvidedKey: boolean
+  upstreamKey?: string
 }
 
 export interface KeyResponse {

@@ -149,7 +149,7 @@ export default {
       groups: {
         tab: 'Smart groups', heading: 'Smart groups', description: 'Use one key for every member model and combine available concurrency.',
         add: 'Add smart group', edit: 'Edit smart group', empty: 'No smart groups yet.', formHelp: 'Members must be regular proxy keys in the current workspace.',
-        selectRoutes: 'Select existing proxy routes', pasteKeys: 'Or paste durable entry keys', pastePlaceholder: 'One sk-th-... key per line',
+        selectRoutes: 'Select existing proxy routes', memberRoute: 'Proxy route', selectMemberRoute: 'Select a route to add', noAvailableMemberRoutes: 'No enabled proxy routes are available to add.',
         members: 'Member routes', models: 'Model catalog', modelsPending: 'The model catalog is syncing automatically.',
         modelCapacity: 'Effective concurrency {count}', entryKey: 'Regular durable entry key', addMember: 'Add member',
         policy: {
@@ -159,6 +159,9 @@ export default {
           minInputSummary: 'Input of at least {count} tokens', rpm: 'Requests per minute', priority: 'Member priority',
           priorityHelp: 'Higher values are selected first; capacity is used as the tie-breaker.', prioritySummary: 'Priority {count}',
           rpmHelp: '0 is unlimited. Once reached, this member is skipped for the rest of the minute.', rpmSummary: 'Up to {count} per minute',
+          useProvidedKey: 'Use a prepared upstream key (no temporary key)', providedKey: 'Prepared upstream key',
+          providedKeyHelp: 'This member uses the prepared key for model calls without creating or deleting a temporary key. Leave blank to keep the saved key.',
+          providedKeyError: 'An upstream key is required when prepared-key mode is enabled.', providedKeySummary: 'Prepared key {preview}',
           default: 'No member restrictions'
         }
       },
@@ -178,7 +181,7 @@ export default {
       key: { newRoute: 'New proxy route key', newGroup: 'New smart group key', storeSafely: 'This key can be revealed here again. Do not share it with untrusted clients.' },
       confirm: { deleteRoute: 'Delete proxy route “{name}”?', deleteGroup: 'Delete smart group “{name}”?', deleteProxy: 'Delete model egress proxy “{name}”?', removeMember: 'Remove “{name}” from this smart group?', rotateKey: 'The old key stops working immediately after rotation. Continue?' },
       notices: { routeUpdated: 'Proxy route updated', groupUpdated: 'Smart group updated', memberPolicyUpdated: 'Member policy updated', proxyCreated: 'Model egress proxy created', proxyUpdated: 'Model egress proxy updated', proxyTested: 'Proxy test passed. Exit IP: {ip}', copied: 'Key copied' },
-      errors: { network: 'Network connection failed.', request: 'Model proxy request failed.' }
+      errors: { network: 'Network connection failed.', request: 'Model proxy request failed.', copy: 'Copy failed. Check browser clipboard permissions.' }
     },
     leaderboard: {
       eyebrow: 'Usage ranking',

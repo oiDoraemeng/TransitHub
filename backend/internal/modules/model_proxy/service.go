@@ -299,12 +299,31 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 		return SmartGroup{}, "", err
 	}
 	input.Name = strings.TrimSpace(input.Name)
-	if input.Name == "" || len(input.MemberKeys) == 0 {
-		return SmartGroup{}, "", &requestError{Status: 400, Message: "name and at least one member key are required"}
+	if input.Name == "" {
+		return SmartGroup{}, "", &requestError{Status: 400, Message: "name is required"}
 	}
-	routeIDs := make([]string, 0, len(input.MemberKeys))
+	routeIDs := make([]string, 0, len(input.RouteIDs)+len(input.MemberKeys))
 	seen := make(map[string]struct{})
+	for _, routeID := range input.RouteIDs {
+		routeID = strings.TrimSpace(routeID)
+		if routeID == "" {
+			continue
+		}
+		route, routeErr := s.repository.GetRoute(ctx, routeID)
+		if routeErr != nil || route == nil || route.UserID != userID || route.AdminAccountID != accountID {
+			return SmartGroup{}, "", &requestError{Status: 400, Message: "one or more member routes are invalid"}
+		}
+		if _, exists := seen[routeID]; exists {
+			continue
+		}
+		seen[routeID] = struct{}{}
+		routeIDs = append(routeIDs, routeID)
+	}
 	for _, entryKey := range input.MemberKeys {
+		entryKey = strings.TrimSpace(entryKey)
+		if entryKey == "" {
+			continue
+		}
 		routeID, resolveErr := s.repository.ResolveRouteKey(ctx, hashKey(entryKey), userID, accountID)
 		if resolveErr != nil {
 			return SmartGroup{}, "", &requestError{Status: 400, Message: "one or more member keys are invalid"}
@@ -314,6 +333,9 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 		}
 		seen[routeID] = struct{}{}
 		routeIDs = append(routeIDs, routeID)
+	}
+	if len(routeIDs) == 0 {
+		return SmartGroup{}, "", &requestError{Status: 400, Message: "at least one member route is required"}
 	}
 	groupID, err := randomID("pgroup_")
 	if err != nil {
@@ -373,14 +395,23 @@ func (s *Service) DeleteSmartGroup(ctx context.Context, userID, groupID string) 
 	return s.repository.DeleteSmartGroup(ctx, userID, accountID, groupID)
 }
 
-func (s *Service) AddMember(ctx context.Context, userID, groupID, entryKey string) error {
+func (s *Service) AddMember(ctx context.Context, userID, groupID, routeID, entryKey string) error {
 	accountID, err := s.currentWorkspace(ctx, userID)
 	if err != nil {
 		return err
 	}
-	routeID, err := s.repository.ResolveRouteKey(ctx, hashKey(entryKey), userID, accountID)
-	if err != nil {
-		return &requestError{Status: 400, Message: "entry key is not a route key in this workspace"}
+	routeID = strings.TrimSpace(routeID)
+	if routeID == "" {
+		entryKey = strings.TrimSpace(entryKey)
+		routeID, err = s.repository.ResolveRouteKey(ctx, hashKey(entryKey), userID, accountID)
+		if err != nil {
+			return &requestError{Status: 400, Message: "entry key is not a route key in this workspace"}
+		}
+	} else {
+		route, routeErr := s.repository.GetRoute(ctx, routeID)
+		if routeErr != nil || route == nil || route.UserID != userID || route.AdminAccountID != accountID {
+			return &requestError{Status: 400, Message: "route is not available in this workspace"}
+		}
 	}
 	if err := s.repository.AddMember(ctx, userID, accountID, groupID, routeID); err != nil {
 		return err
@@ -414,11 +445,47 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	if input.Priority != nil && *input.Priority < 0 {
 		return &requestError{Status: 400, Message: "priority cannot be negative"}
 	}
-	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil {
+	input.UpstreamKey = strings.TrimSpace(input.UpstreamKey)
+	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
+	var keyCiphertext, keyPreviewValue *string
+	if input.UpstreamKey != "" {
+		if input.UseProvidedKey != nil && !*input.UseProvidedKey {
+			return &requestError{Status: 400, Message: "useProvidedKey must be enabled when upstreamKey is provided"}
+		}
+		if s.cipher == nil || !s.cipher.Available() {
+			return errEncryptionKeyUnavailable
+		}
+		ciphertext, encryptErr := s.cipher.Encrypt(input.UpstreamKey)
+		if encryptErr != nil {
+			return encryptErr
+		}
+		preview := keyPreview(input.UpstreamKey)
+		keyCiphertext = &ciphertext
+		keyPreviewValue = &preview
+		if input.UseProvidedKey == nil {
+			enabled := true
+			input.UseProvidedKey = &enabled
+		}
+	}
+	if input.UseProvidedKey != nil && *input.UseProvidedKey && keyCiphertext == nil {
+		hasKey, lookupErr := s.repository.MemberHasProvidedKey(ctx, userID, accountID, groupID, routeID)
+		if lookupErr != nil {
+			return lookupErr
+		}
+		if !hasKey {
+			return &requestError{Status: 400, Message: "upstreamKey is required when useProvidedKey is enabled"}
+		}
+	}
+	if input.UseProvidedKey != nil && !*input.UseProvidedKey {
+		empty := ""
+		keyCiphertext = &empty
+		keyPreviewValue = &empty
+	}
 	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
-		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority)
+		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
+		input.UseProvidedKey, keyCiphertext, keyPreviewValue)
 }
 
 func (s *Service) RevealKey(ctx context.Context, userID, ownerType, ownerID string) (KeyResponse, error) {

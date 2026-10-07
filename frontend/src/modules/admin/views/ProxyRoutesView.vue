@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  Activity, Check, ChevronDown, ChevronRight, Clipboard, Eye, KeyRound, Layers3,
+  Activity, Check, ChevronDown, ChevronRight, Clipboard, Layers3,
   Loader2, Network, Pencil, PlugZap, Plus, RefreshCw, Route, Trash2, Users, X,
 } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
@@ -49,15 +49,17 @@ const editingSmartGroupId = ref('')
 const smartName = ref('')
 const smartEnabled = ref(true)
 const selectedRouteIds = ref<string[]>([])
-const pastedMemberKeys = ref('')
 
 const memberModalGroup = ref<ProxySmartGroup | null>(null)
-const memberKey = ref('')
+const memberRouteId = ref('')
 const memberPolicyTarget = ref<{ group: ProxySmartGroup; route: ProxyRoute } | null>(null)
-const memberPolicyForm = reactive({ streamOnly: false, minInputTokens: 0, requestsPerMinute: 0, priority: 0 })
-const keyModal = reactive({ open: false, title: '', key: '' })
+const memberPolicyForm = reactive({ streamOnly: false, minInputTokens: 0, requestsPerMinute: 0, priority: 0, useProvidedKey: false, upstreamKey: '' })
 
 const enabledRoutes = computed(() => routes.value.filter(route => route.enabled))
+const availableMemberRoutes = computed(() => {
+  const existing = new Set(memberModalGroup.value?.members.map(member => member.id) ?? [])
+  return enabledRoutes.value.filter(route => !existing.has(route.id))
+})
 
 const friendlyError = (error: unknown) => {
   const message = error instanceof Error ? error.message : 'admin.modelProxy.errors.request'
@@ -137,7 +139,7 @@ const submitRoute = async () => {
       flash(t('admin.modelProxy.notices.routeUpdated'))
     } else {
       const created = await createProxyRoute({ ...routeForm })
-      showKey(t('admin.modelProxy.key.newRoute'), created.key)
+      await copyText(created.key)
     }
     routeModalOpen.value = false
     await loadAll(true)
@@ -246,7 +248,6 @@ const openCreateSmart = () => {
   smartName.value = ''
   smartEnabled.value = true
   selectedRouteIds.value = []
-  pastedMemberKeys.value = ''
   smartModalOpen.value = true
 }
 
@@ -255,7 +256,6 @@ const openEditSmart = (group: ProxySmartGroup) => {
   smartName.value = group.name
   smartEnabled.value = group.enabled
   selectedRouteIds.value = group.members.map(member => member.id)
-  pastedMemberKeys.value = ''
   smartModalOpen.value = true
 }
 
@@ -267,10 +267,8 @@ const submitSmart = async () => {
       await updateProxySmartGroup(editingSmartGroupId.value, { name: smartName.value.trim(), enabled: smartEnabled.value })
       flash(t('admin.modelProxy.notices.groupUpdated'))
     } else {
-      const selectedKeys = await Promise.all(selectedRouteIds.value.map(id => revealProxyRouteKey(id).then(result => result.key)))
-      const pasted = pastedMemberKeys.value.split(/\r?\n|,/).map(value => value.trim()).filter(Boolean)
-      const created = await createProxySmartGroup({ name: smartName.value.trim(), enabled: smartEnabled.value, memberKeys: [...new Set([...selectedKeys, ...pasted])] })
-      showKey(t('admin.modelProxy.key.newGroup'), created.key)
+      const created = await createProxySmartGroup({ name: smartName.value.trim(), enabled: smartEnabled.value, routeIds: [...selectedRouteIds.value] })
+      await copyText(created.key)
     }
     smartModalOpen.value = false
     await loadAll(true)
@@ -295,12 +293,12 @@ const removeSmart = async (group: ProxySmartGroup) => {
 }
 
 const submitMember = async () => {
-  if (!memberModalGroup.value || !memberKey.value.trim()) return
+  if (!memberModalGroup.value || !memberRouteId.value) return
   saving.value = true
   try {
-    await addProxySmartGroupMember(memberModalGroup.value.id, memberKey.value.trim())
+    await addProxySmartGroupMember(memberModalGroup.value.id, { routeId: memberRouteId.value })
     memberModalGroup.value = null
-    memberKey.value = ''
+    memberRouteId.value = ''
     await loadAll(true)
   } catch (error) { errorMessage.value = friendlyError(error) } finally { saving.value = false }
 }
@@ -312,6 +310,8 @@ const openMemberPolicy = (group: ProxySmartGroup, route: ProxyRoute) => {
     minInputTokens: route.minInputTokens ?? 0,
     requestsPerMinute: route.requestsPerMinute ?? 0,
     priority: route.priority ?? 0,
+    useProvidedKey: route.useProvidedKey ?? false,
+    upstreamKey: '',
   })
 }
 
@@ -322,10 +322,21 @@ const submitMemberPolicy = async () => {
     errorMessage.value = t('admin.modelProxy.groups.policy.minInputError')
     return
   }
+  if (memberPolicyForm.useProvidedKey && !memberPolicyForm.upstreamKey.trim() && !target.route.upstreamKeyPreview) {
+    errorMessage.value = t('admin.modelProxy.groups.policy.providedKeyError')
+    return
+  }
   saving.value = true
   errorMessage.value = ''
   try {
-    await updateProxySmartGroupMemberPolicy(target.group.id, target.route.id, { ...memberPolicyForm })
+    await updateProxySmartGroupMemberPolicy(target.group.id, target.route.id, {
+      streamOnly: memberPolicyForm.streamOnly,
+      minInputTokens: memberPolicyForm.minInputTokens,
+      requestsPerMinute: memberPolicyForm.requestsPerMinute,
+      priority: memberPolicyForm.priority,
+      useProvidedKey: memberPolicyForm.useProvidedKey,
+      upstreamKey: memberPolicyForm.upstreamKey.trim() || undefined,
+    })
     memberPolicyTarget.value = null
     flash(t('admin.modelProxy.notices.memberPolicyUpdated'))
     await loadAll(true)
@@ -340,12 +351,17 @@ const removeMember = async (group: ProxySmartGroup, route: ProxyRoute) => {
   } catch (error) { errorMessage.value = friendlyError(error) }
 }
 
-const showKey = (title: string, key: string) => Object.assign(keyModal, { open: true, title, key })
+const copyText = async (value: string) => {
+  try {
+    await navigator.clipboard.writeText(value)
+    flash(t('admin.modelProxy.notices.copied'))
+  } catch { errorMessage.value = t('admin.modelProxy.errors.copy') }
+}
 
-const revealKey = async (owner: ProxyRoute | ProxySmartGroup, type: 'route' | 'group') => {
+const copyOwnerKey = async (owner: ProxyRoute | ProxySmartGroup, type: 'route' | 'group') => {
   try {
     const result = type === 'route' ? await revealProxyRouteKey(owner.id) : await revealProxySmartGroupKey(owner.id)
-    showKey(owner.name, result.key)
+    await copyText(result.key)
   } catch (error) { errorMessage.value = friendlyError(error) }
 }
 
@@ -353,14 +369,9 @@ const rotateKey = async (owner: ProxyRoute | ProxySmartGroup, type: 'route' | 'g
   if (!window.confirm(t('admin.modelProxy.confirm.rotateKey'))) return
   try {
     const result = type === 'route' ? await rotateProxyRouteKey(owner.id) : await rotateProxySmartGroupKey(owner.id)
-    showKey(owner.name, result.key)
+    await copyText(result.key)
     await loadAll(true)
   } catch (error) { errorMessage.value = friendlyError(error) }
-}
-
-const copyKey = async () => {
-  await navigator.clipboard.writeText(keyModal.key)
-  flash(t('admin.modelProxy.notices.copied'))
 }
 
 const toggleExpanded = (id: string) => {
@@ -423,7 +434,7 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
                 <td class="px-4 py-3"><span>{{ routeItem.modelCount }}</span><span v-if="routeItem.modelSyncError" class="ml-2 text-xs text-warning" :title="routeItem.modelSyncError">{{ t('admin.modelProxy.stale') }}</span></td>
                 <td class="px-4 py-3 font-mono text-xs text-muted-foreground">{{ routeItem.keyPreview }}</td>
                 <td class="px-4 py-3"><button class="inline-flex items-center gap-2" @click="toggleRoute(routeItem)"><span class="h-2 w-2 rounded-full" :class="routeItem.enabled ? 'bg-signal' : 'bg-muted-foreground'" />{{ routeItem.enabled ? t('admin.modelProxy.enabled') : t('admin.modelProxy.disabled') }}</button><div v-if="routeItem.cleanupPending" class="mt-1 text-xs text-warning">{{ t('admin.modelProxy.cleanup.routePending', { count: routeItem.cleanupPending }) }}</div></td>
-                <td class="px-4 py-3"><div class="flex justify-end gap-1"><button class="icon-button" :title="t('admin.modelProxy.actions.reveal')" @click="revealKey(routeItem, 'route')"><Eye /></button><button class="icon-button" :title="t('admin.modelProxy.actions.rotate')" @click="rotateKey(routeItem, 'route')"><RefreshCw /></button><button class="icon-button" :title="t('admin.modelProxy.actions.edit')" @click="openEditRoute(routeItem)"><Pencil /></button><button class="icon-button text-destructive" :title="t('admin.modelProxy.actions.delete')" @click="removeRoute(routeItem)"><Trash2 /></button></div></td>
+                <td class="px-4 py-3"><div class="flex justify-end gap-1"><button class="icon-button" :title="t('admin.modelProxy.actions.copy')" @click="copyOwnerKey(routeItem, 'route')"><Clipboard /></button><button class="icon-button" :title="t('admin.modelProxy.actions.rotate')" @click="rotateKey(routeItem, 'route')"><RefreshCw /></button><button class="icon-button" :title="t('admin.modelProxy.actions.edit')" @click="openEditRoute(routeItem)"><Pencil /></button><button class="icon-button text-destructive" :title="t('admin.modelProxy.actions.delete')" @click="removeRoute(routeItem)"><Trash2 /></button></div></td>
               </tr>
             </tbody>
           </table>
@@ -439,10 +450,10 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
               <button class="flex min-w-0 items-center gap-3 text-left" @click="toggleExpanded(group.id)"><ChevronDown v-if="expandedGroups.has(group.id)" class="h-4 w-4 shrink-0" /><ChevronRight v-else class="h-4 w-4 shrink-0" /><div class="min-w-0"><div class="truncate font-medium">{{ group.name }}</div><div class="mt-1 truncate font-mono text-xs text-muted-foreground">{{ group.keyPreview }}</div></div></button>
               <div><div class="text-xs text-muted-foreground">{{ t('admin.modelProxy.table.concurrency') }}</div><div class="mt-1 font-mono text-lg">{{ group.totalConcurrency }}</div></div>
               <div class="flex gap-5 text-sm"><span><Users class="mr-1 inline h-4 w-4 text-muted-foreground" />{{ group.members.length }}</span><span><Layers3 class="mr-1 inline h-4 w-4 text-muted-foreground" />{{ group.models.length }}</span><button @click="toggleSmart(group)"><span class="mr-1 inline-block h-2 w-2 rounded-full" :class="group.enabled ? 'bg-signal' : 'bg-muted-foreground'" />{{ group.enabled ? t('admin.modelProxy.enabled') : t('admin.modelProxy.disabled') }}</button></div>
-              <div class="flex justify-end gap-1"><button class="icon-button" :title="t('admin.modelProxy.actions.addMember')" @click="memberModalGroup = group"><Plus /></button><button class="icon-button" :title="t('admin.modelProxy.actions.reveal')" @click="revealKey(group, 'group')"><Eye /></button><button class="icon-button" :title="t('admin.modelProxy.actions.rotate')" @click="rotateKey(group, 'group')"><RefreshCw /></button><button class="icon-button" :title="t('admin.modelProxy.actions.edit')" @click="openEditSmart(group)"><Pencil /></button><button class="icon-button text-destructive" :title="t('admin.modelProxy.actions.delete')" @click="removeSmart(group)"><Trash2 /></button></div>
+              <div class="flex justify-end gap-1"><button class="icon-button" :title="t('admin.modelProxy.actions.addMember')" @click="memberRouteId = ''; memberModalGroup = group"><Plus /></button><button class="icon-button" :title="t('admin.modelProxy.actions.copy')" @click="copyOwnerKey(group, 'group')"><Clipboard /></button><button class="icon-button" :title="t('admin.modelProxy.actions.rotate')" @click="rotateKey(group, 'group')"><RefreshCw /></button><button class="icon-button" :title="t('admin.modelProxy.actions.edit')" @click="openEditSmart(group)"><Pencil /></button><button class="icon-button text-destructive" :title="t('admin.modelProxy.actions.delete')" @click="removeSmart(group)"><Trash2 /></button></div>
             </div>
             <div v-if="expandedGroups.has(group.id)" class="grid gap-6 border-t border-border bg-surface/30 px-5 py-5 lg:grid-cols-2">
-              <div><h4 class="mb-3 text-sm font-medium">{{ t('admin.modelProxy.groups.members') }}</h4><div class="space-y-2"><div v-for="member in group.members" :key="member.id" class="flex items-center justify-between gap-3 border-b border-border/50 pb-2 text-sm"><div class="min-w-0"><span class="font-medium">{{ member.name }}</span><span class="ml-2 text-muted-foreground">{{ member.groupName }}</span><div class="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground"><span>{{ t('admin.modelProxy.groups.policy.prioritySummary', { count: member.priority ?? 0 }) }}</span><span v-if="member.streamOnly">{{ t('admin.modelProxy.groups.policy.streamOnly') }}</span><span v-if="member.minInputTokens">{{ t('admin.modelProxy.groups.policy.minInputSummary', { count: member.minInputTokens }) }}</span><span v-if="member.requestsPerMinute">{{ t('admin.modelProxy.groups.policy.rpmSummary', { count: member.requestsPerMinute }) }}</span><span v-if="!member.streamOnly && !member.minInputTokens && !member.requestsPerMinute && !member.priority">{{ t('admin.modelProxy.groups.policy.default') }}</span></div></div><div class="flex shrink-0 items-center gap-2"><span class="font-mono text-xs">{{ member.activeConcurrency }}/{{ member.concurrencyLimit }}</span><button class="icon-button" :title="t('admin.modelProxy.groups.policy.edit')" @click="openMemberPolicy(group, member)"><Pencil /></button><button class="text-destructive" :title="t('admin.modelProxy.actions.removeMember')" @click="removeMember(group, member)"><X class="h-4 w-4" /></button></div></div></div></div>
+              <div><h4 class="mb-3 text-sm font-medium">{{ t('admin.modelProxy.groups.members') }}</h4><div class="space-y-2"><div v-for="member in group.members" :key="member.id" class="flex items-center justify-between gap-3 border-b border-border/50 pb-2 text-sm"><div class="min-w-0"><span class="font-medium">{{ member.name }}</span><span class="ml-2 text-muted-foreground">{{ member.groupName }}</span><div class="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground"><span>{{ t('admin.modelProxy.groups.policy.prioritySummary', { count: member.priority ?? 0 }) }}</span><span v-if="member.streamOnly">{{ t('admin.modelProxy.groups.policy.streamOnly') }}</span><span v-if="member.minInputTokens">{{ t('admin.modelProxy.groups.policy.minInputSummary', { count: member.minInputTokens }) }}</span><span v-if="member.requestsPerMinute">{{ t('admin.modelProxy.groups.policy.rpmSummary', { count: member.requestsPerMinute }) }}</span><span v-if="member.useProvidedKey">{{ t('admin.modelProxy.groups.policy.providedKeySummary', { preview: member.upstreamKeyPreview || '***' }) }}</span><span v-if="!member.streamOnly && !member.minInputTokens && !member.requestsPerMinute && !member.priority && !member.useProvidedKey">{{ t('admin.modelProxy.groups.policy.default') }}</span></div></div><div class="flex shrink-0 items-center gap-2"><span class="font-mono text-xs">{{ member.activeConcurrency }}/{{ member.concurrencyLimit }}</span><button class="icon-button" :title="t('admin.modelProxy.groups.policy.edit')" @click="openMemberPolicy(group, member)"><Pencil /></button><button class="text-destructive" :title="t('admin.modelProxy.actions.removeMember')" @click="removeMember(group, member)"><X class="h-4 w-4" /></button></div></div></div></div>
               <div><h4 class="mb-3 text-sm font-medium">{{ t('admin.modelProxy.groups.models') }}</h4><div class="max-h-56 overflow-y-auto"><div v-for="model in group.models" :key="model.id" class="flex items-center justify-between border-b border-border/50 py-2 text-sm"><span class="font-mono text-xs">{{ model.id }}</span><span class="text-xs text-muted-foreground">{{ t('admin.modelProxy.groups.modelCapacity', { count: model.effectiveConcurrency }) }}</span></div><p v-if="!group.models.length" class="text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.modelsPending') }}</p></div></div>
             </div>
           </article>
@@ -503,13 +514,12 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
         </form>
       </div>
 
-      <div v-if="smartModalOpen" class="modal-backdrop" @click.self="smartModalOpen = false"><form class="modal-panel max-w-2xl" @submit.prevent="submitSmart"><div class="modal-header"><div><h3 class="font-semibold">{{ editingSmartGroupId ? t('admin.modelProxy.groups.edit') : t('admin.modelProxy.groups.add') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.formHelp') }}</p></div><button type="button" @click="smartModalOpen = false"><X class="h-5 w-5" /></button></div><div class="space-y-5 p-5"><label class="field"><span>{{ t('admin.modelProxy.form.name') }}</span><input v-model="smartName" required /></label><label class="flex items-center gap-3 text-sm"><input v-model="smartEnabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.form.enabled') }}</label><template v-if="!editingSmartGroupId"><fieldset><legend class="mb-2 text-sm font-medium">{{ t('admin.modelProxy.groups.selectRoutes') }}</legend><div class="max-h-48 divide-y divide-border overflow-y-auto border border-border"><label v-for="routeItem in enabledRoutes" :key="routeItem.id" class="flex items-center justify-between gap-3 px-3 py-2 text-sm"><span><span class="font-medium">{{ routeItem.name }}</span><span class="ml-2 text-muted-foreground">{{ routeItem.keyPreview }}</span></span><input v-model="selectedRouteIds" type="checkbox" :value="routeItem.id" class="h-4 w-4" /></label></div></fieldset><label class="field"><span>{{ t('admin.modelProxy.groups.pasteKeys') }}</span><textarea v-model="pastedMemberKeys" rows="3" :placeholder="t('admin.modelProxy.groups.pastePlaceholder')" /></label></template></div><div class="modal-actions"><Button type="button" variant="ghost" @click="smartModalOpen = false">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving || (!editingSmartGroupId && !selectedRouteIds.length && !pastedMemberKeys.trim())"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div></form></div>
+      <div v-if="smartModalOpen" class="modal-backdrop" @click.self="smartModalOpen = false"><form class="modal-panel max-w-2xl" @submit.prevent="submitSmart"><div class="modal-header"><div><h3 class="font-semibold">{{ editingSmartGroupId ? t('admin.modelProxy.groups.edit') : t('admin.modelProxy.groups.add') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.formHelp') }}</p></div><button type="button" @click="smartModalOpen = false"><X class="h-5 w-5" /></button></div><div class="space-y-5 p-5"><label class="field"><span>{{ t('admin.modelProxy.form.name') }}</span><input v-model="smartName" required /></label><label class="flex items-center gap-3 text-sm"><input v-model="smartEnabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.form.enabled') }}</label><template v-if="!editingSmartGroupId"><fieldset><legend class="mb-2 text-sm font-medium">{{ t('admin.modelProxy.groups.selectRoutes') }}</legend><div class="max-h-48 divide-y divide-border overflow-y-auto border border-border"><label v-for="routeItem in enabledRoutes" :key="routeItem.id" class="flex items-center justify-between gap-3 px-3 py-2 text-sm"><span><span class="font-medium">{{ routeItem.name }}</span><span class="ml-2 text-muted-foreground">{{ routeItem.keyPreview }}</span></span><input v-model="selectedRouteIds" type="checkbox" :value="routeItem.id" class="h-4 w-4" /></label></div></fieldset></template></div><div class="modal-actions"><Button type="button" variant="ghost" @click="smartModalOpen = false">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving || (!editingSmartGroupId && !selectedRouteIds.length)"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div></form></div>
 
-      <div v-if="memberModalGroup" class="modal-backdrop" @click.self="memberModalGroup = null"><form class="modal-panel max-w-lg" @submit.prevent="submitMember"><div class="modal-header"><div><h3 class="font-semibold">{{ t('admin.modelProxy.actions.addMember') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ memberModalGroup.name }}</p></div><button type="button" @click="memberModalGroup = null"><X class="h-5 w-5" /></button></div><div class="p-5"><label class="field"><span>{{ t('admin.modelProxy.groups.entryKey') }}</span><input v-model="memberKey" type="password" required placeholder="sk-th-..." /></label></div><div class="modal-actions"><Button type="button" variant="ghost" @click="memberModalGroup = null">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving">{{ t('admin.modelProxy.groups.addMember') }}</Button></div></form></div>
+      <div v-if="memberModalGroup" class="modal-backdrop" @click.self="memberModalGroup = null"><form class="modal-panel max-w-lg" @submit.prevent="submitMember"><div class="modal-header"><div><h3 class="font-semibold">{{ t('admin.modelProxy.actions.addMember') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ memberModalGroup.name }}</p></div><button type="button" @click="memberModalGroup = null"><X class="h-5 w-5" /></button></div><div class="space-y-3 p-5"><label class="field"><span>{{ t('admin.modelProxy.groups.memberRoute') }}</span><select v-model="memberRouteId" required><option value="" disabled>{{ t('admin.modelProxy.groups.selectMemberRoute') }}</option><option v-for="routeItem in availableMemberRoutes" :key="routeItem.id" :value="routeItem.id">{{ routeItem.name }} · {{ routeItem.siteName }} / {{ routeItem.groupName }}</option></select></label><p v-if="!availableMemberRoutes.length" class="text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.noAvailableMemberRoutes') }}</p></div><div class="modal-actions"><Button type="button" variant="ghost" @click="memberModalGroup = null">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving || !memberRouteId">{{ t('admin.modelProxy.groups.addMember') }}</Button></div></form></div>
 
-      <div v-if="memberPolicyTarget" class="modal-backdrop" @click.self="memberPolicyTarget = null"><form class="modal-panel max-w-lg" @submit.prevent="submitMemberPolicy"><div class="modal-header"><div><h3 class="font-semibold">{{ t('admin.modelProxy.groups.policy.edit') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ memberPolicyTarget.route.name }} · {{ memberPolicyTarget.group.name }}</p></div><button type="button" @click="memberPolicyTarget = null"><X class="h-5 w-5" /></button></div><div class="space-y-5 p-5"><label class="field"><span>{{ t('admin.modelProxy.groups.policy.priority') }}</span><input v-model.number="memberPolicyForm.priority" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.priorityHelp') }}</small></label><label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.streamOnly" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.streamOnly') }}</label><label class="field"><span>{{ t('admin.modelProxy.groups.policy.minInput') }}</span><input v-model.number="memberPolicyForm.minInputTokens" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.minInputHelp') }}</small></label><label class="field"><span>{{ t('admin.modelProxy.groups.policy.rpm') }}</span><input v-model.number="memberPolicyForm.requestsPerMinute" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.rpmHelp') }}</small></label></div><div class="modal-actions"><Button type="button" variant="ghost" @click="memberPolicyTarget = null">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div></form></div>
+      <div v-if="memberPolicyTarget" class="modal-backdrop" @click.self="memberPolicyTarget = null"><form class="modal-panel max-w-lg" @submit.prevent="submitMemberPolicy"><div class="modal-header"><div><h3 class="font-semibold">{{ t('admin.modelProxy.groups.policy.edit') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ memberPolicyTarget.route.name }} · {{ memberPolicyTarget.group.name }}</p></div><button type="button" @click="memberPolicyTarget = null"><X class="h-5 w-5" /></button></div><div class="space-y-5 p-5"><label class="field"><span>{{ t('admin.modelProxy.groups.policy.priority') }}</span><input v-model.number="memberPolicyForm.priority" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.priorityHelp') }}</small></label><label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.streamOnly" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.streamOnly') }}</label><label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.useProvidedKey" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.useProvidedKey') }}</label><label v-if="memberPolicyForm.useProvidedKey" class="field"><span>{{ t('admin.modelProxy.groups.policy.providedKey') }}</span><input v-model="memberPolicyForm.upstreamKey" type="password" autocomplete="new-password" :placeholder="memberPolicyTarget.route.upstreamKeyPreview || 'sk-...'" /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.providedKeyHelp') }}</small></label><label class="field"><span>{{ t('admin.modelProxy.groups.policy.minInput') }}</span><input v-model.number="memberPolicyForm.minInputTokens" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.minInputHelp') }}</small></label><label class="field"><span>{{ t('admin.modelProxy.groups.policy.rpm') }}</span><input v-model.number="memberPolicyForm.requestsPerMinute" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.rpmHelp') }}</small></label></div><div class="modal-actions"><Button type="button" variant="ghost" @click="memberPolicyTarget = null">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div></form></div>
 
-      <div v-if="keyModal.open" class="modal-backdrop" @click.self="keyModal.open = false"><div class="modal-panel max-w-xl"><div class="modal-header"><div><h3 class="font-semibold">{{ keyModal.title }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.key.storeSafely') }}</p></div><button @click="keyModal.open = false"><X class="h-5 w-5" /></button></div><div class="p-5"><div class="flex items-center gap-2 border border-border bg-surface p-3"><KeyRound class="h-4 w-4 shrink-0 text-primary" /><code class="min-w-0 flex-1 break-all text-xs">{{ keyModal.key }}</code><button :title="t('admin.modelProxy.actions.copy')" @click="copyKey"><Clipboard class="h-4 w-4" /></button></div></div><div class="modal-actions"><Button @click="copyKey"><Clipboard class="h-4 w-4" />{{ t('admin.modelProxy.actions.copy') }}</Button></div></div></div>
     </Teleport>
   </div>
 </template>
