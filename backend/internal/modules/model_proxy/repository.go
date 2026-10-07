@@ -95,7 +95,7 @@ func scanRouteWithPolicy(row routeScanner) (Route, error) {
 		&route.ProxyID, &route.ProxyName,
 		&route.KeyPreview, &route.ModelCount, &route.CleanupPending, &route.ModelSyncedAt,
 		&route.ModelSyncError, &route.CreatedAt, &route.UpdatedAt,
-		&route.StreamOnly, &route.MinInputTokens, &route.RequestsPerMinute)
+		&route.StreamOnly, &route.MinInputTokens, &route.RequestsPerMinute, &route.Priority)
 	return route, err
 }
 
@@ -347,17 +347,18 @@ func (r *Repository) AddMember(ctx context.Context, userID, accountID, groupID, 
 	return nil
 }
 
-func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute *int) error {
+func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int) error {
 	result, err := r.db.Exec(ctx, `
 		UPDATE proxy_smart_group_members m
 		SET stream_only=COALESCE($5::boolean,m.stream_only),
 			min_input_tokens=COALESCE($6::integer,m.min_input_tokens),
-			requests_per_minute=COALESCE($7::integer,m.requests_per_minute)
+			requests_per_minute=COALESCE($7::integer,m.requests_per_minute),
+			priority=COALESCE($8::integer,m.priority)
 		FROM proxy_smart_groups g, proxy_routes r
 		WHERE m.smart_group_id=g.id AND g.id=$1 AND m.route_id=$2 AND r.id=m.route_id
 			AND g.user_id=$3 AND g.admin_account_id=$4
 			AND r.user_id=$3 AND r.admin_account_id=$4
-	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute)
+	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority)
 	if err != nil {
 		return err
 	}
@@ -401,7 +402,7 @@ func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enable
 			(SELECT count(*) FROM proxy_route_models mc WHERE mc.route_id=r.id),
 			(SELECT count(*) FROM proxy_cleanup_jobs j WHERE j.route_id=r.id AND j.status <> 'done'),
 			r.model_synced_at,r.model_sync_error,r.created_at,r.updated_at,
-			gm.stream_only,gm.min_input_tokens,gm.requests_per_minute
+			gm.stream_only,gm.min_input_tokens,gm.requests_per_minute,gm.priority
 		FROM proxy_smart_group_members gm JOIN proxy_routes r ON r.id=gm.route_id
 		LEFT JOIN upstream_sites s ON s.id=r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id

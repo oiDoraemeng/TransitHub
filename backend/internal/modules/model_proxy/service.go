@@ -411,11 +411,14 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	if input.RequestsPerMinute != nil && *input.RequestsPerMinute < 0 {
 		return &requestError{Status: 400, Message: "requestsPerMinute cannot be negative"}
 	}
-	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil {
+	if input.Priority != nil && *input.Priority < 0 {
+		return &requestError{Status: 400, Message: "priority cannot be negative"}
+	}
+	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
 	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
-		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute)
+		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority)
 }
 
 func (s *Service) RevealKey(ctx context.Context, userID, ownerType, ownerID string) (KeyResponse, error) {

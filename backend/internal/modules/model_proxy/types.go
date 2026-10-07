@@ -29,6 +29,7 @@ type Route struct {
 	StreamOnly        bool       `json:"streamOnly,omitempty"`
 	MinInputTokens    int        `json:"minInputTokens,omitempty"`
 	RequestsPerMinute int        `json:"requestsPerMinute,omitempty"`
+	Priority          int        `json:"priority,omitempty"`
 	ModelSyncedAt     *time.Time `json:"modelSyncedAt"`
 	ModelSyncError    string     `json:"modelSyncError"`
 	CreatedAt         time.Time  `json:"createdAt"`
@@ -154,6 +155,7 @@ type UpdateMemberPolicyRequest struct {
 	StreamOnly        *bool `json:"streamOnly,omitempty"`
 	MinInputTokens    *int  `json:"minInputTokens,omitempty"`
 	RequestsPerMinute *int  `json:"requestsPerMinute,omitempty"`
+	Priority          *int  `json:"priority,omitempty"`
 }
 
 type KeyResponse struct {

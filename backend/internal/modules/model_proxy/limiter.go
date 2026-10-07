@@ -54,6 +54,23 @@ type Lease struct {
 	stop    chan struct{}
 }
 
+type availableRoute struct {
+	route     Route
+	available int64
+}
+
+func sortAvailableRoutes(routes []availableRoute) {
+	sort.SliceStable(routes, func(i, j int) bool {
+		if routes[i].route.Priority == routes[j].route.Priority {
+			if routes[i].available == routes[j].available {
+				return routes[i].route.ID < routes[j].route.ID
+			}
+			return routes[i].available > routes[j].available
+		}
+		return routes[i].route.Priority > routes[j].route.Priority
+	})
+}
+
 func NewLimiter(client *redis.Client) *Limiter { return &Limiter{redis: client} }
 
 func leaseKey(routeID string) string { return "proxy:concurrency:{routes}:" + routeID }
@@ -96,10 +113,6 @@ func (l *Limiter) Acquire(ctx context.Context, route Route, leaseID string) (*Le
 }
 
 func (l *Limiter) AcquireBest(ctx context.Context, routes []Route, leaseID string) (*Lease, *Route, error) {
-	type availableRoute struct {
-		route     Route
-		available int64
-	}
 	available := make([]availableRoute, 0, len(routes))
 	for _, route := range routes {
 		active, err := l.Active(ctx, route.ID)
@@ -108,15 +121,10 @@ func (l *Limiter) AcquireBest(ctx context.Context, routes []Route, leaseID strin
 		}
 		available = append(available, availableRoute{route: route, available: int64(route.ConcurrencyLimit) - active})
 	}
-	sort.SliceStable(available, func(i, j int) bool {
-		if available[i].available == available[j].available {
-			return available[i].route.ID < available[j].route.ID
-		}
-		return available[i].available > available[j].available
-	})
+	sortAvailableRoutes(available)
 	if len(available) > 1 && available[0].available > 0 {
 		tied := 1
-		for tied < len(available) && available[tied].available == available[0].available {
+		for tied < len(available) && available[tied].route.Priority == available[0].route.Priority && available[tied].available == available[0].available {
 			tied++
 		}
 		if tied > 1 {

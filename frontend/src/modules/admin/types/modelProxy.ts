@@ -18,6 +18,7 @@ export interface ProxyRoute {
   streamOnly?: boolean
   minInputTokens?: number
   requestsPerMinute?: number
+  priority?: number
   modelSyncedAt: string | null
   modelSyncError: string
   createdAt: string
@@ -92,6 +93,7 @@ export interface SmartGroupMemberPolicyInput {
   streamOnly: boolean
   minInputTokens: number
   requestsPerMinute: number
+  priority: number
 }
 
 export interface KeyResponse {

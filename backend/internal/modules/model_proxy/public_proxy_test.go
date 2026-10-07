@@ -348,3 +348,15 @@ func TestReadFirstSSEEventPreservesBufferedBytes(t *testing.T) {
 		t.Fatalf("remaining reader = %q", rest)
 	}
 }
+
+func TestSortAvailableRoutesUsesMemberPriorityBeforeCapacity(t *testing.T) {
+	routes := []availableRoute{
+		{route: Route{ID: "low", Priority: 1}, available: 100},
+		{route: Route{ID: "high", Priority: 10}, available: 1},
+		{route: Route{ID: "same-capacity", Priority: 10}, available: 5},
+	}
+	sortAvailableRoutes(routes)
+	if routes[0].route.ID != "same-capacity" || routes[1].route.ID != "high" || routes[2].route.ID != "low" {
+		t.Fatalf("sorted routes=%v, want priority descending before capacity", []string{routes[0].route.ID, routes[1].route.ID, routes[2].route.ID})
+	}
+}
