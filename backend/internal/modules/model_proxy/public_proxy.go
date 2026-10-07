@@ -29,7 +29,7 @@ func (s *Service) PublicHandler() http.Handler {
 
 func (s *Service) handlePublic(w http.ResponseWriter, r *http.Request) {
 	if !supportedPublicEndpoint(r.Method, r.URL.Path) {
-		writeOpenAIError(w, http.StatusNotFound, "unsupported_endpoint", "only /v1/models, /v1/chat/completions, /v1/responses, /v1/responses/compact, /v1/messages and /v1beta/models/* are supported")
+		writeOpenAIError(w, http.StatusNotFound, "unsupported_endpoint", "only /v1/models, /v1/embeddings, /v1/chat/completions, /v1/responses, /v1/responses/compact, /v1/messages and /v1beta/models/* are supported")
 		return
 	}
 	token := publicAPIKey(r.Header)
@@ -71,7 +71,7 @@ func supportedPublicEndpoint(method, path string) bool {
 	}
 	if method == http.MethodPost {
 		switch path {
-		case "/v1/chat/completions", "/v1/responses", "/v1/responses/compact", "/v1/messages":
+		case "/v1/embeddings", "/v1/chat/completions", "/v1/responses", "/v1/responses/compact", "/v1/messages":
 			return true
 		}
 	}

@@ -21,6 +21,7 @@ func TestSupportedPublicEndpoint(t *testing.T) {
 		{http.MethodGet, "/v1/models", true},
 		{http.MethodPost, "/v1/responses", true},
 		{http.MethodPost, "/v1/responses/compact", true},
+		{http.MethodPost, "/v1/embeddings", true},
 		{http.MethodPost, "/v1/chat/completions", true},
 		{http.MethodPost, "/v1/messages", true},
 		{http.MethodGet, "/v1beta/models", true},
@@ -33,7 +34,7 @@ func TestSupportedPublicEndpoint(t *testing.T) {
 		{http.MethodPost, "/v1beta/models/gemini-2.5-pro/other:generateContent", false},
 		{http.MethodPost, "/v1beta/files", false},
 		{http.MethodGet, "/v1/chat/completions", false},
-		{http.MethodPost, "/v1/embeddings", false},
+		{http.MethodGet, "/v1/embeddings", false},
 	}
 	for _, test := range tests {
 		if got := supportedPublicEndpoint(test.method, test.path); got != test.want {
