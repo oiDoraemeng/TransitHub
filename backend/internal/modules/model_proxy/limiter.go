@@ -30,6 +30,19 @@ redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
 return redis.call('ZCARD', KEYS[1])
 `)
 
+var allowRequestScript = redis.NewScript(`
+local now = tonumber(ARGV[1])
+local cutoff = now - tonumber(ARGV[2])
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', cutoff)
+local count = redis.call('ZCARD', KEYS[1])
+if count >= tonumber(ARGV[3]) then
+  return 0
+end
+redis.call('ZADD', KEYS[1], now, ARGV[4])
+redis.call('PEXPIRE', KEYS[1], ARGV[2])
+return 1
+`)
+
 type Limiter struct {
 	redis *redis.Client
 }
@@ -44,6 +57,22 @@ type Lease struct {
 func NewLimiter(client *redis.Client) *Limiter { return &Limiter{redis: client} }
 
 func leaseKey(routeID string) string { return "proxy:concurrency:{routes}:" + routeID }
+
+func requestRateKey(groupID, routeID string) string {
+	return "proxy:requests:{" + groupID + ":" + routeID + "}"
+}
+
+func (l *Limiter) AllowRequestsPerMinute(ctx context.Context, groupID, routeID string, limit int, requestID string) (bool, error) {
+	if limit <= 0 {
+		return true, nil
+	}
+	result, err := allowRequestScript.Run(ctx, l.redis, []string{requestRateKey(groupID, routeID)},
+		time.Now().UnixMilli(), (time.Minute).Milliseconds(), limit, requestID).Int64()
+	if err != nil {
+		return false, err
+	}
+	return result == 1, nil
+}
 
 func (l *Limiter) Active(ctx context.Context, routeID string) (int64, error) {
 	result, err := activeLeaseScript.Run(ctx, l.redis, []string{leaseKey(routeID)}, time.Now().UnixMilli()).Int64()

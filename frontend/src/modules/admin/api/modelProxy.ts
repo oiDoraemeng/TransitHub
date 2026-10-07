@@ -11,6 +11,7 @@ import type {
   ProxySite,
   ProxySmartGroup,
   SmartGroupInput,
+  SmartGroupMemberPolicyInput,
 } from '../types/modelProxy'
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api'
@@ -70,6 +71,7 @@ export const createProxySmartGroup = (input: SmartGroupInput) => request<{ group
 export const updateProxySmartGroup = (id: string, input: { name?: string; enabled?: boolean }) => request<ProxySmartGroup>(`/proxy-smart-groups/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
 export const deleteProxySmartGroup = (id: string) => request<{ success: boolean }>(`/proxy-smart-groups/${id}`, { method: 'DELETE' })
 export const addProxySmartGroupMember = (id: string, entryKey: string) => request<{ success: boolean }>(`/proxy-smart-groups/${id}/members`, { method: 'POST', body: JSON.stringify({ entryKey }) })
+export const updateProxySmartGroupMemberPolicy = (id: string, routeId: string, input: Partial<SmartGroupMemberPolicyInput>) => request<{ success: boolean }>(`/proxy-smart-groups/${id}/members/${routeId}`, { method: 'PATCH', body: JSON.stringify(input) })
 export const removeProxySmartGroupMember = (id: string, routeId: string) => request<{ success: boolean }>(`/proxy-smart-groups/${id}/members/${routeId}`, { method: 'DELETE' })
 export const revealProxySmartGroupKey = (id: string) => request<KeyResponse>(`/proxy-smart-groups/${id}/key`)
 export const rotateProxySmartGroupKey = (id: string) => request<KeyResponse>(`/proxy-smart-groups/${id}/rotate-key`, { method: 'POST' })

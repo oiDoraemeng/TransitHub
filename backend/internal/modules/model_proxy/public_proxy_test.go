@@ -147,6 +147,35 @@ func TestRequestModelIDSupportsGeminiPath(t *testing.T) {
 	}
 }
 
+func TestRequestPolicyFactsEstimatesInputAndStreaming(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"model":"test","stream":true,"messages":[{"role":"user","content":"`+strings.Repeat("x", 8000)+`"}]}`)), 20000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replay.Close()
+	streaming, tokens, err := requestPolicyFacts(request, replay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !streaming || tokens < 2000 {
+		t.Fatalf("streaming=%v tokens=%d, want streaming and at least 2000 tokens", streaming, tokens)
+	}
+}
+
+func TestRequestPolicyFactsRecognizesNativeGeminiStream(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-test:streamGenerateContent?alt=sse", nil)
+	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"contents":[]}`)), 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replay.Close()
+	streaming, tokens, err := requestPolicyFacts(request, replay)
+	if err != nil || !streaming || tokens != 0 {
+		t.Fatalf("streaming=%v tokens=%d err=%v", streaming, tokens, err)
+	}
+}
+
 func TestPublicAPIKeySupportsNativeProtocolHeaders(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -269,6 +298,36 @@ func TestCleanupGateBodyDeletesBeforeFirstEventIsReleased(t *testing.T) {
 	if string(rest) != "data: second\n\n" {
 		t.Fatalf("remaining events = %q", rest)
 	}
+}
+
+func TestCleanupGateBodyStartsCleanupWhileWaitingForFirstEvent(t *testing.T) {
+	sourceReader, sourceWriter := io.Pipe()
+	cleanupStarted := make(chan struct{})
+	cleanupRelease := make(chan struct{})
+	body := newCleanupGateBody(sourceReader, func() error {
+		close(cleanupStarted)
+		<-cleanupRelease
+		return nil
+	})
+	readDone := make(chan error, 1)
+	go func() {
+		buffer := make([]byte, len("data: first\n\n"))
+		_, err := body.Read(buffer)
+		readDone <- err
+	}()
+	select {
+	case <-cleanupStarted:
+	case <-time.After(time.Second):
+		t.Fatal("cleanup did not start while waiting for the first event")
+	}
+	if _, err := sourceWriter.Write([]byte("data: first\n\n")); err != nil {
+		t.Fatal(err)
+	}
+	close(cleanupRelease)
+	if err := <-readDone; err != nil {
+		t.Fatal(err)
+	}
+	_ = body.Close()
 }
 
 func TestReadFirstSSEEventPreservesBufferedBytes(t *testing.T) {

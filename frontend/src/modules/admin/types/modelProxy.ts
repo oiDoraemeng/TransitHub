@@ -15,6 +15,9 @@ export interface ProxyRoute {
   keyPreview: string
   modelCount: number
   cleanupPending: number
+  streamOnly?: boolean
+  minInputTokens?: number
+  requestsPerMinute?: number
   modelSyncedAt: string | null
   modelSyncError: string
   createdAt: string
@@ -83,6 +86,12 @@ export interface SmartGroupInput {
   name: string
   memberKeys: string[]
   enabled: boolean
+}
+
+export interface SmartGroupMemberPolicyInput {
+  streamOnly: boolean
+  minInputTokens: number
+  requestsPerMinute: number
 }
 
 export interface KeyResponse {

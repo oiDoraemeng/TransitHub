@@ -225,9 +225,25 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		writeOpenAIError(w, http.StatusNotFound, "model_not_found", "no enabled smart group member supports this model")
 		return
 	}
+	streaming, inputTokens, _ := requestPolicyFacts(incoming, replay)
+	eligible := make([]Route, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate.StreamOnly && !streaming {
+			continue
+		}
+		if candidate.MinInputTokens > 0 && inputTokens < candidate.MinInputTokens {
+			continue
+		}
+		eligible = append(eligible, candidate)
+	}
+	if len(eligible) == 0 {
+		writeOpenAIError(w, http.StatusNotFound, "no_eligible_member", "no smart group member matches the request policy")
+		return
+	}
 	requestID, _ := randomID("req_")
-	remaining := append([]Route(nil), candidates...)
+	remaining := append([]Route(nil), eligible...)
 	var lastErr error
+	rateLimited := false
 	for len(remaining) > 0 {
 		lease, route, acquireErr := s.limiter.AcquireBest(incoming.Context(), remaining, requestID)
 		if acquireErr != nil {
@@ -238,6 +254,17 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			break
 		}
 		remaining = withoutRoute(remaining, route.ID)
+		allowed, rateErr := s.limiter.AllowRequestsPerMinute(incoming.Context(), group.ID, route.ID, route.RequestsPerMinute, requestID)
+		if rateErr != nil {
+			lease.Release(context.Background())
+			writeOpenAIError(w, http.StatusServiceUnavailable, "request_rate_backend_unavailable", "request rate service is unavailable")
+			return
+		}
+		if !allowed {
+			rateLimited = true
+			lease.Release(context.Background())
+			continue
+		}
 		response, retryable, attemptErr := s.performAttempt(incoming, *route, replay.Open)
 		if attemptErr != nil {
 			lastErr = attemptErr
@@ -259,6 +286,10 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		return
 	}
 	w.Header().Set("Retry-After", "1")
+	if rateLimited {
+		writeOpenAIError(w, http.StatusTooManyRequests, "smart_group_rate_limit_exceeded", "all eligible smart group members reached their per-minute request limit")
+		return
+	}
 	writeOpenAIError(w, http.StatusTooManyRequests, "smart_group_concurrency_exceeded", "all eligible smart group members are at capacity")
 }
 
@@ -369,8 +400,10 @@ func newCleanupGateBody(source io.ReadCloser, onGate func() error) io.ReadCloser
 
 func (b *cleanupGateBody) Read(p []byte) (int, error) {
 	b.once.Do(func() {
+		cleanupDone := make(chan error, 1)
+		go func() { cleanupDone <- b.onGate() }()
 		b.pending, b.terminalErr = readFirstSSEEvent(b.source)
-		b.gateErr = b.onGate()
+		b.gateErr = <-cleanupDone
 	})
 	if b.gateErr != nil {
 		return 0, b.gateErr
@@ -574,6 +607,54 @@ func (r *replayBody) ModelID() (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(value.Model), nil
+}
+
+func requestPolicyFacts(incoming *http.Request, replay *replayBody) (bool, int, error) {
+	if strings.HasSuffix(strings.TrimSpace(incoming.URL.Path), ":streamGenerateContent") || incoming.URL.Query().Get("alt") == "sse" {
+		return true, 0, nil
+	}
+	reader, err := replay.Open()
+	if err != nil {
+		return false, 0, err
+	}
+	defer reader.Close()
+	var payload any
+	if err := json.NewDecoder(reader).Decode(&payload); err != nil {
+		return false, 0, err
+	}
+	streaming := false
+	if object, ok := payload.(map[string]any); ok {
+		streaming, _ = object["stream"].(bool)
+	}
+	characters := 0
+	collectInputText(payload, "", &characters)
+	return streaming, (characters + 3) / 4, nil
+}
+
+func collectInputText(value any, key string, characters *int) {
+	switch current := value.(type) {
+	case string:
+		if isInputTextKey(key) {
+			*characters += len([]rune(current))
+		}
+	case []any:
+		for _, item := range current {
+			collectInputText(item, key, characters)
+		}
+	case map[string]any:
+		for childKey, child := range current {
+			collectInputText(child, childKey, characters)
+		}
+	}
+}
+
+func isInputTextKey(key string) bool {
+	switch strings.ToLower(key) {
+	case "content", "text", "input", "prompt", "parts", "messages", "systeminstruction":
+		return true
+	default:
+		return false
+	}
 }
 
 func (r *replayBody) Close() error {

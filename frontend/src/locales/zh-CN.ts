@@ -151,7 +151,15 @@ export default {
         add: '新增智能分组', edit: '编辑智能分组', empty: '还没有智能分组。', formHelp: '成员只能是当前工作区中的普通代理 Key。',
         selectRoutes: '选择现有代理路由', pasteKeys: '或粘贴长期入口 Key', pastePlaceholder: '每行一个 sk-th-... Key',
         members: '成员路由', models: '模型目录', modelsPending: '模型目录正在后台自动同步。',
-        modelCapacity: '有效并发 {count}', entryKey: '普通长期入口 Key', addMember: '添加成员'
+        modelCapacity: '有效并发 {count}', entryKey: '普通长期入口 Key', addMember: '添加成员',
+        policy: {
+          edit: '成员策略', streamOnly: '仅接收流式请求', minInput: '最少输入 Token',
+          minInputHelp: '0 表示不限；启用时至少为 2000，低于门槛会跳过此成员。',
+          minInputError: '最少输入 Token 必须为 0 或不低于 2000。',
+          minInputSummary: '输入不少于 {count} Token', rpm: '每分钟请求数',
+          rpmHelp: '0 表示不限；达到上限后本分钟内切换到其他成员。', rpmSummary: '每分钟最多 {count} 次',
+          default: '未设置成员限制'
+        }
       },
       proxies: {
         tab: 'IP 管理', heading: '模型出口代理', description: '集中管理模型请求使用的出口 IP；未选择代理的路由始终直连。',
@@ -168,7 +176,7 @@ export default {
       cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个正在自动重试', routePending: '{count} 个待清理' },
       key: { newRoute: '新代理路由 Key', newGroup: '新智能分组 Key', storeSafely: '此 Key 可随时在管理页再次查看，请勿发送给不可信客户端。' },
       confirm: { deleteRoute: '删除代理路由“{name}”？', deleteGroup: '删除智能分组“{name}”？', deleteProxy: '删除模型出口代理“{name}”？', removeMember: '从智能分组移除“{name}”？', rotateKey: '轮换后旧 Key 会立即失效，确认继续？' },
-      notices: { routeUpdated: '代理路由已更新', groupUpdated: '智能分组已更新', proxyCreated: '模型出口代理已创建', proxyUpdated: '模型出口代理已更新', proxyTested: '代理测试成功，出口 IP：{ip}', copied: 'Key 已复制' },
+      notices: { routeUpdated: '代理路由已更新', groupUpdated: '智能分组已更新', memberPolicyUpdated: '成员策略已更新', proxyCreated: '模型出口代理已创建', proxyUpdated: '模型出口代理已更新', proxyTested: '代理测试成功，出口 IP：{ip}', copied: 'Key 已复制' },
       errors: { network: '网络连接失败。', request: '模型代理请求失败。' }
     },
     leaderboard: {

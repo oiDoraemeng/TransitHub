@@ -38,6 +38,7 @@ func RegisterRoutes(mux *http.ServeMux, service *Service) {
 	mux.HandleFunc("PATCH /api/proxy-smart-groups/{id}", h.updateSmartGroup)
 	mux.HandleFunc("DELETE /api/proxy-smart-groups/{id}", h.deleteSmartGroup)
 	mux.HandleFunc("POST /api/proxy-smart-groups/{id}/members", h.addMember)
+	mux.HandleFunc("PATCH /api/proxy-smart-groups/{id}/members/{routeId}", h.updateMemberPolicy)
 	mux.HandleFunc("DELETE /api/proxy-smart-groups/{id}/members/{routeId}", h.removeMember)
 	mux.HandleFunc("GET /api/proxy-smart-groups/{id}/key", h.revealSmartGroupKey)
 	mux.HandleFunc("POST /api/proxy-smart-groups/{id}/rotate-key", h.rotateSmartGroupKey)
@@ -346,6 +347,23 @@ func (h *Handler) removeMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.service.RemoveMember(r.Context(), userID, r.PathValue("id"), r.PathValue("routeId")); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+func (h *Handler) updateMemberPolicy(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.userID(w, r)
+	if !ok {
+		return
+	}
+	var input UpdateMemberPolicyRequest
+	if err := httpjson.Decode(r, &input); err != nil {
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := h.service.UpdateMemberPolicy(r.Context(), userID, r.PathValue("id"), r.PathValue("routeId"), input); err != nil {
 		h.writeError(w, err)
 		return
 	}

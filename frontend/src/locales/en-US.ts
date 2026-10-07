@@ -151,7 +151,15 @@ export default {
         add: 'Add smart group', edit: 'Edit smart group', empty: 'No smart groups yet.', formHelp: 'Members must be regular proxy keys in the current workspace.',
         selectRoutes: 'Select existing proxy routes', pasteKeys: 'Or paste durable entry keys', pastePlaceholder: 'One sk-th-... key per line',
         members: 'Member routes', models: 'Model catalog', modelsPending: 'The model catalog is syncing automatically.',
-        modelCapacity: 'Effective concurrency {count}', entryKey: 'Regular durable entry key', addMember: 'Add member'
+        modelCapacity: 'Effective concurrency {count}', entryKey: 'Regular durable entry key', addMember: 'Add member',
+        policy: {
+          edit: 'Member policy', streamOnly: 'Accept streaming requests only', minInput: 'Minimum input tokens',
+          minInputHelp: '0 disables this rule. Set at least 2000; smaller requests skip this member.',
+          minInputError: 'Minimum input tokens must be 0 or at least 2000.',
+          minInputSummary: 'Input of at least {count} tokens', rpm: 'Requests per minute',
+          rpmHelp: '0 is unlimited. Once reached, this member is skipped for the rest of the minute.', rpmSummary: 'Up to {count} per minute',
+          default: 'No member restrictions'
+        }
       },
       proxies: {
         tab: 'IP management', heading: 'Model egress proxies', description: 'Manage model-request egress IPs. Routes without a selected proxy always connect directly.',
@@ -168,7 +176,7 @@ export default {
       cleanup: { pending: '{count} temporary keys pending cleanup', retrying: '{count} retrying automatically', routePending: '{count} pending cleanup' },
       key: { newRoute: 'New proxy route key', newGroup: 'New smart group key', storeSafely: 'This key can be revealed here again. Do not share it with untrusted clients.' },
       confirm: { deleteRoute: 'Delete proxy route “{name}”?', deleteGroup: 'Delete smart group “{name}”?', deleteProxy: 'Delete model egress proxy “{name}”?', removeMember: 'Remove “{name}” from this smart group?', rotateKey: 'The old key stops working immediately after rotation. Continue?' },
-      notices: { routeUpdated: 'Proxy route updated', groupUpdated: 'Smart group updated', proxyCreated: 'Model egress proxy created', proxyUpdated: 'Model egress proxy updated', proxyTested: 'Proxy test passed. Exit IP: {ip}', copied: 'Key copied' },
+      notices: { routeUpdated: 'Proxy route updated', groupUpdated: 'Smart group updated', memberPolicyUpdated: 'Member policy updated', proxyCreated: 'Model egress proxy created', proxyUpdated: 'Model egress proxy updated', proxyTested: 'Proxy test passed. Exit IP: {ip}', copied: 'Key copied' },
       errors: { network: 'Network connection failed.', request: 'Model proxy request failed.' }
     },
     leaderboard: {

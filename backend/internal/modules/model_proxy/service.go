@@ -397,6 +397,27 @@ func (s *Service) RemoveMember(ctx context.Context, userID, groupID, routeID str
 	return s.repository.RemoveMember(ctx, userID, accountID, groupID, routeID)
 }
 
+func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, routeID string, input UpdateMemberPolicyRequest) error {
+	accountID, err := s.currentWorkspace(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if input.MinInputTokens != nil && *input.MinInputTokens != 0 && *input.MinInputTokens < 2000 {
+		return &requestError{Status: 400, Message: "minInputTokens must be 0 or at least 2000"}
+	}
+	if input.MinInputTokens != nil && *input.MinInputTokens < 0 {
+		return &requestError{Status: 400, Message: "minInputTokens cannot be negative"}
+	}
+	if input.RequestsPerMinute != nil && *input.RequestsPerMinute < 0 {
+		return &requestError{Status: 400, Message: "requestsPerMinute cannot be negative"}
+	}
+	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil {
+		return &requestError{Status: 400, Message: "at least one member policy field is required"}
+	}
+	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
+		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute)
+}
+
 func (s *Service) RevealKey(ctx context.Context, userID, ownerType, ownerID string) (KeyResponse, error) {
 	accountID, err := s.currentWorkspace(ctx, userID)
 	if err != nil {

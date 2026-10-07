@@ -8,22 +8,27 @@ const (
 )
 
 type Route struct {
-	ID                string     `json:"id"`
-	UserID            string     `json:"-"`
-	AdminAccountID    string     `json:"-"`
-	Name              string     `json:"name"`
-	SiteID            string     `json:"siteId"`
-	SiteName          string     `json:"siteName"`
-	GroupID           string     `json:"groupId"`
-	GroupName         string     `json:"groupName"`
-	ConcurrencyLimit  int        `json:"concurrencyLimit"`
-	ActiveConcurrency int64      `json:"activeConcurrency"`
-	Enabled           bool       `json:"enabled"`
-	ProxyID           string     `json:"proxyId"`
-	ProxyName         string     `json:"proxyName"`
-	KeyPreview        string     `json:"keyPreview"`
-	ModelCount        int        `json:"modelCount"`
-	CleanupPending    int        `json:"cleanupPending"`
+	ID                string `json:"id"`
+	UserID            string `json:"-"`
+	AdminAccountID    string `json:"-"`
+	Name              string `json:"name"`
+	SiteID            string `json:"siteId"`
+	SiteName          string `json:"siteName"`
+	GroupID           string `json:"groupId"`
+	GroupName         string `json:"groupName"`
+	ConcurrencyLimit  int    `json:"concurrencyLimit"`
+	ActiveConcurrency int64  `json:"activeConcurrency"`
+	Enabled           bool   `json:"enabled"`
+	ProxyID           string `json:"proxyId"`
+	ProxyName         string `json:"proxyName"`
+	KeyPreview        string `json:"keyPreview"`
+	ModelCount        int    `json:"modelCount"`
+	CleanupPending    int    `json:"cleanupPending"`
+	// Member policies are populated only when this route is loaded through a
+	// smart-group membership. They are intentionally not route-level settings.
+	StreamOnly        bool       `json:"streamOnly,omitempty"`
+	MinInputTokens    int        `json:"minInputTokens,omitempty"`
+	RequestsPerMinute int        `json:"requestsPerMinute,omitempty"`
 	ModelSyncedAt     *time.Time `json:"modelSyncedAt"`
 	ModelSyncError    string     `json:"modelSyncError"`
 	CreatedAt         time.Time  `json:"createdAt"`
@@ -143,6 +148,12 @@ type UpdateSmartGroupRequest struct {
 
 type AddMemberRequest struct {
 	EntryKey string `json:"entryKey"`
+}
+
+type UpdateMemberPolicyRequest struct {
+	StreamOnly        *bool `json:"streamOnly,omitempty"`
+	MinInputTokens    *int  `json:"minInputTokens,omitempty"`
+	RequestsPerMinute *int  `json:"requestsPerMinute,omitempty"`
 }
 
 type KeyResponse struct {
