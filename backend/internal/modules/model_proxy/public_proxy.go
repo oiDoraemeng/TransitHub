@@ -194,7 +194,7 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 
 	var lastStatus int
 	for attempt := 0; attempt < directMaxAttempts; attempt++ {
-		response, retryable, attemptErr := s.performAttempt(incoming, route, replay.Open, nil)
+		response, retryable, attemptErr := s.performAttempt(incoming, route, replay.Open, nil, mappedResponseContext{})
 		if attemptErr == nil && !retryable {
 			s.writeUpstreamResponse(w, response)
 			return
@@ -241,6 +241,11 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	modelID, err := requestModelID(incoming, replay)
 	if err != nil || strings.TrimSpace(modelID) == "" {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "model is required")
+		return
+	}
+	responseMapping, responseMappingErr := newMappedResponseContext(incoming, replay, modelID, group.ModelMapping)
+	if responseMappingErr != nil {
+		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "failed to parse request body")
 		return
 	}
 	candidates, err := s.smartGroupCandidates(incoming.Context(), group, modelID)
@@ -326,7 +331,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			lease.Release(context.Background())
 			continue
 		}
-		response, retryable, attemptErr := s.performAttempt(incoming, *route, replay.Open, group.ModelMapping)
+		response, retryable, attemptErr := s.performAttempt(incoming, *route, replay.Open, group.ModelMapping, responseMapping)
 		if attemptErr != nil {
 			lastErr = attemptErr
 			lease.Release(context.Background())
@@ -466,7 +471,7 @@ func nativeGeminiModelAction(path string) (string, string, bool) {
 	return model, action, true
 }
 
-func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string) (*http.Response, bool, error) {
+func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string, responseMapping mappedResponseContext) (*http.Response, bool, error) {
 	client, err := s.dataClientForRoute(incoming.Context(), route)
 	if err != nil {
 		return nil, true, err
@@ -527,6 +532,13 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 		return nil, true, err
 	}
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
+	if !retryable && responseMapping.Enabled && route.ModelMappingEnabled {
+		if err := rewriteMappedResponse(response, responseMapping); err != nil {
+			response.Body.Close()
+			cleanup()
+			return nil, true, err
+		}
+	}
 	if !retryable && protocolRequest.responseAdapter != nil {
 		if err := protocolRequest.responseAdapter(response); err != nil {
 			response.Body.Close()

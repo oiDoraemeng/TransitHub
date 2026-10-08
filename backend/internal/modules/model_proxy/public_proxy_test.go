@@ -2,6 +2,7 @@ package model_proxy
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -195,6 +196,124 @@ func TestGroupModelsWithMappingsAddsSortedAliases(t *testing.T) {
 	}
 	if models[1].EffectiveConcurrency != 4 {
 		t.Fatalf("alias concurrency=%d", models[1].EffectiveConcurrency)
+	}
+}
+
+func TestMappedResponsesRewriteCompatibilityFields(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"model":"gpt-6-astra","input":"hello","reasoning":{"mode":"focused","effort":"high"}}`)), 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replay.Close()
+
+	context, err := newMappedResponseContext(request, replay, "gpt-6-astra", map[string]string{"gpt-6-astra": "gpt-6-luna"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !context.Enabled || !context.ResponsesAPI || context.ReasoningMode != "focused" || context.ReasoningEffort != "high" {
+		t.Fatalf("mapped response context=%#v", context)
+	}
+
+	response := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"model":"gpt-6-luna","access_programs":null,"reasoning":{"mode":"standard","effort":"medium"}}`)),
+	}
+	if err := rewriteMappedResponse(response, context); err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["model"] != "gpt-6-astra" {
+		t.Fatalf("response model=%v", payload["model"])
+	}
+	accessPrograms, ok := payload["access_programs"].(map[string]any)
+	if !ok || accessPrograms["cyber"] != "standard" {
+		t.Fatalf("access_programs=%#v", payload["access_programs"])
+	}
+	reasoning, ok := payload["reasoning"].(map[string]any)
+	if !ok || reasoning["mode"] != "focused" || reasoning["effort"] != "high" {
+		t.Fatalf("reasoning=%#v", payload["reasoning"])
+	}
+}
+
+func TestMappedResponsesKeepUpstreamEffortWhenRequestOmitsIt(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"model":"gpt-6","input":"hello"}`)), 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replay.Close()
+	context, err := newMappedResponseContext(request, replay, "gpt-6", map[string]string{"gpt-6": "gpt-6-luna"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"model":"gpt-6-luna","access_programs":null,"reasoning":{"mode":"standard","effort":"medium"}}`)),
+	}
+	if err := rewriteMappedResponse(response, context); err != nil {
+		t.Fatal(err)
+	}
+	var payload struct {
+		Model          string         `json:"model"`
+		AccessPrograms map[string]any `json:"access_programs"`
+		Reasoning      struct {
+			Mode   string `json:"mode"`
+			Effort string `json:"effort"`
+		} `json:"reasoning"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Model != "gpt-6" || payload.AccessPrograms["cyber"] != "standard" || payload.Reasoning.Effort != "medium" {
+		t.Fatalf("rewritten response=%#v", payload)
+	}
+}
+
+func TestMappedResponsesIgnoreUnsupportedMappings(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"model":"gpt-4o","input":"hello","reasoning":{"effort":"high"}}`)), 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replay.Close()
+	context, err := newMappedResponseContext(request, replay, "gpt-4o", map[string]string{"gpt-4o": "gpt-6-luna"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if context.Enabled {
+		t.Fatalf("unsupported source model unexpectedly enabled mapping: %#v", context)
+	}
+}
+
+func TestMappedResponsesRewriteSSEResponseObject(t *testing.T) {
+	context := mappedResponseContext{
+		Enabled:         true,
+		SourceModel:     "gpt-6-astra",
+		TargetModel:     "gpt-6-luna",
+		ResponsesAPI:    true,
+		ReasoningMode:   "focused",
+		ReasoningEffort: "high",
+	}
+	line := rewriteMappedSSELine([]byte("data: {\"response\":{\"model\":\"gpt-6-luna\",\"access_programs\":null,\"reasoning\":{\"mode\":\"standard\",\"effort\":\"medium\"}}}\n"), context)
+	var payload map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:"))), &payload); err != nil {
+		t.Fatal(err)
+	}
+	nested, ok := payload["response"].(map[string]any)
+	if !ok || nested["model"] != "gpt-6-astra" {
+		t.Fatalf("SSE response=%#v", payload)
+	}
+	if nested["access_programs"].(map[string]any)["cyber"] != "standard" {
+		t.Fatalf("SSE access_programs=%#v", nested["access_programs"])
+	}
+	if nested["reasoning"].(map[string]any)["effort"] != "high" {
+		t.Fatalf("SSE reasoning=%#v", nested["reasoning"])
 	}
 }
 
