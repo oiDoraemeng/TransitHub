@@ -615,7 +615,7 @@ var hopHeaders = map[string]struct{}{
 
 func copyRequestHeaders(destination, source http.Header) {
 	for key, values := range source {
-		if _, skip := hopHeaders[http.CanonicalHeaderKey(key)]; skip || isCredentialHeader(key) || strings.EqualFold(key, "Host") {
+		if _, skip := hopHeaders[http.CanonicalHeaderKey(key)]; skip || isCredentialHeader(key) || strings.EqualFold(key, "Host") || strings.EqualFold(key, "Accept-Encoding") {
 			continue
 		}
 		for _, value := range values {

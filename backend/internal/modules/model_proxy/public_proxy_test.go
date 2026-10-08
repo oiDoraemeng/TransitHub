@@ -3,6 +3,7 @@ package model_proxy
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io"
@@ -489,18 +490,63 @@ func TestPublicAPIKeySupportsNativeProtocolHeaders(t *testing.T) {
 
 func TestCopyRequestHeadersRemovesClientCredentials(t *testing.T) {
 	source := http.Header{
-		"Authorization":  []string{"Bearer client-key"},
-		"X-Api-Key":      []string{"claude-key"},
-		"X-Goog-Api-Key": []string{"gemini-key"},
-		"Anthropic-Beta": []string{"feature"},
+		"Authorization":   []string{"Bearer client-key"},
+		"X-Api-Key":       []string{"claude-key"},
+		"X-Goog-Api-Key":  []string{"gemini-key"},
+		"Accept-Encoding": []string{"gzip, br"},
+		"Anthropic-Beta":  []string{"feature"},
 	}
 	destination := make(http.Header)
 	copyRequestHeaders(destination, source)
 	if destination.Get("Authorization") != "" || destination.Get("X-Api-Key") != "" || destination.Get("X-Goog-Api-Key") != "" {
 		t.Fatal("client credentials must not be forwarded upstream")
 	}
+	if destination.Get("Accept-Encoding") != "" {
+		t.Fatal("client compression negotiation must not be forwarded upstream")
+	}
 	if got := destination.Get("Anthropic-Beta"); got != "feature" {
 		t.Fatalf("protocol header=%q want feature", got)
+	}
+}
+
+func TestMappedResponseUsesTransportDecompressedBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Accept-Encoding") != "gzip" {
+			t.Errorf("transport Accept-Encoding=%q want gzip", request.Header.Get("Accept-Encoding"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Encoding", "gzip")
+		writer := gzip.NewWriter(w)
+		_, _ = writer.Write([]byte(`{"model":"upstream-model","output":[]}`))
+		_ = writer.Close()
+	}))
+	defer server.Close()
+
+	client, err := newModelHTTPClient("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.CloseIdleConnections()
+	request, err := http.NewRequest(http.MethodPost, server.URL, strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	copyRequestHeaders(request.Header, http.Header{"Accept-Encoding": []string{"gzip, br"}})
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	context := mappedResponseContext{Enabled: true, SourceModel: "client-model", TargetModel: "upstream-model"}
+	if err := rewriteMappedResponse(response, context); err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var payload map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["model"] != "client-model" {
+		t.Fatalf("rewritten model=%v", payload["model"])
 	}
 }
 
