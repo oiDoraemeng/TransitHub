@@ -112,7 +112,10 @@ func (s *PlatformService) LoginWithToken(baseURL string, platform Platform, acco
 		tokenType = "Bearer"
 	}
 	session := Session{Platform: PlatformSub2API, BaseURL: normalizedURL, AccessToken: accessToken, RefreshToken: refreshToken, TokenType: tokenType}
-	if session.RefreshToken != "" {
+	if expiresAt := sub2APIAccessTokenExpiry(accessToken); expiresAt != nil {
+		session.ExpiresAt = expiresAt
+	}
+	if strings.TrimSpace(session.AccessToken) == "" && session.RefreshToken != "" {
 		refreshedSession, err := s.refreshSub2APISession(session)
 		if err != nil {
 			return LoginResult{}, err
@@ -123,10 +126,50 @@ func (s *PlatformService) LoginWithToken(baseURL string, platform Platform, acco
 		return LoginResult{}, newRequestError(ErrorAuth, PlatformSub2API)
 	}
 	metrics, err := s.fetchSub2APIMetrics(session)
+	// Refresh tokens are commonly rotated on every use. Prefer a supplied access
+	// token and consume the refresh token only after the access token is rejected;
+	// an old refresh token must not make an otherwise valid login fail.
+	if err != nil && session.RefreshToken != "" && isSub2APIAuthError(err) {
+		refreshedSession, refreshErr := s.refreshSub2APISession(session)
+		if refreshErr != nil {
+			return LoginResult{}, refreshErr
+		}
+		session = refreshedSession
+		metrics, err = s.fetchSub2APIMetrics(session)
+	}
 	if err != nil {
 		return LoginResult{}, err
 	}
 	return LoginResult{Platform: PlatformSub2API, Session: session, Metrics: metrics}, nil
+}
+
+func isSub2APIAuthError(err error) bool {
+	requestErr, ok := err.(*RequestError)
+	if !ok || requestErr.MessageKey != ErrorAuth {
+		return false
+	}
+	return requestErr.StatusCode == 0 || requestErr.StatusCode == http.StatusUnauthorized
+}
+
+// sub2APIAccessTokenExpiry extracts exp from the JWT access tokens issued by
+// Sub2API. Opaque tokens simply return nil and retain the existing behavior.
+func sub2APIAccessTokenExpiry(token string) *int64 {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return nil
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil
+	}
+	var claims struct {
+		ExpiresAt float64 `json:"exp"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil || claims.ExpiresAt <= 0 {
+		return nil
+	}
+	expiresAt := int64(claims.ExpiresAt * 1000)
+	return &expiresAt
 }
 
 // LoginWithUserKey signs in to new-api with the system access token generated in
