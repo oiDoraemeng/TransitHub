@@ -181,7 +181,7 @@ export default {
       table: { route: '路由', binding: '站点 / 分组', proxy: '模型出口', concurrency: '并发', models: '模型', status: '状态', actions: '操作' },
       form: { name: '名称', site: 'Sub2API 站点', group: '分组', proxy: '模型出口代理（可选）', proxyHelp: '仅模型请求使用此代理。代理停用或不可用时请求会失败，不会回退到直连。', concurrency: '并发额度', enabled: '创建后立即启用', selectSite: '选择站点', selectGroup: '选择分组' },
       actions: { reveal: '查看 Key', rotate: '轮换 Key', edit: '编辑', delete: '删除', test: '测试代理', copy: '复制', addMember: '添加成员', removeMember: '移除成员' },
-      cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个正在自动重试', routePending: '{count} 个待清理' },
+      cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个待自动重试', processing: '{count} 个正在清理', routePending: '{count} 个待清理' },
       key: { newRoute: '新代理路由 Key', newGroup: '新智能分组 Key', storeSafely: '此 Key 可随时在管理页再次查看，请勿发送给不可信客户端。' },
       confirm: { deleteRoute: '删除代理路由“{name}”？', deleteGroup: '删除智能分组“{name}”？', deleteProxy: '删除模型出口代理“{name}”？', removeMember: '从智能分组移除“{name}”？', rotateKey: '轮换后旧 Key 会立即失效，确认继续？' },
       notices: { routeUpdated: '代理路由已更新', groupUpdated: '智能分组已更新', memberPolicyUpdated: '成员策略已更新', proxyCreated: '模型出口代理已创建', proxyUpdated: '模型出口代理已更新', proxyTested: '代理测试成功，出口 IP：{ip}', copied: 'Key 已复制' },

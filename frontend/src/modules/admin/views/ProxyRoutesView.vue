@@ -26,7 +26,7 @@ const smartGroups = ref<ProxySmartGroup[]>([])
 const proxies = ref<ModelEgressProxy[]>([])
 const sites = ref<ProxySite[]>([])
 const availableGroups = ref<ProxyGroup[]>([])
-const cleanup = ref<CleanupStatus>({ pending: 0, retrying: 0, lastError: '' })
+const cleanup = ref<CleanupStatus>({ pending: 0, retrying: 0, processing: 0, lastError: '' })
 const loading = ref(true)
 const saving = ref(false)
 const groupsLoading = ref(false)
@@ -409,6 +409,7 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
         <div class="flex flex-wrap items-center gap-3 text-sm">
           <span class="inline-flex items-center gap-2 text-muted-foreground"><Activity class="h-4 w-4 text-signal" />{{ t('admin.modelProxy.cleanup.pending', { count: cleanup.pending }) }}</span>
           <span v-if="cleanup.retrying" class="inline-flex items-center gap-2 text-warning"><RefreshCw class="h-4 w-4" />{{ t('admin.modelProxy.cleanup.retrying', { count: cleanup.retrying }) }}</span>
+          <span v-if="cleanup.processing" class="inline-flex items-center gap-2 text-muted-foreground"><Loader2 class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.cleanup.processing', { count: cleanup.processing }) }}</span>
           <Button @click="openActiveCreate"><Plus class="h-4 w-4" />{{ activeCreateLabel }}</Button>
         </div>
       </div>

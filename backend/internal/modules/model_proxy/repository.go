@@ -658,15 +658,16 @@ func (r *Repository) PurgeCompletedCleanupJobs(ctx context.Context) error {
 }
 
 func (r *Repository) CleanupSummary(ctx context.Context, userID, accountID string) (map[string]any, error) {
-	var pending, retrying int
+	var pending, retrying, processing int
 	var lastError string
 	err := r.db.QueryRow(ctx, `
 		SELECT count(*) FILTER (WHERE status <> 'done'),
-			count(*) FILTER (WHERE status <> 'done' AND attempts > 0),
+			count(*) FILTER (WHERE status <> 'done' AND attempts > 0 AND next_attempt_at <= now() AND (locked_until IS NULL OR locked_until < now())),
+			count(*) FILTER (WHERE status <> 'done' AND locked_until > now()),
 			COALESCE((array_agg(last_error ORDER BY updated_at DESC) FILTER (WHERE last_error <> ''))[1],'')
 		FROM proxy_cleanup_jobs WHERE user_id=$1 AND admin_account_id=$2
-	`, userID, accountID).Scan(&pending, &retrying, &lastError)
-	return map[string]any{"pending": pending, "retrying": retrying, "lastError": lastError}, err
+	`, userID, accountID).Scan(&pending, &retrying, &processing, &lastError)
+	return map[string]any{"pending": pending, "retrying": retrying, "processing": processing, "lastError": lastError}, err
 }
 
 func (r *Repository) ValidateOwner(ctx context.Context, userID, accountID, ownerType, ownerID string) error {

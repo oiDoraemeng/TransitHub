@@ -113,6 +113,7 @@ export interface KeyResponse {
 export interface CleanupStatus {
   pending: number
   retrying: number
+  processing: number
   lastError: string
 }
 

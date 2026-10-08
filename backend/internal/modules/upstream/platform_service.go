@@ -1384,6 +1384,40 @@ func (s *PlatformService) FindSub2APIKeyByName(session Session, name string) (*S
 	}
 }
 
+// FindSub2APIKeysByNames scans the remote key list once and returns every
+// matching temporary key. Cleanup can use this to recover a batch of jobs
+// without issuing one full pagination scan per job.
+func (s *PlatformService) FindSub2APIKeysByNames(session Session, names []string) (map[string]Sub2APIKeyItem, error) {
+	if session.Platform != PlatformSub2API || strings.TrimSpace(session.AccessToken) == "" {
+		return nil, newRequestError(ErrorAuth, PlatformSub2API)
+	}
+	wanted := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		if name = strings.TrimSpace(name); name != "" {
+			wanted[name] = struct{}{}
+		}
+	}
+	found := make(map[string]Sub2APIKeyItem, len(wanted))
+	if len(wanted) == 0 {
+		return found, nil
+	}
+	const pageSize = 100
+	for page := 1; ; page++ {
+		keys, err := s.listSub2APIKeysPage(session, page, pageSize)
+		if err != nil {
+			return nil, err
+		}
+		for _, key := range keys {
+			if _, ok := wanted[key.Name]; ok {
+				found[key.Name] = key
+			}
+		}
+		if len(found) == len(wanted) || len(keys) < pageSize {
+			return found, nil
+		}
+	}
+}
+
 func (s *PlatformService) listSub2APIKeysPage(session Session, page, pageSize int) ([]Sub2APIKeyItem, error) {
 	response, err := s.httpClient.requestJSON(
 		fmt.Sprintf("%s/api/v1/keys?page=%d&page_size=%d&sort_by=created_at&sort_order=desc", session.BaseURL, page, pageSize),

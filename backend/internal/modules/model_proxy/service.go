@@ -23,10 +23,14 @@ import (
 )
 
 const (
-	cleanupBatchSize      = 100
-	cleanupWorkerCount    = 8
+	cleanupBatchSize      = 50
+	cleanupWorkerCount    = 2
 	cleanupRequestTimeout = 60 * time.Second
 	cleanupStateTimeout   = 5 * time.Second
+	cleanupSiteInterval   = 500 * time.Millisecond
+	cleanup429BaseDelay   = 30 * time.Second
+	cleanup429MaxDelay    = 30 * time.Minute
+	forceRefreshCooldown  = 30 * time.Second
 )
 
 type AccountResolver interface {
@@ -41,21 +45,25 @@ type UpstreamSites interface {
 }
 
 type Service struct {
-	repository      *Repository
-	accounts        AccountResolver
-	sites           UpstreamSites
-	platform        *upstream.PlatformService
-	cipher          *KeyCipher
-	limiter         *Limiter
-	dataClient      *http.Client
-	egressClientsMu sync.Mutex
-	egressClients   map[string]cachedEgressClient
-	refreshInterval time.Duration
-	maxRequestBytes int64
-	sessionRefresh  singleflight.Group
-	modelRefresh    singleflight.Group
-	cancel          context.CancelFunc
-	wg              sync.WaitGroup
+	repository        *Repository
+	accounts          AccountResolver
+	sites             UpstreamSites
+	platform          *upstream.PlatformService
+	cipher            *KeyCipher
+	limiter           *Limiter
+	dataClient        *http.Client
+	egressClientsMu   sync.Mutex
+	egressClients     map[string]cachedEgressClient
+	refreshInterval   time.Duration
+	maxRequestBytes   int64
+	sessionRefresh    singleflight.Group
+	modelRefresh      singleflight.Group
+	cancel            context.CancelFunc
+	wg                sync.WaitGroup
+	cleanupRateMu     sync.Mutex
+	cleanupNext       map[string]time.Time
+	forceRefreshMu    sync.Mutex
+	forceRefreshUntil map[string]time.Time
 }
 
 func NewService(repository *Repository, accounts AccountResolver, sites UpstreamSites, platform *upstream.PlatformService, cipher *KeyCipher, limiter *Limiter, maxRequestBytes int64, refreshInterval time.Duration) *Service {
@@ -73,6 +81,7 @@ func NewService(repository *Repository, accounts AccountResolver, sites Upstream
 		repository: repository, accounts: accounts, sites: sites, platform: platform,
 		cipher: cipher, limiter: limiter, maxRequestBytes: maxRequestBytes, refreshInterval: refreshInterval,
 		dataClient: dataClient, egressClients: make(map[string]cachedEgressClient),
+		cleanupNext: make(map[string]time.Time), forceRefreshUntil: make(map[string]time.Time),
 	}
 }
 
@@ -676,6 +685,12 @@ func (s *Service) beginDelete(job CleanupJob) {
 }
 
 func (s *Service) processCleanupJob(ctx context.Context, job CleanupJob) {
+	if err := s.waitCleanupSlot(ctx, job.SiteID); err != nil {
+		stateCtx, cancel := context.WithTimeout(context.Background(), cleanupStateTimeout)
+		s.retryCleanup(stateCtx, job, err)
+		cancel()
+		return
+	}
 	if err := s.deleteCleanupJob(ctx, job); err != nil {
 		stateCtx, cancel := context.WithTimeout(context.Background(), cleanupStateTimeout)
 		s.retryCleanup(stateCtx, job, err)
@@ -746,6 +761,16 @@ func (s *Service) deleteCleanupJobNow(job CleanupJob) error {
 
 func (s *Service) retryCleanup(ctx context.Context, job CleanupJob, cleanupErr error) {
 	job.Attempts++
+	if requestErr, ok := cleanupRequestError(cleanupErr); ok && isCleanupUpstreamThrottle(requestErr.StatusCode) {
+		exponent := math.Min(float64(job.Attempts-1), 5)
+		delay := time.Duration(math.Pow(2, exponent)) * cleanup429BaseDelay
+		if delay > cleanup429MaxDelay {
+			delay = cleanup429MaxDelay
+		}
+		delay += time.Duration(mathrand.Int64N(int64(cleanup429BaseDelay)))
+		_ = s.repository.RetryCleanupJob(ctx, job.ID, job.Attempts, time.Now().Add(delay), cleanupError(cleanupErr))
+		return
+	}
 	exponent := math.Min(float64(job.Attempts-1), 9)
 	delay := time.Duration(math.Pow(2, exponent)) * time.Second
 	if delay > 5*time.Minute {
@@ -753,6 +778,15 @@ func (s *Service) retryCleanup(ctx context.Context, job CleanupJob, cleanupErr e
 	}
 	delay += time.Duration(mathrand.Int64N(int64(time.Second)))
 	_ = s.repository.RetryCleanupJob(ctx, job.ID, job.Attempts, time.Now().Add(delay), cleanupError(cleanupErr))
+}
+
+func isCleanupUpstreamThrottle(status int) bool {
+	return status == http.StatusUnauthorized || status == http.StatusTooManyRequests || status == http.StatusBadGateway || status == http.StatusServiceUnavailable || status == http.StatusGatewayTimeout
+}
+
+func cleanupRequestError(err error) (*upstream.RequestError, bool) {
+	var requestErr *upstream.RequestError
+	return requestErr, errors.As(err, &requestErr)
 }
 
 func cleanupError(err error) error {
@@ -777,13 +811,26 @@ func isUpstreamUnauthorized(err error) bool {
 }
 
 func (s *Service) forceSession(ctx context.Context, siteID string) (upstream.Session, error) {
-	s.sessionRefresh.Forget(siteID)
+	s.forceRefreshMu.Lock()
+	if until := s.forceRefreshUntil[siteID]; until.After(time.Now()) {
+		s.forceRefreshMu.Unlock()
+		return upstream.Session{}, fmt.Errorf("upstream session refresh is rate limited until %s", until.Format(time.RFC3339))
+	}
+	s.forceRefreshMu.Unlock()
 	value, err, _ := s.sessionRefresh.Do("force:"+siteID, func() (any, error) {
 		return s.sites.ForceRefreshSiteSession(ctx, siteID)
 	})
 	if err != nil {
+		if requestErr, ok := cleanupRequestError(err); ok && requestErr.StatusCode == http.StatusTooManyRequests {
+			s.forceRefreshMu.Lock()
+			s.forceRefreshUntil[siteID] = time.Now().Add(forceRefreshCooldown)
+			s.forceRefreshMu.Unlock()
+		}
 		return upstream.Session{}, err
 	}
+	s.forceRefreshMu.Lock()
+	delete(s.forceRefreshUntil, siteID)
+	s.forceRefreshMu.Unlock()
 	return value.(upstream.Session), nil
 }
 
@@ -801,12 +848,115 @@ func (s *Service) cleanupLoop(ctx context.Context) {
 	}
 }
 
+func (s *Service) waitCleanupSlot(ctx context.Context, siteID string) error {
+	for {
+		now := time.Now()
+		s.cleanupRateMu.Lock()
+		next := s.cleanupNext[siteID]
+		if !next.After(now) {
+			s.cleanupNext[siteID] = now.Add(cleanupSiteInterval)
+			s.cleanupRateMu.Unlock()
+			return nil
+		}
+		wait := time.Until(next)
+		s.cleanupRateMu.Unlock()
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+// prepareCleanupJobs resolves missing remote IDs once per claimed batch. Older
+// jobs were created before remote IDs were persisted, so resolving each job in
+// a worker would repeatedly scan the entire upstream key list and trigger 429s.
+func (s *Service) prepareCleanupJobs(ctx context.Context, jobs []CleanupJob) []CleanupJob {
+	prepared := make([]CleanupJob, 0, len(jobs))
+	bySite := make(map[string][]int)
+	for index := range jobs {
+		if jobs[index].RemoteKeyID == "" {
+			bySite[jobs[index].SiteID] = append(bySite[jobs[index].SiteID], index)
+			continue
+		}
+		prepared = append(prepared, jobs[index])
+	}
+	for siteID, indexes := range bySite {
+		if err := s.waitCleanupSlot(ctx, siteID); err != nil {
+			s.retryCleanupBatch(jobs, indexes, err)
+			continue
+		}
+		session, err := s.freshSession(ctx, siteID)
+		if isUpstreamUnauthorized(err) {
+			session, err = s.forceSession(ctx, siteID)
+		}
+		if err == nil {
+			names := make([]string, 0, len(indexes))
+			for _, index := range indexes {
+				names = append(names, jobs[index].RemoteKeyName)
+			}
+			var found map[string]upstream.Sub2APIKeyItem
+			found, err = s.platform.FindSub2APIKeysByNames(session, names)
+			if isUpstreamUnauthorized(err) {
+				session, err = s.forceSession(ctx, siteID)
+				if err == nil {
+					found, err = s.platform.FindSub2APIKeysByNames(session, names)
+				}
+			}
+			if err == nil {
+				for _, index := range indexes {
+					key, ok := found[jobs[index].RemoteKeyName]
+					if !ok || strings.TrimSpace(key.ID) == "" {
+						stateCtx, cancel := context.WithTimeout(context.Background(), cleanupStateTimeout)
+						_ = s.repository.CompleteCleanupJob(stateCtx, jobs[index].ID)
+						cancel()
+						continue
+					}
+					jobs[index].RemoteKeyID = key.ID
+					stateCtx, cancel := context.WithTimeout(context.Background(), cleanupStateTimeout)
+					if saveErr := s.repository.SetCleanupRemoteKey(stateCtx, jobs[index].ID, key.ID); saveErr != nil {
+						cancel()
+						retryCtx, retryCancel := context.WithTimeout(context.Background(), cleanupStateTimeout)
+						s.retryCleanup(retryCtx, jobs[index], saveErr)
+						retryCancel()
+						continue
+					}
+					cancel()
+					prepared = append(prepared, jobs[index])
+				}
+				continue
+			}
+		}
+		s.retryCleanupBatch(jobs, indexes, err)
+	}
+	return prepared
+}
+
+func (s *Service) retryCleanupBatch(jobs []CleanupJob, indexes []int, cleanupErr error) {
+	if cleanupErr == nil {
+		cleanupErr = errors.New("cleanup key lookup failed")
+	}
+	for _, index := range indexes {
+		stateCtx, cancel := context.WithTimeout(context.Background(), cleanupStateTimeout)
+		s.retryCleanup(stateCtx, jobs[index], cleanupErr)
+		cancel()
+	}
+}
+
 func (s *Service) processDueCleanupJobs(ctx context.Context) {
 	jobs, err := s.repository.ClaimCleanupJobs(ctx, cleanupBatchSize)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			log.Printf("[model-proxy] claim cleanup jobs: %v", err)
 		}
+		return
+	}
+	jobs = s.prepareCleanupJobs(ctx, jobs)
+	if len(jobs) == 0 {
 		return
 	}
 	if len(jobs) > 0 {
