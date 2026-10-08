@@ -821,7 +821,7 @@ func (s *Service) forceSession(ctx context.Context, siteID string) (upstream.Ses
 		return s.sites.ForceRefreshSiteSession(ctx, siteID)
 	})
 	if err != nil {
-		if requestErr, ok := cleanupRequestError(err); ok && requestErr.StatusCode == http.StatusTooManyRequests {
+		if requestErr, ok := cleanupRequestError(err); ok && (requestErr.StatusCode == http.StatusUnauthorized || requestErr.StatusCode == http.StatusTooManyRequests) {
 			s.forceRefreshMu.Lock()
 			s.forceRefreshUntil[siteID] = time.Now().Add(forceRefreshCooldown)
 			s.forceRefreshMu.Unlock()
