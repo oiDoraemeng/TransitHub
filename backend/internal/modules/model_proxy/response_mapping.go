@@ -28,30 +28,32 @@ var mappedAstraCompatibleModels = map[string]struct{}{
 }
 
 type mappedResponseContext struct {
-	Enabled         bool
-	SourceModel     string
-	TargetModel     string
-	ResponsesAPI    bool
-	ReasoningMode   string
-	ReasoningEffort string
+	Enabled             bool
+	CompatibilityFields bool
+	SourceModel         string
+	TargetModel         string
+	ResponsesAPI        bool
+	ReasoningMode       string
+	ReasoningEffort     string
 }
 
 func newMappedResponseContext(incoming *http.Request, replay *replayBody, sourceModel string, mapping map[string]string) (mappedResponseContext, error) {
 	sourceModel = strings.TrimSpace(sourceModel)
 	targetModel := strings.TrimSpace(mapping[sourceModel])
-	if _, ok := mappedModelTargets[targetModel]; !ok {
+	if sourceModel == "" || targetModel == "" || targetModel == sourceModel {
 		return mappedResponseContext{}, nil
 	}
-	if _, ok := mappedAstraCompatibleModels[sourceModel]; !ok {
-		return mappedResponseContext{}, nil
-	}
+	_, compatibleTarget := mappedModelTargets[targetModel]
+	_, compatibleSource := mappedAstraCompatibleModels[sourceModel]
+	compatibilityFields := compatibleTarget && compatibleSource
 	context := mappedResponseContext{
-		Enabled:      true,
-		SourceModel:  sourceModel,
-		TargetModel:  targetModel,
-		ResponsesAPI: incoming.URL.Path == "/v1/responses" || incoming.URL.Path == "/v1/responses/compact",
+		Enabled:             true,
+		CompatibilityFields: compatibilityFields,
+		SourceModel:         sourceModel,
+		TargetModel:         targetModel,
+		ResponsesAPI:        incoming.URL.Path == "/v1/responses" || incoming.URL.Path == "/v1/responses/compact",
 	}
-	if !context.ResponsesAPI {
+	if !context.ResponsesAPI || !context.CompatibilityFields {
 		return context, nil
 	}
 	reader, err := replay.Open()
@@ -97,7 +99,7 @@ func rewriteMappedResponse(response *http.Response, context mappedResponseContex
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return err
 	}
-	rewriteMappedResponseObject(payload, context, context.ResponsesAPI)
+	rewriteMappedResponseObject(payload, context, context.ResponsesAPI && context.CompatibilityFields)
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -110,7 +112,7 @@ func rewriteMappedResponse(response *http.Response, context mappedResponseContex
 }
 
 func rewriteMappedResponseObject(payload map[string]any, context mappedResponseContext, responsesAPI bool) {
-	if model, ok := payload["model"].(string); ok && (model == context.TargetModel || model == "") {
+	if _, ok := payload["model"]; ok {
 		payload["model"] = context.SourceModel
 	}
 	if responsesAPI {
@@ -133,10 +135,10 @@ func rewriteMappedResponseObject(payload map[string]any, context mappedResponseC
 
 func rewriteMappedSSEPayload(payload map[string]any, context mappedResponseContext) {
 	if nested, ok := payload["response"].(map[string]any); ok {
-		rewriteMappedResponseObject(nested, context, context.ResponsesAPI && hasMappedResponseMetadata(nested))
+		rewriteMappedResponseObject(nested, context, context.ResponsesAPI && context.CompatibilityFields && hasMappedResponseMetadata(nested))
 		return
 	}
-	rewriteMappedResponseObject(payload, context, context.ResponsesAPI && hasMappedResponseMetadata(payload))
+	rewriteMappedResponseObject(payload, context, context.ResponsesAPI && context.CompatibilityFields && hasMappedResponseMetadata(payload))
 }
 
 func hasMappedResponseMetadata(payload map[string]any) bool {
