@@ -35,6 +35,7 @@ type Route struct {
 	UpstreamKeyCiphertext string     `json:"-"`
 	KeywordCheckEnabled   bool       `json:"keywordCheckEnabled,omitempty"`
 	ExcludedKeywords      []string   `json:"excludedKeywords,omitempty"`
+	ModelMappingEnabled   bool       `json:"modelMappingEnabled,omitempty"`
 	ModelSyncedAt         *time.Time `json:"modelSyncedAt"`
 	ModelSyncError        string     `json:"modelSyncError"`
 	CreatedAt             time.Time  `json:"createdAt"`
@@ -61,17 +62,18 @@ type EgressProxy struct {
 }
 
 type SmartGroup struct {
-	ID               string    `json:"id"`
-	UserID           string    `json:"-"`
-	AdminAccountID   string    `json:"-"`
-	Name             string    `json:"name"`
-	Enabled          bool      `json:"enabled"`
-	KeyPreview       string    `json:"keyPreview"`
-	TotalConcurrency int       `json:"totalConcurrency"`
-	Members          []Route   `json:"members"`
-	Models           []Model   `json:"models"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	ID               string            `json:"id"`
+	UserID           string            `json:"-"`
+	AdminAccountID   string            `json:"-"`
+	Name             string            `json:"name"`
+	Enabled          bool              `json:"enabled"`
+	KeyPreview       string            `json:"keyPreview"`
+	ModelMapping     map[string]string `json:"modelMapping"`
+	TotalConcurrency int               `json:"totalConcurrency"`
+	Members          []Route           `json:"members"`
+	Models           []Model           `json:"models"`
+	CreatedAt        time.Time         `json:"createdAt"`
+	UpdatedAt        time.Time         `json:"updatedAt"`
 }
 
 type Model struct {
@@ -142,15 +144,17 @@ type EgressProxyTestResult struct {
 }
 
 type CreateSmartGroupRequest struct {
-	Name       string   `json:"name"`
-	MemberKeys []string `json:"memberKeys,omitempty"`
-	RouteIDs   []string `json:"routeIds,omitempty"`
-	Enabled    *bool    `json:"enabled,omitempty"`
+	Name         string            `json:"name"`
+	MemberKeys   []string          `json:"memberKeys,omitempty"`
+	RouteIDs     []string          `json:"routeIds,omitempty"`
+	Enabled      *bool             `json:"enabled,omitempty"`
+	ModelMapping map[string]string `json:"modelMapping,omitempty"`
 }
 
 type UpdateSmartGroupRequest struct {
-	Name    *string `json:"name,omitempty"`
-	Enabled *bool   `json:"enabled,omitempty"`
+	Name         *string           `json:"name,omitempty"`
+	Enabled      *bool             `json:"enabled,omitempty"`
+	ModelMapping map[string]string `json:"modelMapping,omitempty"`
 }
 
 type AddMemberRequest struct {
@@ -163,6 +167,7 @@ type UpdateMemberPolicyRequest struct {
 	MinInputTokens      *int     `json:"minInputTokens,omitempty"`
 	RequestsPerMinute   *int     `json:"requestsPerMinute,omitempty"`
 	Priority            *int     `json:"priority,omitempty"`
+	ModelMappingEnabled *bool    `json:"modelMappingEnabled,omitempty"`
 	UseProvidedKey      *bool    `json:"useProvidedKey,omitempty"`
 	UpstreamKey         string   `json:"upstreamKey,omitempty"`
 	KeywordCheckEnabled *bool    `json:"keywordCheckEnabled,omitempty"`

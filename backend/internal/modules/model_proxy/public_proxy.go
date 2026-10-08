@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -101,8 +102,8 @@ func supportedGeminiEndpoint(method, path string) bool {
 }
 
 func (s *Service) writeGroupModels(w http.ResponseWriter, group *SmartGroup) {
-	data := make([]map[string]any, 0, len(group.Models))
-	for _, model := range group.Models {
+	data := make([]map[string]any, 0, len(group.Models)+len(group.ModelMapping))
+	for _, model := range groupModelsWithMappings(group) {
 		raw := make(map[string]any, len(model.Raw)+1)
 		for key, value := range model.Raw {
 			raw[key] = value
@@ -120,7 +121,7 @@ func (s *Service) writeGroupModels(w http.ResponseWriter, group *SmartGroup) {
 
 func (s *Service) writeGroupGeminiModels(w http.ResponseWriter, group *SmartGroup) {
 	models := make([]map[string]any, 0, len(group.Models))
-	for _, model := range group.Models {
+	for _, model := range groupModelsWithMappings(group) {
 		id := strings.TrimPrefix(model.ID, "models/")
 		models = append(models, map[string]any{
 			"name":                       "models/" + id,
@@ -131,6 +132,36 @@ func (s *Service) writeGroupGeminiModels(w http.ResponseWriter, group *SmartGrou
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"models": models})
+}
+
+func groupModelsWithMappings(group *SmartGroup) []Model {
+	models := append([]Model(nil), group.Models...)
+	seen := make(map[string]struct{}, len(models)+len(group.ModelMapping))
+	for _, model := range models {
+		seen[model.ID] = struct{}{}
+	}
+	keys := make([]string, 0, len(group.ModelMapping))
+	for source := range group.ModelMapping {
+		keys = append(keys, source)
+	}
+	sort.Strings(keys)
+	for _, source := range keys {
+		if _, exists := seen[source]; exists {
+			continue
+		}
+		target := group.ModelMapping[source]
+		alias := Model{ID: source, Object: "model"}
+		for _, model := range group.Models {
+			if model.ID == target {
+				alias.EffectiveConcurrency = model.EffectiveConcurrency
+				alias.Raw = model.Raw
+				break
+			}
+		}
+		models = append(models, alias)
+		seen[source] = struct{}{}
+	}
+	return models
 }
 
 func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, route Route) {
@@ -163,7 +194,7 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 
 	var lastStatus int
 	for attempt := 0; attempt < directMaxAttempts; attempt++ {
-		response, retryable, attemptErr := s.performAttempt(incoming, route, replay.Open)
+		response, retryable, attemptErr := s.performAttempt(incoming, route, replay.Open, nil)
 		if attemptErr == nil && !retryable {
 			s.writeUpstreamResponse(w, response)
 			return
@@ -212,14 +243,14 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "model is required")
 		return
 	}
-	candidates, err := s.repository.ListGroupRoutes(incoming.Context(), group.ID, true, modelID)
+	candidates, err := s.smartGroupCandidates(incoming.Context(), group, modelID)
 	if err != nil {
 		writeOpenAIError(w, http.StatusInternalServerError, "proxy_error", "failed to load smart group members")
 		return
 	}
 	if len(candidates) == 0 {
 		s.refreshGroupModels(incoming.Context(), group.ID)
-		candidates, err = s.repository.ListGroupRoutes(incoming.Context(), group.ID, true, modelID)
+		candidates, err = s.smartGroupCandidates(incoming.Context(), group, modelID)
 	}
 	if err != nil || len(candidates) == 0 {
 		writeOpenAIError(w, http.StatusNotFound, "model_not_found", "no enabled smart group member supports this model")
@@ -295,7 +326,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			lease.Release(context.Background())
 			continue
 		}
-		response, retryable, attemptErr := s.performAttempt(incoming, *route, replay.Open)
+		response, retryable, attemptErr := s.performAttempt(incoming, *route, replay.Open, group.ModelMapping)
 		if attemptErr != nil {
 			lastErr = attemptErr
 			lease.Release(context.Background())
@@ -323,6 +354,42 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	writeOpenAIError(w, http.StatusTooManyRequests, "smart_group_concurrency_exceeded", "all eligible smart group members are at capacity")
 }
 
+func (s *Service) smartGroupCandidates(ctx context.Context, group SmartGroup, modelID string) ([]Route, error) {
+	sourceCandidates, err := s.repository.ListGroupRoutes(ctx, group.ID, true, modelID)
+	if err != nil {
+		return nil, err
+	}
+	targetModel, mapped := group.ModelMapping[modelID]
+	targetModel = strings.TrimSpace(targetModel)
+	if !mapped || targetModel == "" || targetModel == modelID {
+		return sourceCandidates, nil
+	}
+	mappedCandidates, err := s.repository.ListGroupRoutes(ctx, group.ID, true, targetModel)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Route, 0, len(sourceCandidates)+len(mappedCandidates))
+	seen := make(map[string]struct{}, len(sourceCandidates)+len(mappedCandidates))
+	for _, route := range sourceCandidates {
+		if route.ModelMappingEnabled {
+			continue
+		}
+		result = append(result, route)
+		seen[route.ID] = struct{}{}
+	}
+	for _, route := range mappedCandidates {
+		if !route.ModelMappingEnabled {
+			continue
+		}
+		if _, exists := seen[route.ID]; exists {
+			continue
+		}
+		result = append(result, route)
+		seen[route.ID] = struct{}{}
+	}
+	return result, nil
+}
+
 func requestModelID(incoming *http.Request, replay *replayBody) (string, error) {
 	const geminiModelsPrefix = "/v1beta/models/"
 	if strings.HasPrefix(incoming.URL.Path, geminiModelsPrefix) {
@@ -337,7 +404,69 @@ func requestModelID(incoming *http.Request, replay *replayBody) (string, error) 
 	return replay.ModelID()
 }
 
-func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error)) (*http.Response, bool, error) {
+func applyModelMapping(incoming *http.Request, body io.ReadCloser, enabled bool, mapping map[string]string) (*http.Request, io.ReadCloser, error) {
+	if !enabled || len(mapping) == 0 {
+		return incoming, body, nil
+	}
+	if source, action, ok := nativeGeminiModelAction(incoming.URL.Path); ok {
+		if target := strings.TrimSpace(mapping[source]); target != "" && target != source {
+			mapped := incoming.Clone(incoming.Context())
+			mapped.URL.Path = "/v1beta/models/" + target + ":" + action
+			mapped.URL.RawPath = ""
+			return mapped, body, nil
+		}
+		return incoming, body, nil
+	}
+	raw, err := io.ReadAll(body)
+	closeErr := body.Close()
+	if err != nil {
+		return nil, nil, err
+	}
+	if closeErr != nil {
+		return nil, nil, closeErr
+	}
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &payload); err != nil || payload == nil {
+		return incoming, io.NopCloser(bytes.NewReader(raw)), nil
+	}
+	var source string
+	if err := json.Unmarshal(payload["model"], &source); err != nil {
+		return incoming, io.NopCloser(bytes.NewReader(raw)), nil
+	}
+	target := strings.TrimSpace(mapping[strings.TrimSpace(source)])
+	if target == "" || target == source {
+		return incoming, io.NopCloser(bytes.NewReader(raw)), nil
+	}
+	encodedTarget, err := json.Marshal(target)
+	if err != nil {
+		return nil, nil, err
+	}
+	payload["model"] = encodedTarget
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return nil, nil, err
+	}
+	return incoming, io.NopCloser(bytes.NewReader(encoded)), nil
+}
+
+func nativeGeminiModelAction(path string) (string, string, bool) {
+	const prefix = "/v1beta/models/"
+	if !strings.HasPrefix(path, prefix) {
+		return "", "", false
+	}
+	modelAction := strings.TrimPrefix(path, prefix)
+	separator := strings.LastIndexByte(modelAction, ':')
+	if separator <= 0 || separator == len(modelAction)-1 {
+		return "", "", false
+	}
+	model, action := modelAction[:separator], modelAction[separator+1:]
+	if strings.Contains(model, "/") || (action != "generateContent" && action != "streamGenerateContent") {
+		return "", "", false
+	}
+	return model, action, true
+}
+
+func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string) (*http.Response, bool, error) {
 	client, err := s.dataClientForRoute(incoming.Context(), route)
 	if err != nil {
 		return nil, true, err
@@ -366,7 +495,12 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 		cleanup()
 		return nil, true, err
 	}
-	protocolRequest, err := adaptUpstreamProtocol(incoming, body)
+	protocolIncoming, protocolBody, err := applyModelMapping(incoming, body, route.ModelMappingEnabled, modelMapping)
+	if err != nil {
+		cleanup()
+		return nil, true, err
+	}
+	protocolRequest, err := adaptUpstreamProtocol(protocolIncoming, protocolBody)
 	if err != nil {
 		cleanup()
 		return nil, true, err

@@ -68,7 +68,7 @@ export const testModelEgressProxy = (id: string) => request<ModelEgressProxyTest
 
 export const listProxySmartGroups = () => request<ProxySmartGroup[]>('/proxy-smart-groups')
 export const createProxySmartGroup = (input: SmartGroupInput) => request<{ group: ProxySmartGroup; key: string }>('/proxy-smart-groups', { method: 'POST', body: JSON.stringify(input) })
-export const updateProxySmartGroup = (id: string, input: { name?: string; enabled?: boolean }) => request<ProxySmartGroup>(`/proxy-smart-groups/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+export const updateProxySmartGroup = (id: string, input: { name?: string; enabled?: boolean; modelMapping?: Record<string, string> }) => request<ProxySmartGroup>(`/proxy-smart-groups/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
 export const deleteProxySmartGroup = (id: string) => request<{ success: boolean }>(`/proxy-smart-groups/${id}`, { method: 'DELETE' })
 export const addProxySmartGroupMember = (id: string, input: { routeId?: string; entryKey?: string }) => request<{ success: boolean }>(`/proxy-smart-groups/${id}/members`, { method: 'POST', body: JSON.stringify(input) })
 export const updateProxySmartGroupMemberPolicy = (id: string, routeId: string, input: Partial<SmartGroupMemberPolicyInput>) => request<{ success: boolean }>(`/proxy-smart-groups/${id}/members/${routeId}`, { method: 'PATCH', body: JSON.stringify(input) })

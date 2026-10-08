@@ -353,6 +353,10 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 	if len(routeIDs) == 0 {
 		return SmartGroup{}, "", &requestError{Status: 400, Message: "at least one member route is required"}
 	}
+	modelMapping, err := normalizeModelMapping(input.ModelMapping)
+	if err != nil {
+		return SmartGroup{}, "", err
+	}
 	groupID, err := randomID("pgroup_")
 	if err != nil {
 		return SmartGroup{}, "", err
@@ -365,7 +369,7 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 	if input.Enabled != nil {
 		enabled = *input.Enabled
 	}
-	group := SmartGroup{ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, KeyPreview: preview}
+	group := SmartGroup{ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, KeyPreview: preview, ModelMapping: modelMapping}
 	if err := s.repository.CreateSmartGroup(ctx, group, routeIDs, keyID, hash, ciphertext, preview); err != nil {
 		return SmartGroup{}, "", err
 	}
@@ -393,6 +397,13 @@ func (s *Service) UpdateSmartGroup(ctx context.Context, userID, groupID string, 
 	}
 	if input.Enabled != nil {
 		group.Enabled = *input.Enabled
+	}
+	if input.ModelMapping != nil {
+		modelMapping, mappingErr := normalizeModelMapping(input.ModelMapping)
+		if mappingErr != nil {
+			return SmartGroup{}, mappingErr
+		}
+		group.ModelMapping = modelMapping
 	}
 	if group.Name == "" {
 		return SmartGroup{}, &requestError{Status: 400, Message: "name is required"}
@@ -473,7 +484,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 			return &requestError{Status: 400, Message: "at least one excluded keyword is required when keyword checking is enabled"}
 		}
 	}
-	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordCheckEnabled == nil && !keywordsProvided {
+	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordCheckEnabled == nil && !keywordsProvided {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
 	var keyCiphertext, keyPreviewValue *string
@@ -525,14 +536,35 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	}
 	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
 		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
-		input.UseProvidedKey, keyCiphertext, keyPreviewValue,
+		input.ModelMappingEnabled, input.UseProvidedKey, keyCiphertext, keyPreviewValue,
 		input.KeywordCheckEnabled, excludedKeywords)
 }
 
 const (
-	maxExcludedKeywords    = 64
-	maxExcludedKeywordSize = 256
+	maxModelMappings        = 128
+	maxModelMappingPartSize = 256
+	maxExcludedKeywords     = 64
+	maxExcludedKeywordSize  = 256
 )
+
+func normalizeModelMapping(values map[string]string) (map[string]string, error) {
+	result := make(map[string]string, len(values))
+	for source, target := range values {
+		source = strings.TrimSpace(source)
+		target = strings.TrimSpace(target)
+		if source == "" || target == "" {
+			return nil, &requestError{Status: 400, Message: "model mapping source and target are required"}
+		}
+		if len([]rune(source)) > maxModelMappingPartSize || len([]rune(target)) > maxModelMappingPartSize {
+			return nil, &requestError{Status: 400, Message: "model mapping source or target is too long"}
+		}
+		result[source] = target
+		if len(result) > maxModelMappings {
+			return nil, &requestError{Status: 400, Message: "too many model mappings"}
+		}
+	}
+	return result, nil
+}
 
 func normalizeExcludedKeywords(values []string) ([]string, error) {
 	result := make([]string, 0, len(values))

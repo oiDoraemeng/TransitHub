@@ -97,8 +97,19 @@ func scanRouteWithPolicy(row routeScanner) (Route, error) {
 		&route.ModelSyncError, &route.CreatedAt, &route.UpdatedAt,
 		&route.StreamOnly, &route.MinInputTokens, &route.RequestsPerMinute, &route.Priority,
 		&route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext,
-		&route.KeywordCheckEnabled, &route.ExcludedKeywords)
+		&route.KeywordCheckEnabled, &route.ExcludedKeywords, &route.ModelMappingEnabled)
 	return route, err
+}
+
+func decodeModelMapping(raw []byte) map[string]string {
+	mapping := make(map[string]string)
+	if len(raw) == 0 {
+		return mapping
+	}
+	if err := json.Unmarshal(raw, &mapping); err != nil || mapping == nil {
+		return make(map[string]string)
+	}
+	return mapping
 }
 
 func (r *Repository) CreateRoute(ctx context.Context, route Route, keyID, keyHash, ciphertext, preview string) error {
@@ -214,7 +225,11 @@ func (r *Repository) CreateSmartGroup(ctx context.Context, group SmartGroup, rou
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, `INSERT INTO proxy_smart_groups (id,user_id,admin_account_id,name,enabled) VALUES ($1,$2,$3,$4,$5)`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled); err != nil {
+	mappingJSON, err := json.Marshal(group.ModelMapping)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO proxy_smart_groups (id,user_id,admin_account_id,name,enabled,model_mapping) VALUES ($1,$2,$3,$4,$5,$6::jsonb)`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled, string(mappingJSON)); err != nil {
 		return err
 	}
 	for _, routeID := range routeIDs {
@@ -237,7 +252,7 @@ func (r *Repository) CreateSmartGroup(ctx context.Context, group SmartGroup, rou
 
 func (r *Repository) ListSmartGroups(ctx context.Context, userID, accountID string) ([]SmartGroup, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(k.key_preview,''),g.created_at,g.updated_at
+		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(g.model_mapping,'{}'::jsonb),COALESCE(k.key_preview,''),g.created_at,g.updated_at
 		FROM proxy_smart_groups g
 		LEFT JOIN proxy_access_keys k ON k.owner_type='smart_group' AND k.owner_id=g.id
 		WHERE g.user_id=$1 AND g.admin_account_id=$2 ORDER BY g.created_at ASC,g.id ASC
@@ -249,9 +264,11 @@ func (r *Repository) ListSmartGroups(ctx context.Context, userID, accountID stri
 	groups := make([]SmartGroup, 0)
 	for rows.Next() {
 		var group SmartGroup
-		if err := rows.Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt); err != nil {
+		var mappingJSON []byte
+		if err := rows.Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &mappingJSON, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt); err != nil {
 			return nil, err
 		}
+		group.ModelMapping = decodeModelMapping(mappingJSON)
 		groups = append(groups, group)
 	}
 	if err := rows.Err(); err != nil {
@@ -279,17 +296,19 @@ func (r *Repository) ListSmartGroups(ctx context.Context, userID, accountID stri
 
 func (r *Repository) GetSmartGroup(ctx context.Context, groupID string) (*SmartGroup, error) {
 	var group SmartGroup
+	var mappingJSON []byte
 	err := r.db.QueryRow(ctx, `
-		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(k.key_preview,''),g.created_at,g.updated_at
+		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(g.model_mapping,'{}'::jsonb),COALESCE(k.key_preview,''),g.created_at,g.updated_at
 		FROM proxy_smart_groups g LEFT JOIN proxy_access_keys k ON k.owner_type='smart_group' AND k.owner_id=g.id
 		WHERE g.id=$1
-	`, groupID).Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt)
+	`, groupID).Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &mappingJSON, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	group.ModelMapping = decodeModelMapping(mappingJSON)
 	group.Members, err = r.ListGroupRoutes(ctx, groupID, false, "")
 	if err != nil {
 		return nil, err
@@ -304,7 +323,11 @@ func (r *Repository) GetSmartGroup(ctx context.Context, groupID string) (*SmartG
 }
 
 func (r *Repository) UpdateSmartGroup(ctx context.Context, group SmartGroup) error {
-	result, err := r.db.Exec(ctx, `UPDATE proxy_smart_groups SET name=$4,enabled=$5,updated_at=now() WHERE id=$1 AND user_id=$2 AND admin_account_id=$3`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled)
+	mappingJSON, err := json.Marshal(group.ModelMapping)
+	if err != nil {
+		return err
+	}
+	result, err := r.db.Exec(ctx, `UPDATE proxy_smart_groups SET name=$4,enabled=$5,model_mapping=$6::jsonb,updated_at=now() WHERE id=$1 AND user_id=$2 AND admin_account_id=$3`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled, string(mappingJSON))
 	if err != nil {
 		return err
 	}
@@ -349,34 +372,35 @@ func (r *Repository) AddMember(ctx context.Context, userID, accountID, groupID, 
 	return nil
 }
 
-func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, useProvidedKey *bool, keyCiphertext, keyPreview *string, keywordCheckEnabled *bool, excludedKeywords []string) error {
+func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, modelMappingEnabled, useProvidedKey *bool, keyCiphertext, keyPreview *string, keywordCheckEnabled *bool, excludedKeywords []string) error {
 	result, err := r.db.Exec(ctx, `
 		UPDATE proxy_smart_group_members m
 		SET stream_only=COALESCE($5::boolean,m.stream_only),
 			min_input_tokens=COALESCE($6::integer,m.min_input_tokens),
 			requests_per_minute=COALESCE($7::integer,m.requests_per_minute),
 			priority=COALESCE($8::integer,m.priority),
-			use_upstream_key=COALESCE($9::boolean,m.use_upstream_key),
+			model_mapping_enabled=COALESCE($9::boolean,m.model_mapping_enabled),
+			use_upstream_key=COALESCE($10::boolean,m.use_upstream_key),
 			upstream_key_ciphertext=CASE
-				WHEN $10::text IS NULL THEN m.upstream_key_ciphertext
-				WHEN $10::text='' THEN NULL
-				ELSE $10::text
-			END,
-			upstream_key_preview=CASE
-				WHEN $11::text IS NULL THEN m.upstream_key_preview
-				WHEN $11::text='' THEN ''
+				WHEN $11::text IS NULL THEN m.upstream_key_ciphertext
+				WHEN $11::text='' THEN NULL
 				ELSE $11::text
 			END,
-			keyword_check_enabled=COALESCE($12::boolean,m.keyword_check_enabled),
+			upstream_key_preview=CASE
+				WHEN $12::text IS NULL THEN m.upstream_key_preview
+				WHEN $12::text='' THEN ''
+				ELSE $12::text
+			END,
+			keyword_check_enabled=COALESCE($13::boolean,m.keyword_check_enabled),
 			excluded_keywords=CASE
-				WHEN $13::text[] IS NULL THEN m.excluded_keywords
-				ELSE $13::text[]
+				WHEN $14::text[] IS NULL THEN m.excluded_keywords
+				ELSE $14::text[]
 			END
 		FROM proxy_smart_groups g, proxy_routes r
 		WHERE m.smart_group_id=g.id AND g.id=$1 AND m.route_id=$2 AND r.id=m.route_id
 			AND g.user_id=$3 AND g.admin_account_id=$4
 			AND r.user_id=$3 AND r.admin_account_id=$4
-	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, useProvidedKey, keyCiphertext, keyPreview, keywordCheckEnabled, excludedKeywords)
+	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, modelMappingEnabled, useProvidedKey, keyCiphertext, keyPreview, keywordCheckEnabled, excludedKeywords)
 	if err != nil {
 		return err
 	}
@@ -456,7 +480,7 @@ func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enable
 			r.model_synced_at,r.model_sync_error,r.created_at,r.updated_at,
 			gm.stream_only,gm.min_input_tokens,gm.requests_per_minute,gm.priority,
 			gm.use_upstream_key,COALESCE(gm.upstream_key_preview,''),COALESCE(gm.upstream_key_ciphertext,''),
-			gm.keyword_check_enabled,COALESCE(gm.excluded_keywords, ARRAY[]::text[])
+			gm.keyword_check_enabled,COALESCE(gm.excluded_keywords, ARRAY[]::text[]),gm.model_mapping_enabled
 		FROM proxy_smart_group_members gm JOIN proxy_routes r ON r.id=gm.route_id
 		LEFT JOIN upstream_sites s ON s.id=r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id

@@ -150,6 +150,54 @@ func TestRequestModelIDSupportsGeminiPath(t *testing.T) {
 	}
 }
 
+func TestApplyModelMappingUpdatesOpenAIStyleBody(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	mappedRequest, mappedBody, err := applyModelMapping(request, io.NopCloser(strings.NewReader(`{"model":"client-model","messages":[]}`)), true, map[string]string{"client-model": "upstream-model"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mappedRequest != request {
+		t.Fatal("body mapping should preserve the incoming request")
+	}
+	defer mappedBody.Close()
+	var payload map[string]any
+	if err := json.NewDecoder(mappedBody).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["model"] != "upstream-model" {
+		t.Fatalf("mapped model=%v", payload["model"])
+	}
+}
+
+func TestApplyModelMappingUpdatesNativeGeminiPath(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1beta/models/client-model:streamGenerateContent?alt=sse", nil)
+	mappedRequest, mappedBody, err := applyModelMapping(request, io.NopCloser(strings.NewReader(`{"contents":[]}`)), true, map[string]string{"client-model": "upstream-model"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mappedBody.Close()
+	if mappedRequest.URL.Path != "/v1beta/models/upstream-model:streamGenerateContent" || mappedRequest.URL.RawQuery != "alt=sse" {
+		t.Fatalf("mapped request URI=%s", mappedRequest.URL.RequestURI())
+	}
+}
+
+func TestGroupModelsWithMappingsAddsSortedAliases(t *testing.T) {
+	group := &SmartGroup{
+		Models: []Model{{ID: "gemini-2.5-flash", EffectiveConcurrency: 4}},
+		ModelMapping: map[string]string{
+			"z-alias": "gemini-2.5-flash",
+			"a-alias": "gemini-2.5-flash",
+		},
+	}
+	models := groupModelsWithMappings(group)
+	if len(models) != 3 || models[1].ID != "a-alias" || models[2].ID != "z-alias" {
+		t.Fatalf("models=%#v", models)
+	}
+	if models[1].EffectiveConcurrency != 4 {
+		t.Fatalf("alias concurrency=%d", models[1].EffectiveConcurrency)
+	}
+}
+
 func TestRequestPolicyFactsEstimatesInputAndStreaming(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
 	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"model":"test","stream":true,"messages":[{"role":"user","content":"`+strings.Repeat("x", 8000)+`"}]}`)), 20000)

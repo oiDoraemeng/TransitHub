@@ -23,6 +23,7 @@ export interface ProxyRoute {
   upstreamKeyPreview?: string
   keywordCheckEnabled?: boolean
   excludedKeywords?: string[]
+  modelMappingEnabled?: boolean
   modelSyncedAt: string | null
   modelSyncError: string
   createdAt: string
@@ -41,6 +42,7 @@ export interface ProxySmartGroup {
   name: string
   enabled: boolean
   keyPreview: string
+  modelMapping: Record<string, string>
   totalConcurrency: number
   members: ProxyRoute[]
   models: ProxyModel[]
@@ -92,6 +94,7 @@ export interface SmartGroupInput {
   memberKeys?: string[]
   routeIds?: string[]
   enabled: boolean
+  modelMapping?: Record<string, string>
 }
 
 export interface SmartGroupMemberPolicyInput {
@@ -99,6 +102,7 @@ export interface SmartGroupMemberPolicyInput {
   minInputTokens: number
   requestsPerMinute: number
   priority: number
+  modelMappingEnabled: boolean
   useProvidedKey: boolean
   upstreamKey?: string
   keywordCheckEnabled: boolean
