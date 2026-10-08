@@ -150,7 +150,6 @@ export default {
         tab: '智能分组', heading: '智能分组', description: '一个 Key 调用所有成员模型，并自动汇总可用并发。',
         add: '新增智能分组', edit: '编辑智能分组', empty: '还没有智能分组。', formHelp: '成员只能是当前工作区中的普通代理 Key。',
         selectRoutes: '选择现有代理路由', memberRoute: '代理路由', selectMemberRoute: '选择要加入的代理路由', noAvailableMemberRoutes: '没有可加入的已启用代理路由。',
-        modelMapping: '智能分组模型映射', modelMappingPlaceholder: '例如：gemini-2.5-pro = gemini-2.5-flash', modelMappingHelp: '每行一条，格式为“客户端模型 = 上游模型”。成员开启映射后才会使用这里的目标模型。', modelMappingError: '模型映射格式无效，请使用“客户端模型 = 上游模型”，每行一条。',
         members: '成员路由', models: '模型目录', modelsPending: '模型目录正在后台自动同步。',
         modelCapacity: '有效并发 {count}', entryKey: '普通长期入口 Key', addMember: '添加成员',
         policy: {
@@ -167,7 +166,7 @@ export default {
           keywordPlaceholder: '每行或用逗号填写一个关键词，例如：鹈鹕\n糖果',
           keywordHelp: '只有至少一个成员启用检测时才会解析输入内容；命中任一关键词后不会使用此成员路由。',
           keywordError: '启用关键词检测时至少填写一个关键词。', keywordSummary: '关键词检测 {count} 个',
-          modelMappingEnabled: '启用模型映射', default: '未设置成员限制'
+          modelMappingEnabled: '启用模型映射', modelMapping: '成员模型映射', modelMappingPlaceholder: '例如：gpt-6-astra = gpt-6-luna', modelMappingHelp: '每行一条，格式为“客户端模型 = 上游模型”。仅此成员使用这些映射。', modelMappingError: '模型映射格式无效，请使用“客户端模型 = 上游模型”，每行一条。', modelMappingRequired: '启用模型映射时至少填写一条映射。', default: '未设置成员限制'
         }
       },
       proxies: {

@@ -182,20 +182,26 @@ func TestApplyModelMappingUpdatesNativeGeminiPath(t *testing.T) {
 	}
 }
 
-func TestGroupModelsWithMappingsAddsSortedAliases(t *testing.T) {
+func TestNormalizeModelMappingTrimsMemberEntries(t *testing.T) {
+	mapping, err := normalizeModelMapping(map[string]string{" gpt-6-astra ": " gpt-6-luna "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mapping["gpt-6-astra"] != "gpt-6-luna" {
+		t.Fatalf("normalized mapping=%#v", mapping)
+	}
+}
+
+func TestGroupModelsWithoutGroupMappingsKeepsCatalog(t *testing.T) {
 	group := &SmartGroup{
 		Models: []Model{{ID: "gemini-2.5-flash", EffectiveConcurrency: 4}},
-		ModelMapping: map[string]string{
-			"z-alias": "gemini-2.5-flash",
-			"a-alias": "gemini-2.5-flash",
-		},
 	}
 	models := groupModelsWithMappings(group)
-	if len(models) != 3 || models[1].ID != "a-alias" || models[2].ID != "z-alias" {
+	if len(models) != 1 || models[0].ID != "gemini-2.5-flash" {
 		t.Fatalf("models=%#v", models)
 	}
-	if models[1].EffectiveConcurrency != 4 {
-		t.Fatalf("alias concurrency=%d", models[1].EffectiveConcurrency)
+	if models[0].EffectiveConcurrency != 4 {
+		t.Fatalf("model concurrency=%d", models[0].EffectiveConcurrency)
 	}
 }
 

@@ -353,10 +353,6 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 	if len(routeIDs) == 0 {
 		return SmartGroup{}, "", &requestError{Status: 400, Message: "at least one member route is required"}
 	}
-	modelMapping, err := normalizeModelMapping(input.ModelMapping)
-	if err != nil {
-		return SmartGroup{}, "", err
-	}
 	groupID, err := randomID("pgroup_")
 	if err != nil {
 		return SmartGroup{}, "", err
@@ -369,7 +365,7 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 	if input.Enabled != nil {
 		enabled = *input.Enabled
 	}
-	group := SmartGroup{ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, KeyPreview: preview, ModelMapping: modelMapping}
+	group := SmartGroup{ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, KeyPreview: preview}
 	if err := s.repository.CreateSmartGroup(ctx, group, routeIDs, keyID, hash, ciphertext, preview); err != nil {
 		return SmartGroup{}, "", err
 	}
@@ -397,13 +393,6 @@ func (s *Service) UpdateSmartGroup(ctx context.Context, userID, groupID string, 
 	}
 	if input.Enabled != nil {
 		group.Enabled = *input.Enabled
-	}
-	if input.ModelMapping != nil {
-		modelMapping, mappingErr := normalizeModelMapping(input.ModelMapping)
-		if mappingErr != nil {
-			return SmartGroup{}, mappingErr
-		}
-		group.ModelMapping = modelMapping
 	}
 	if group.Name == "" {
 		return SmartGroup{}, &requestError{Status: 400, Message: "name is required"}
@@ -472,6 +461,40 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	if input.Priority != nil && *input.Priority < 0 {
 		return &requestError{Status: 400, Message: "priority cannot be negative"}
 	}
+	var modelMappingJSON *string
+	var normalizedModelMapping map[string]string
+	if input.ModelMapping != nil {
+		normalized, normalizeErr := normalizeModelMapping(*input.ModelMapping)
+		if normalizeErr != nil {
+			return normalizeErr
+		}
+		normalizedModelMapping = normalized
+		encoded, marshalErr := json.Marshal(normalized)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		encodedValue := string(encoded)
+		modelMappingJSON = &encodedValue
+	}
+	if input.ModelMappingEnabled != nil && *input.ModelMappingEnabled && input.ModelMapping != nil && len(normalizedModelMapping) == 0 {
+		return &requestError{Status: 400, Message: "modelMapping is required when model mapping is enabled"}
+	}
+	if input.ModelMappingEnabled != nil && *input.ModelMappingEnabled && input.ModelMapping == nil {
+		existing, lookupErr := s.repository.ListGroupRoutes(ctx, groupID, false, "")
+		if lookupErr != nil {
+			return lookupErr
+		}
+		found := false
+		for _, route := range existing {
+			if route.ID == routeID {
+				found = len(route.ModelMapping) > 0
+				break
+			}
+		}
+		if !found {
+			return &requestError{Status: 400, Message: "modelMapping is required when model mapping is enabled"}
+		}
+	}
 	input.UpstreamKey = strings.TrimSpace(input.UpstreamKey)
 	keywordsProvided := input.ExcludedKeywords != nil
 	if keywordsProvided {
@@ -484,7 +507,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 			return &requestError{Status: 400, Message: "at least one excluded keyword is required when keyword checking is enabled"}
 		}
 	}
-	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordCheckEnabled == nil && !keywordsProvided {
+	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordCheckEnabled == nil && !keywordsProvided {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
 	var keyCiphertext, keyPreviewValue *string
@@ -536,7 +559,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	}
 	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
 		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
-		input.ModelMappingEnabled, input.UseProvidedKey, keyCiphertext, keyPreviewValue,
+		input.ModelMappingEnabled, modelMappingJSON, input.UseProvidedKey, keyCiphertext, keyPreviewValue,
 		input.KeywordCheckEnabled, excludedKeywords)
 }
 

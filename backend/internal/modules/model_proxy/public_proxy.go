@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -102,7 +101,7 @@ func supportedGeminiEndpoint(method, path string) bool {
 }
 
 func (s *Service) writeGroupModels(w http.ResponseWriter, group *SmartGroup) {
-	data := make([]map[string]any, 0, len(group.Models)+len(group.ModelMapping))
+	data := make([]map[string]any, 0, len(group.Models))
 	for _, model := range groupModelsWithMappings(group) {
 		raw := make(map[string]any, len(model.Raw)+1)
 		for key, value := range model.Raw {
@@ -135,33 +134,7 @@ func (s *Service) writeGroupGeminiModels(w http.ResponseWriter, group *SmartGrou
 }
 
 func groupModelsWithMappings(group *SmartGroup) []Model {
-	models := append([]Model(nil), group.Models...)
-	seen := make(map[string]struct{}, len(models)+len(group.ModelMapping))
-	for _, model := range models {
-		seen[model.ID] = struct{}{}
-	}
-	keys := make([]string, 0, len(group.ModelMapping))
-	for source := range group.ModelMapping {
-		keys = append(keys, source)
-	}
-	sort.Strings(keys)
-	for _, source := range keys {
-		if _, exists := seen[source]; exists {
-			continue
-		}
-		target := group.ModelMapping[source]
-		alias := Model{ID: source, Object: "model"}
-		for _, model := range group.Models {
-			if model.ID == target {
-				alias.EffectiveConcurrency = model.EffectiveConcurrency
-				alias.Raw = model.Raw
-				break
-			}
-		}
-		models = append(models, alias)
-		seen[source] = struct{}{}
-	}
-	return models
+	return group.Models
 }
 
 func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, route Route) {
@@ -241,11 +214,6 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	modelID, err := requestModelID(incoming, replay)
 	if err != nil || strings.TrimSpace(modelID) == "" {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "model is required")
-		return
-	}
-	responseMapping, responseMappingErr := newMappedResponseContext(incoming, replay, modelID, group.ModelMapping)
-	if responseMappingErr != nil {
-		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "failed to parse request body")
 		return
 	}
 	candidates, err := s.smartGroupCandidates(incoming.Context(), group, modelID)
@@ -331,7 +299,13 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			lease.Release(context.Background())
 			continue
 		}
-		response, retryable, attemptErr := s.performAttempt(incoming, *route, replay.Open, group.ModelMapping, responseMapping)
+		responseMapping, responseMappingErr := newMappedResponseContext(incoming, replay, modelID, route.ModelMapping)
+		if responseMappingErr != nil {
+			lastErr = responseMappingErr
+			lease.Release(context.Background())
+			continue
+		}
+		response, retryable, attemptErr := s.performAttempt(incoming, *route, replay.Open, route.ModelMapping, responseMapping)
 		if attemptErr != nil {
 			lastErr = attemptErr
 			lease.Release(context.Background())
@@ -360,39 +334,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 }
 
 func (s *Service) smartGroupCandidates(ctx context.Context, group SmartGroup, modelID string) ([]Route, error) {
-	sourceCandidates, err := s.repository.ListGroupRoutes(ctx, group.ID, true, modelID)
-	if err != nil {
-		return nil, err
-	}
-	targetModel, mapped := group.ModelMapping[modelID]
-	targetModel = strings.TrimSpace(targetModel)
-	if !mapped || targetModel == "" || targetModel == modelID {
-		return sourceCandidates, nil
-	}
-	mappedCandidates, err := s.repository.ListGroupRoutes(ctx, group.ID, true, targetModel)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]Route, 0, len(sourceCandidates)+len(mappedCandidates))
-	seen := make(map[string]struct{}, len(sourceCandidates)+len(mappedCandidates))
-	for _, route := range sourceCandidates {
-		if route.ModelMappingEnabled {
-			continue
-		}
-		result = append(result, route)
-		seen[route.ID] = struct{}{}
-	}
-	for _, route := range mappedCandidates {
-		if !route.ModelMappingEnabled {
-			continue
-		}
-		if _, exists := seen[route.ID]; exists {
-			continue
-		}
-		result = append(result, route)
-		seen[route.ID] = struct{}{}
-	}
-	return result, nil
+	return s.repository.ListGroupRoutes(ctx, group.ID, true, modelID)
 }
 
 func requestModelID(incoming *http.Request, replay *replayBody) (string, error) {

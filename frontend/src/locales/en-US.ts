@@ -150,7 +150,6 @@ export default {
         tab: 'Smart groups', heading: 'Smart groups', description: 'Use one key for every member model and combine available concurrency.',
         add: 'Add smart group', edit: 'Edit smart group', empty: 'No smart groups yet.', formHelp: 'Members must be regular proxy keys in the current workspace.',
         selectRoutes: 'Select existing proxy routes', memberRoute: 'Proxy route', selectMemberRoute: 'Select a route to add', noAvailableMemberRoutes: 'No enabled proxy routes are available to add.',
-        modelMapping: 'Smart-group model mapping', modelMappingPlaceholder: 'For example: gemini-2.5-pro = gemini-2.5-flash', modelMappingHelp: 'One entry per line in the form “client model = upstream model”. Members use these targets only when mapping is enabled.', modelMappingError: 'Invalid model mapping. Use “client model = upstream model”, one entry per line.',
         members: 'Member routes', models: 'Model catalog', modelsPending: 'The model catalog is syncing automatically.',
         modelCapacity: 'Effective concurrency {count}', entryKey: 'Regular durable entry key', addMember: 'Add member',
         policy: {
@@ -167,7 +166,7 @@ export default {
           keywordPlaceholder: 'One keyword per line or comma, for example: pelican\ncandy',
           keywordHelp: 'Input is parsed only when at least one member enables checks. A matching keyword skips this member route.',
           keywordError: 'Enter at least one keyword when keyword checks are enabled.', keywordSummary: 'Keyword checks: {count}',
-          modelMappingEnabled: 'Model mapping enabled', default: 'No member restrictions'
+          modelMappingEnabled: 'Model mapping enabled', modelMapping: 'Member model mapping', modelMappingPlaceholder: 'For example: gpt-6-astra = gpt-6-luna', modelMappingHelp: 'One entry per line in the form “client model = upstream model”. Only this member uses these mappings.', modelMappingError: 'Invalid model mapping. Use “client model = upstream model”, one entry per line.', modelMappingRequired: 'Enter at least one mapping when model mapping is enabled.', default: 'No member restrictions'
         }
       },
       proxies: {

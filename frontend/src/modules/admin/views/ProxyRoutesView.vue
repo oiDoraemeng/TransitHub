@@ -48,13 +48,12 @@ const smartModalOpen = ref(false)
 const editingSmartGroupId = ref('')
 const smartName = ref('')
 const smartEnabled = ref(true)
-const smartModelMapping = ref('')
 const selectedRouteIds = ref<string[]>([])
 
 const memberModalGroup = ref<ProxySmartGroup | null>(null)
 const memberRouteId = ref('')
 const memberPolicyTarget = ref<{ group: ProxySmartGroup; route: ProxyRoute } | null>(null)
-const memberPolicyForm = reactive({ streamOnly: false, minInputTokens: 0, requestsPerMinute: 0, priority: 0, modelMappingEnabled: false, useProvidedKey: false, upstreamKey: '', keywordCheckEnabled: false, excludedKeywords: '' })
+const memberPolicyForm = reactive({ streamOnly: false, minInputTokens: 0, requestsPerMinute: 0, priority: 0, modelMappingEnabled: false, modelMapping: '', useProvidedKey: false, upstreamKey: '', keywordCheckEnabled: false, excludedKeywords: '' })
 
 const enabledRoutes = computed(() => routes.value.filter(route => route.enabled))
 const availableMemberRoutes = computed(() => {
@@ -248,7 +247,6 @@ const openCreateSmart = () => {
   editingSmartGroupId.value = ''
   smartName.value = ''
   smartEnabled.value = true
-  smartModelMapping.value = ''
   selectedRouteIds.value = []
   smartModalOpen.value = true
 }
@@ -257,7 +255,6 @@ const openEditSmart = (group: ProxySmartGroup) => {
   editingSmartGroupId.value = group.id
   smartName.value = group.name
   smartEnabled.value = group.enabled
-  smartModelMapping.value = Object.entries(group.modelMapping ?? {}).map(([source, target]) => `${source} = ${target}`).join('\n')
   selectedRouteIds.value = group.members.map(member => member.id)
   smartModalOpen.value = true
 }
@@ -266,29 +263,11 @@ const submitSmart = async () => {
   saving.value = true
   errorMessage.value = ''
   try {
-    const modelMapping: Record<string, string> = {}
-    for (const line of smartModelMapping.value.split(/[\r\n]+/)) {
-      const trimmed = line.trim()
-      if (!trimmed) continue
-      const separator = trimmed.includes('=>') ? '=>' : '='
-      const index = trimmed.indexOf(separator)
-      if (index <= 0 || index === trimmed.length - separator.length) {
-        errorMessage.value = t('admin.modelProxy.groups.modelMappingError')
-        return
-      }
-      const source = trimmed.slice(0, index).trim()
-      const target = trimmed.slice(index + separator.length).trim()
-      if (!source || !target) {
-        errorMessage.value = t('admin.modelProxy.groups.modelMappingError')
-        return
-      }
-      modelMapping[source] = target
-    }
     if (editingSmartGroupId.value) {
-      await updateProxySmartGroup(editingSmartGroupId.value, { name: smartName.value.trim(), enabled: smartEnabled.value, modelMapping })
+      await updateProxySmartGroup(editingSmartGroupId.value, { name: smartName.value.trim(), enabled: smartEnabled.value })
       flash(t('admin.modelProxy.notices.groupUpdated'))
     } else {
-      const created = await createProxySmartGroup({ name: smartName.value.trim(), enabled: smartEnabled.value, routeIds: [...selectedRouteIds.value], modelMapping })
+      const created = await createProxySmartGroup({ name: smartName.value.trim(), enabled: smartEnabled.value, routeIds: [...selectedRouteIds.value] })
       await copyText(created.key)
     }
     smartModalOpen.value = false
@@ -332,6 +311,7 @@ const openMemberPolicy = (group: ProxySmartGroup, route: ProxyRoute) => {
     requestsPerMinute: route.requestsPerMinute ?? 0,
     priority: route.priority ?? 0,
     modelMappingEnabled: route.modelMappingEnabled ?? false,
+    modelMapping: Object.entries(route.modelMapping ?? {}).map(([source, target]) => `${source} = ${target}`).join('\n'),
     useProvidedKey: route.useProvidedKey ?? false,
     upstreamKey: '',
     keywordCheckEnabled: route.keywordCheckEnabled ?? false,
@@ -355,6 +335,28 @@ const submitMemberPolicy = async () => {
     errorMessage.value = t('admin.modelProxy.groups.policy.keywordError')
     return
   }
+  const modelMapping: Record<string, string> = {}
+  for (const line of memberPolicyForm.modelMapping.split(/[\r\n]+/)) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    const separator = trimmed.includes('=>') ? '=>' : '='
+    const index = trimmed.indexOf(separator)
+    if (index <= 0 || index === trimmed.length - separator.length) {
+      errorMessage.value = t('admin.modelProxy.groups.policy.modelMappingError')
+      return
+    }
+    const source = trimmed.slice(0, index).trim()
+    const target = trimmed.slice(index + separator.length).trim()
+    if (!source || !target) {
+      errorMessage.value = t('admin.modelProxy.groups.policy.modelMappingError')
+      return
+    }
+    modelMapping[source] = target
+  }
+  if (memberPolicyForm.modelMappingEnabled && !Object.keys(modelMapping).length) {
+    errorMessage.value = t('admin.modelProxy.groups.policy.modelMappingRequired')
+    return
+  }
   saving.value = true
   errorMessage.value = ''
   try {
@@ -364,6 +366,7 @@ const submitMemberPolicy = async () => {
       requestsPerMinute: memberPolicyForm.requestsPerMinute,
       priority: memberPolicyForm.priority,
       modelMappingEnabled: memberPolicyForm.modelMappingEnabled,
+      modelMapping,
       useProvidedKey: memberPolicyForm.useProvidedKey,
       upstreamKey: memberPolicyForm.upstreamKey.trim() || undefined,
       keywordCheckEnabled: memberPolicyForm.keywordCheckEnabled,
@@ -547,11 +550,11 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
         </form>
       </div>
 
-      <div v-if="smartModalOpen" class="modal-backdrop" @click.self="smartModalOpen = false"><form class="modal-panel max-w-2xl" @submit.prevent="submitSmart"><div class="modal-header"><div><h3 class="font-semibold">{{ editingSmartGroupId ? t('admin.modelProxy.groups.edit') : t('admin.modelProxy.groups.add') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.formHelp') }}</p></div><button type="button" @click="smartModalOpen = false"><X class="h-5 w-5" /></button></div><div class="space-y-5 p-5"><label class="field"><span>{{ t('admin.modelProxy.form.name') }}</span><input v-model="smartName" required /></label><label class="flex items-center gap-3 text-sm"><input v-model="smartEnabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.form.enabled') }}</label><label class="field"><span>{{ t('admin.modelProxy.groups.modelMapping') }}</span><textarea v-model="smartModelMapping" rows="5" :placeholder="t('admin.modelProxy.groups.modelMappingPlaceholder')" /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.modelMappingHelp') }}</small></label><template v-if="!editingSmartGroupId"><fieldset><legend class="mb-2 text-sm font-medium">{{ t('admin.modelProxy.groups.selectRoutes') }}</legend><div class="max-h-48 divide-y divide-border overflow-y-auto border border-border"><label v-for="routeItem in enabledRoutes" :key="routeItem.id" class="flex items-center justify-between gap-3 px-3 py-2 text-sm"><span><span class="font-medium">{{ routeItem.name }}</span><span class="ml-2 text-muted-foreground">{{ routeItem.keyPreview }}</span></span><input v-model="selectedRouteIds" type="checkbox" :value="routeItem.id" class="h-4 w-4" /></label></div></fieldset></template></div><div class="modal-actions"><Button type="button" variant="ghost" @click="smartModalOpen = false">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving || (!editingSmartGroupId && !selectedRouteIds.length)"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div></form></div>
+      <div v-if="smartModalOpen" class="modal-backdrop" @click.self="smartModalOpen = false"><form class="modal-panel max-w-2xl" @submit.prevent="submitSmart"><div class="modal-header"><div><h3 class="font-semibold">{{ editingSmartGroupId ? t('admin.modelProxy.groups.edit') : t('admin.modelProxy.groups.add') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.formHelp') }}</p></div><button type="button" @click="smartModalOpen = false"><X class="h-5 w-5" /></button></div><div class="space-y-5 p-5"><label class="field"><span>{{ t('admin.modelProxy.form.name') }}</span><input v-model="smartName" required /></label><label class="flex items-center gap-3 text-sm"><input v-model="smartEnabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.form.enabled') }}</label><template v-if="!editingSmartGroupId"><fieldset><legend class="mb-2 text-sm font-medium">{{ t('admin.modelProxy.groups.selectRoutes') }}</legend><div class="max-h-48 divide-y divide-border overflow-y-auto border border-border"><label v-for="routeItem in enabledRoutes" :key="routeItem.id" class="flex items-center justify-between gap-3 px-3 py-2 text-sm"><span><span class="font-medium">{{ routeItem.name }}</span><span class="ml-2 text-muted-foreground">{{ routeItem.keyPreview }}</span></span><input v-model="selectedRouteIds" type="checkbox" :value="routeItem.id" class="h-4 w-4" /></label></div></fieldset></template></div><div class="modal-actions"><Button type="button" variant="ghost" @click="smartModalOpen = false">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving || (!editingSmartGroupId && !selectedRouteIds.length)"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div></form></div>
 
       <div v-if="memberModalGroup" class="modal-backdrop" @click.self="memberModalGroup = null"><form class="modal-panel max-w-lg" @submit.prevent="submitMember"><div class="modal-header"><div><h3 class="font-semibold">{{ t('admin.modelProxy.actions.addMember') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ memberModalGroup.name }}</p></div><button type="button" @click="memberModalGroup = null"><X class="h-5 w-5" /></button></div><div class="space-y-3 p-5"><label class="field"><span>{{ t('admin.modelProxy.groups.memberRoute') }}</span><select v-model="memberRouteId" required><option value="" disabled>{{ t('admin.modelProxy.groups.selectMemberRoute') }}</option><option v-for="routeItem in availableMemberRoutes" :key="routeItem.id" :value="routeItem.id">{{ routeItem.name }} · {{ routeItem.siteName }} / {{ routeItem.groupName }}</option></select></label><p v-if="!availableMemberRoutes.length" class="text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.noAvailableMemberRoutes') }}</p></div><div class="modal-actions"><Button type="button" variant="ghost" @click="memberModalGroup = null">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving || !memberRouteId">{{ t('admin.modelProxy.groups.addMember') }}</Button></div></form></div>
 
-      <div v-if="memberPolicyTarget" class="modal-backdrop" @click.self="memberPolicyTarget = null"><form class="modal-panel max-w-lg" @submit.prevent="submitMemberPolicy"><div class="modal-header"><div><h3 class="font-semibold">{{ t('admin.modelProxy.groups.policy.edit') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ memberPolicyTarget.route.name }} · {{ memberPolicyTarget.group.name }}</p></div><button type="button" @click="memberPolicyTarget = null"><X class="h-5 w-5" /></button></div><div class="space-y-5 p-5"><label class="field"><span>{{ t('admin.modelProxy.groups.policy.priority') }}</span><input v-model.number="memberPolicyForm.priority" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.priorityHelp') }}</small></label><label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.modelMappingEnabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.modelMappingEnabled') }}</label><label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.streamOnly" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.streamOnly') }}</label><label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.useProvidedKey" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.useProvidedKey') }}</label><label v-if="memberPolicyForm.useProvidedKey" class="field"><span>{{ t('admin.modelProxy.groups.policy.providedKey') }}</span><input v-model="memberPolicyForm.upstreamKey" type="password" autocomplete="new-password" :placeholder="memberPolicyTarget.route.upstreamKeyPreview || 'sk-...'" /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.providedKeyHelp') }}</small></label><label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.keywordCheckEnabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.keywordCheckEnabled') }}</label><label v-if="memberPolicyForm.keywordCheckEnabled" class="field"><span>{{ t('admin.modelProxy.groups.policy.excludedKeywords') }}</span><textarea v-model="memberPolicyForm.excludedKeywords" rows="3" :placeholder="t('admin.modelProxy.groups.policy.keywordPlaceholder')" /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.keywordHelp') }}</small></label><label class="field"><span>{{ t('admin.modelProxy.groups.policy.minInput') }}</span><input v-model.number="memberPolicyForm.minInputTokens" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.minInputHelp') }}</small></label><label class="field"><span>{{ t('admin.modelProxy.groups.policy.rpm') }}</span><input v-model.number="memberPolicyForm.requestsPerMinute" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.rpmHelp') }}</small></label></div><div class="modal-actions"><Button type="button" variant="ghost" @click="memberPolicyTarget = null">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div></form></div>
+      <div v-if="memberPolicyTarget" class="modal-backdrop" @click.self="memberPolicyTarget = null"><form class="modal-panel max-w-lg" @submit.prevent="submitMemberPolicy"><div class="modal-header"><div><h3 class="font-semibold">{{ t('admin.modelProxy.groups.policy.edit') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ memberPolicyTarget.route.name }} · {{ memberPolicyTarget.group.name }}</p></div><button type="button" @click="memberPolicyTarget = null"><X class="h-5 w-5" /></button></div><div class="space-y-5 p-5"><label class="field"><span>{{ t('admin.modelProxy.groups.policy.priority') }}</span><input v-model.number="memberPolicyForm.priority" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.priorityHelp') }}</small></label><label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.modelMappingEnabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.modelMappingEnabled') }}</label><label v-if="memberPolicyForm.modelMappingEnabled" class="field"><span>{{ t('admin.modelProxy.groups.policy.modelMapping') }}</span><textarea v-model="memberPolicyForm.modelMapping" rows="5" :placeholder="t('admin.modelProxy.groups.policy.modelMappingPlaceholder')" /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.modelMappingHelp') }}</small></label><label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.streamOnly" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.streamOnly') }}</label><label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.useProvidedKey" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.useProvidedKey') }}</label><label v-if="memberPolicyForm.useProvidedKey" class="field"><span>{{ t('admin.modelProxy.groups.policy.providedKey') }}</span><input v-model="memberPolicyForm.upstreamKey" type="password" autocomplete="new-password" :placeholder="memberPolicyTarget.route.upstreamKeyPreview || 'sk-...'" /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.providedKeyHelp') }}</small></label><label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.keywordCheckEnabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.keywordCheckEnabled') }}</label><label v-if="memberPolicyForm.keywordCheckEnabled" class="field"><span>{{ t('admin.modelProxy.groups.policy.excludedKeywords') }}</span><textarea v-model="memberPolicyForm.excludedKeywords" rows="3" :placeholder="t('admin.modelProxy.groups.policy.keywordPlaceholder')" /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.keywordHelp') }}</small></label><label class="field"><span>{{ t('admin.modelProxy.groups.policy.minInput') }}</span><input v-model.number="memberPolicyForm.minInputTokens" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.minInputHelp') }}</small></label><label class="field"><span>{{ t('admin.modelProxy.groups.policy.rpm') }}</span><input v-model.number="memberPolicyForm.requestsPerMinute" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.rpmHelp') }}</small></label></div><div class="modal-actions"><Button type="button" variant="ghost" @click="memberPolicyTarget = null">{{ t('admin.modelProxy.cancel') }}</Button><Button type="submit" :disabled="saving"><Loader2 v-if="saving" class="h-4 w-4 animate-spin" />{{ t('admin.modelProxy.save') }}</Button></div></form></div>
 
     </Teleport>
   </div>
