@@ -317,6 +317,25 @@ func TestMappedResponsesRewriteSSEResponseObject(t *testing.T) {
 	}
 }
 
+func TestMappedResponsesDoNotAddMetadataToSSEDelta(t *testing.T) {
+	context := mappedResponseContext{
+		Enabled:         true,
+		SourceModel:     "gpt-6-astra",
+		TargetModel:     "gpt-6-luna",
+		ResponsesAPI:    true,
+		ReasoningMode:   "focused",
+		ReasoningEffort: "high",
+	}
+	line := rewriteMappedSSELine([]byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"hello\"}\n"), context)
+	var payload map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:"))), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload) != 2 || payload["type"] != "response.output_text.delta" || payload["delta"] != "hello" {
+		t.Fatalf("SSE delta was modified: %#v", payload)
+	}
+}
+
 func TestRequestPolicyFactsEstimatesInputAndStreaming(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
 	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"model":"test","stream":true,"messages":[{"role":"user","content":"`+strings.Repeat("x", 8000)+`"}]}`)), 20000)

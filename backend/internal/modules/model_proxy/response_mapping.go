@@ -130,10 +130,19 @@ func rewriteMappedResponseObject(payload map[string]any, context mappedResponseC
 
 func rewriteMappedSSEPayload(payload map[string]any, context mappedResponseContext) {
 	if nested, ok := payload["response"].(map[string]any); ok {
-		rewriteMappedResponseObject(nested, context, context.ResponsesAPI)
+		rewriteMappedResponseObject(nested, context, context.ResponsesAPI && hasMappedResponseMetadata(nested))
 		return
 	}
-	rewriteMappedResponseObject(payload, context, false)
+	rewriteMappedResponseObject(payload, context, context.ResponsesAPI && hasMappedResponseMetadata(payload))
+}
+
+func hasMappedResponseMetadata(payload map[string]any) bool {
+	for _, key := range []string{"model", "access_programs", "reasoning"} {
+		if _, ok := payload[key]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 type mappedSSEBody struct {
