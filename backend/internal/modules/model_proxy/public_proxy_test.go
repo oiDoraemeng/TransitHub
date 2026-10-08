@@ -188,7 +188,10 @@ func TestRequestPolicyFactsWithTextExtractsChatInputForKeywordChecks(t *testing.
 	if err != nil || streaming || tokens == 0 || !strings.Contains(input, "鹈鹕") {
 		t.Fatalf("streaming=%v tokens=%d input=%q err=%v", streaming, tokens, input, err)
 	}
-	if !containsExcludedKeyword(strings.ToLower(input), []string{"糖果", "鹈鹕"}) {
+	matched := matchExcludedKeywordRoutes(strings.ToLower(input), []Route{
+		{ID: "route-a", KeywordCheckEnabled: true, ExcludedKeywords: []string{"糖果", "鹈鹕"}},
+	})
+	if _, ok := matched["route-a"]; !ok {
 		t.Fatal("matching excluded keyword was not detected")
 	}
 }
@@ -203,6 +206,24 @@ func TestRequestPolicyFactsWithTextExtractsNativeGeminiInput(t *testing.T) {
 	streaming, _, input, err := requestPolicyFactsWithText(request, replay)
 	if err != nil || !streaming || !strings.Contains(input, "糖果") {
 		t.Fatalf("streaming=%v input=%q err=%v", streaming, input, err)
+	}
+}
+
+func TestMatchExcludedKeywordRoutesDeduplicatesKeywordsAcrossMembers(t *testing.T) {
+	routes := []Route{
+		{ID: "route-a", KeywordCheckEnabled: true, ExcludedKeywords: []string{"糖果", "鹈鹕"}},
+		{ID: "route-b", KeywordCheckEnabled: true, ExcludedKeywords: []string{"糖果", "糖果"}},
+		{ID: "route-c", KeywordCheckEnabled: false, ExcludedKeywords: []string{"糖果"}},
+	}
+	matched := matchExcludedKeywordRoutes("请使用糖果路由", routes)
+	if _, ok := matched["route-a"]; !ok {
+		t.Fatal("route-a should be skipped")
+	}
+	if _, ok := matched["route-b"]; !ok {
+		t.Fatal("route-b should be skipped")
+	}
+	if _, ok := matched["route-c"]; ok {
+		t.Fatal("keyword checks disabled route-c should remain eligible")
 	}
 }
 

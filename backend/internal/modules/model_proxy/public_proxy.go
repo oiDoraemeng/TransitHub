@@ -245,7 +245,6 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "failed to parse request body")
 		return
 	}
-	normalizedInput := strings.ToLower(inputText)
 	eligible := make([]Route, 0, len(candidates))
 	for _, candidate := range candidates {
 		if candidate.StreamOnly && !streaming {
@@ -254,10 +253,18 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		if candidate.MinInputTokens > 0 && inputTokens < candidate.MinInputTokens {
 			continue
 		}
-		if candidate.KeywordCheckEnabled && containsExcludedKeyword(normalizedInput, candidate.ExcludedKeywords) {
-			continue
-		}
 		eligible = append(eligible, candidate)
+	}
+	if keywordFiltering {
+		matchedRoutes := matchExcludedKeywordRoutes(strings.ToLower(inputText), eligible)
+		filtered := eligible[:0]
+		for _, candidate := range eligible {
+			if _, matched := matchedRoutes[candidate.ID]; matched {
+				continue
+			}
+			filtered = append(filtered, candidate)
+		}
+		eligible = filtered
 	}
 	if len(eligible) == 0 {
 		writeOpenAIError(w, http.StatusNotFound, "no_eligible_member", "no smart group member matches the request policy")
@@ -712,14 +719,36 @@ func collectInputText(value any, key string, characters *int, inputText *strings
 	}
 }
 
-func containsExcludedKeyword(input string, keywords []string) bool {
-	for _, keyword := range keywords {
-		keyword = strings.ToLower(strings.TrimSpace(keyword))
-		if keyword != "" && strings.Contains(input, keyword) {
-			return true
+func matchExcludedKeywordRoutes(input string, routes []Route) map[string]struct{} {
+	keywordRoutes := make(map[string][]string)
+	for _, route := range routes {
+		if !route.KeywordCheckEnabled {
+			continue
+		}
+		seen := make(map[string]struct{}, len(route.ExcludedKeywords))
+		for _, keyword := range route.ExcludedKeywords {
+			keyword = strings.ToLower(strings.TrimSpace(keyword))
+			if keyword == "" {
+				continue
+			}
+			if _, duplicate := seen[keyword]; duplicate {
+				continue
+			}
+			seen[keyword] = struct{}{}
+			keywordRoutes[keyword] = append(keywordRoutes[keyword], route.ID)
 		}
 	}
-	return false
+
+	matchedRoutes := make(map[string]struct{})
+	for keyword, routeIDs := range keywordRoutes {
+		if !strings.Contains(input, keyword) {
+			continue
+		}
+		for _, routeID := range routeIDs {
+			matchedRoutes[routeID] = struct{}{}
+		}
+	}
+	return matchedRoutes
 }
 
 func isInputTextKey(key string) bool {
