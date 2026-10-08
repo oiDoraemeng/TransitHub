@@ -291,6 +291,22 @@ func TestMappedResponsesIgnoreUnsupportedMappings(t *testing.T) {
 	}
 }
 
+func TestMappedResponsesAcceptGpt56LunaTarget(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"model":"gpt-5.6-sol","input":"hello"}`)), 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replay.Close()
+	context, err := newMappedResponseContext(request, replay, "gpt-5.6-sol", map[string]string{"gpt-5.6-sol": "gpt-5.6-luna"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !context.Enabled || context.TargetModel != "gpt-5.6-luna" {
+		t.Fatalf("gpt-5.6-luna mapping was not enabled: %#v", context)
+	}
+}
+
 func TestMappedResponsesRewriteSSEResponseObject(t *testing.T) {
 	context := mappedResponseContext{
 		Enabled:         true,

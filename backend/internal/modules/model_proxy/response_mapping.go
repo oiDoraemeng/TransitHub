@@ -10,7 +10,10 @@ import (
 	"strings"
 )
 
-const mappedModelTarget = "gpt-6-luna"
+var mappedModelTargets = map[string]struct{}{
+	"gpt-6-luna":   {},
+	"gpt-5.6-luna": {},
+}
 
 var mappedAstraCompatibleModels = map[string]struct{}{
 	"gpt-6":         {},
@@ -36,7 +39,7 @@ type mappedResponseContext struct {
 func newMappedResponseContext(incoming *http.Request, replay *replayBody, sourceModel string, mapping map[string]string) (mappedResponseContext, error) {
 	sourceModel = strings.TrimSpace(sourceModel)
 	targetModel := strings.TrimSpace(mapping[sourceModel])
-	if targetModel != mappedModelTarget {
+	if _, ok := mappedModelTargets[targetModel]; !ok {
 		return mappedResponseContext{}, nil
 	}
 	if _, ok := mappedAstraCompatibleModels[sourceModel]; !ok {
