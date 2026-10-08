@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"transithub/backend/internal/modules/upstream"
 )
 
 func TestSupportedPublicEndpoint(t *testing.T) {
@@ -224,6 +226,13 @@ func TestMatchExcludedKeywordRoutesDeduplicatesKeywordsAcrossMembers(t *testing.
 	}
 	if _, ok := matched["route-c"]; ok {
 		t.Fatal("keyword checks disabled route-c should remain eligible")
+	}
+}
+
+func TestCleanupErrorIncludesUpstreamStatus(t *testing.T) {
+	err := cleanupError(&upstream.RequestError{MessageKey: "upstream.request", StatusCode: http.StatusTooManyRequests})
+	if !strings.Contains(err.Error(), "status=429") {
+		t.Fatalf("cleanup error = %q, want HTTP status", err)
 	}
 }
 

@@ -598,6 +598,11 @@ func (r *Repository) ActivateCleanupJob(ctx context.Context, id, remoteKeyID str
 	return err
 }
 
+func (r *Repository) SetCleanupRemoteKey(ctx context.Context, id, remoteKeyID string) error {
+	_, err := r.db.Exec(ctx, `UPDATE proxy_cleanup_jobs SET remote_key_id=$2,updated_at=now() WHERE id=$1 AND status <> 'done'`, id, remoteKeyID)
+	return err
+}
+
 func (r *Repository) MarkCleanupPending(ctx context.Context, id string) error {
 	_, err := r.db.Exec(ctx, `UPDATE proxy_cleanup_jobs SET status='delete_pending',next_attempt_at=now(),locked_until=NULL,updated_at=now() WHERE id=$1 AND status <> 'done'`, id)
 	return err
@@ -628,7 +633,7 @@ func (r *Repository) ClaimCleanupJobs(ctx context.Context, limit int) ([]Cleanup
 			AND (locked_until IS NULL OR locked_until < now())
 			ORDER BY next_attempt_at ASC LIMIT $1 FOR UPDATE SKIP LOCKED
 		)
-		UPDATE proxy_cleanup_jobs j SET locked_until=now()+interval '30 seconds',updated_at=now()
+		UPDATE proxy_cleanup_jobs j SET locked_until=now()+interval '2 minutes',updated_at=now()
 		FROM due WHERE j.id=due.id
 		RETURNING j.id,j.user_id,j.admin_account_id,COALESCE(j.route_id,''),j.site_id,j.remote_key_id,j.remote_key_name,j.status,j.attempts,j.last_error
 	`, limit)

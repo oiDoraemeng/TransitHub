@@ -22,6 +22,13 @@ import (
 	"transithub/backend/internal/modules/upstream"
 )
 
+const (
+	cleanupBatchSize      = 100
+	cleanupWorkerCount    = 8
+	cleanupRequestTimeout = 60 * time.Second
+	cleanupStateTimeout   = 5 * time.Second
+)
+
 type AccountResolver interface {
 	RequireCurrentID(ctx context.Context, userID string) (string, error)
 }
@@ -663,16 +670,21 @@ func (s *Service) createRemoteKey(ctx context.Context, route Route) (string, Cle
 }
 
 func (s *Service) beginDelete(job CleanupJob) {
-	_ = s.repository.MarkCleanupPending(context.Background(), job.ID)
-	go s.processCleanupJob(context.Background(), job)
+	if err := s.repository.MarkCleanupPending(context.Background(), job.ID); err != nil {
+		log.Printf("[model-proxy] mark cleanup pending job_id=%s err=%v", job.ID, err)
+	}
 }
 
 func (s *Service) processCleanupJob(ctx context.Context, job CleanupJob) {
 	if err := s.deleteCleanupJob(ctx, job); err != nil {
-		s.retryCleanup(ctx, job, err)
+		stateCtx, cancel := context.WithTimeout(context.Background(), cleanupStateTimeout)
+		s.retryCleanup(stateCtx, job, err)
+		cancel()
 		return
 	}
-	_ = s.repository.CompleteCleanupJob(ctx, job.ID)
+	stateCtx, cancel := context.WithTimeout(context.Background(), cleanupStateTimeout)
+	_ = s.repository.CompleteCleanupJob(stateCtx, job.ID)
+	cancel()
 }
 
 // deleteCleanupJob performs one cleanup attempt and leaves retry scheduling to
@@ -695,6 +707,9 @@ func (s *Service) deleteCleanupJob(ctx context.Context, job CleanupJob) error {
 		}
 		if key != nil {
 			job.RemoteKeyID = key.ID
+			if err := s.repository.SetCleanupRemoteKey(ctx, job.ID, key.ID); err != nil {
+				return err
+			}
 		}
 		if job.RemoteKeyID == "" {
 			return nil
@@ -737,7 +752,18 @@ func (s *Service) retryCleanup(ctx context.Context, job CleanupJob, cleanupErr e
 		delay = 5 * time.Minute
 	}
 	delay += time.Duration(mathrand.Int64N(int64(time.Second)))
-	_ = s.repository.RetryCleanupJob(ctx, job.ID, job.Attempts, time.Now().Add(delay), cleanupErr)
+	_ = s.repository.RetryCleanupJob(ctx, job.ID, job.Attempts, time.Now().Add(delay), cleanupError(cleanupErr))
+}
+
+func cleanupError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var requestErr *upstream.RequestError
+	if errors.As(err, &requestErr) && requestErr.StatusCode > 0 {
+		return fmt.Errorf("%w (status=%d)", err, requestErr.StatusCode)
+	}
+	return err
 }
 
 func isUpstreamNotFound(err error) bool {
@@ -776,15 +802,36 @@ func (s *Service) cleanupLoop(ctx context.Context) {
 }
 
 func (s *Service) processDueCleanupJobs(ctx context.Context) {
-	jobs, err := s.repository.ClaimCleanupJobs(ctx, 50)
+	jobs, err := s.repository.ClaimCleanupJobs(ctx, cleanupBatchSize)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			log.Printf("[model-proxy] claim cleanup jobs: %v", err)
 		}
 		return
 	}
-	for _, job := range jobs {
-		s.processCleanupJob(ctx, job)
+	if len(jobs) > 0 {
+		workers := cleanupWorkerCount
+		if len(jobs) < workers {
+			workers = len(jobs)
+		}
+		jobQueue := make(chan CleanupJob)
+		var wg sync.WaitGroup
+		wg.Add(workers)
+		for i := 0; i < workers; i++ {
+			go func() {
+				defer wg.Done()
+				for job := range jobQueue {
+					jobCtx, cancel := context.WithTimeout(ctx, cleanupRequestTimeout)
+					s.processCleanupJob(jobCtx, job)
+					cancel()
+				}
+			}()
+		}
+		for _, job := range jobs {
+			jobQueue <- job
+		}
+		close(jobQueue)
+		wg.Wait()
 	}
 	_ = s.repository.PurgeCompletedCleanupJobs(ctx)
 }
