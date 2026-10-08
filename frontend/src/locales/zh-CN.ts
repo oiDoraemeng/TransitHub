@@ -162,6 +162,10 @@ export default {
           useProvidedKey: '使用预置上游 Key（不创建临时 Key）', providedKey: '预置上游 Key',
           providedKeyHelp: '开启后使用该成员的预置 Key 调用模型，不会创建或删除临时 Key。留空表示保留已保存的 Key。',
           providedKeyError: '启用预置上游 Key 时必须提供 Key。', providedKeySummary: '预置 Key {preview}',
+          keywordCheckEnabled: '启用关键词检测（命中后跳过此成员）', excludedKeywords: '跳过路由的关键词',
+          keywordPlaceholder: '每行或用逗号填写一个关键词，例如：鹈鹕\n糖果',
+          keywordHelp: '只有至少一个成员启用检测时才会解析输入内容；命中任一关键词后不会使用此成员路由。',
+          keywordError: '启用关键词检测时至少填写一个关键词。', keywordSummary: '关键词检测 {count} 个',
           default: '未设置成员限制'
         }
       },

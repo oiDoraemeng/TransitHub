@@ -446,7 +446,18 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 		return &requestError{Status: 400, Message: "priority cannot be negative"}
 	}
 	input.UpstreamKey = strings.TrimSpace(input.UpstreamKey)
-	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" {
+	keywordsProvided := input.ExcludedKeywords != nil
+	if keywordsProvided {
+		keywords, normalizeErr := normalizeExcludedKeywords(input.ExcludedKeywords)
+		if normalizeErr != nil {
+			return normalizeErr
+		}
+		input.ExcludedKeywords = keywords
+		if input.KeywordCheckEnabled != nil && *input.KeywordCheckEnabled && len(keywords) == 0 {
+			return &requestError{Status: 400, Message: "at least one excluded keyword is required when keyword checking is enabled"}
+		}
+	}
+	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordCheckEnabled == nil && !keywordsProvided {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
 	var keyCiphertext, keyPreviewValue *string
@@ -483,9 +494,52 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 		keyCiphertext = &empty
 		keyPreviewValue = &empty
 	}
+	if input.KeywordCheckEnabled != nil && *input.KeywordCheckEnabled && !keywordsProvided {
+		hasKeywords, lookupErr := s.repository.MemberHasExcludedKeywords(ctx, userID, accountID, groupID, routeID)
+		if lookupErr != nil {
+			return lookupErr
+		}
+		if !hasKeywords {
+			return &requestError{Status: 400, Message: "excludedKeywords is required when keyword checking is enabled"}
+		}
+	}
+	var excludedKeywords []string
+	if keywordsProvided {
+		excludedKeywords = input.ExcludedKeywords
+	}
 	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
 		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
-		input.UseProvidedKey, keyCiphertext, keyPreviewValue)
+		input.UseProvidedKey, keyCiphertext, keyPreviewValue,
+		input.KeywordCheckEnabled, excludedKeywords)
+}
+
+const (
+	maxExcludedKeywords    = 64
+	maxExcludedKeywordSize = 256
+)
+
+func normalizeExcludedKeywords(values []string) ([]string, error) {
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if len([]rune(value)) > maxExcludedKeywordSize {
+			return nil, &requestError{Status: 400, Message: "excluded keyword is too long"}
+		}
+		key := strings.ToLower(value)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, value)
+		if len(result) > maxExcludedKeywords {
+			return nil, &requestError{Status: 400, Message: "too many excluded keywords"}
+		}
+	}
+	return result, nil
 }
 
 func (s *Service) RevealKey(ctx context.Context, userID, ownerType, ownerID string) (KeyResponse, error) {

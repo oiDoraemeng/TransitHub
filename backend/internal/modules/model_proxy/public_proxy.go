@@ -225,13 +225,36 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		writeOpenAIError(w, http.StatusNotFound, "model_not_found", "no enabled smart group member supports this model")
 		return
 	}
-	streaming, inputTokens, _ := requestPolicyFacts(incoming, replay)
+	keywordFiltering := false
+	for _, candidate := range candidates {
+		if candidate.KeywordCheckEnabled {
+			keywordFiltering = true
+			break
+		}
+	}
+	var inputText string
+	var policyErr error
+	var streaming bool
+	var inputTokens int
+	if keywordFiltering {
+		streaming, inputTokens, inputText, policyErr = requestPolicyFactsWithText(incoming, replay)
+	} else {
+		streaming, inputTokens, policyErr = requestPolicyFacts(incoming, replay)
+	}
+	if policyErr != nil {
+		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "failed to parse request body")
+		return
+	}
+	normalizedInput := strings.ToLower(inputText)
 	eligible := make([]Route, 0, len(candidates))
 	for _, candidate := range candidates {
 		if candidate.StreamOnly && !streaming {
 			continue
 		}
 		if candidate.MinInputTokens > 0 && inputTokens < candidate.MinInputTokens {
+			continue
+		}
+		if candidate.KeywordCheckEnabled && containsExcludedKeyword(normalizedInput, candidate.ExcludedKeywords) {
 			continue
 		}
 		eligible = append(eligible, candidate)
@@ -625,42 +648,78 @@ func (r *replayBody) ModelID() (string, error) {
 }
 
 func requestPolicyFacts(incoming *http.Request, replay *replayBody) (bool, int, error) {
-	if strings.HasSuffix(strings.TrimSpace(incoming.URL.Path), ":streamGenerateContent") || incoming.URL.Query().Get("alt") == "sse" {
+	if isNativeGeminiStreamingRequest(incoming) {
 		return true, 0, nil
 	}
+	streaming, inputTokens, _, err := requestPolicyFactsBody(incoming, replay, false)
+	return streaming, inputTokens, err
+}
+
+func requestPolicyFactsWithText(incoming *http.Request, replay *replayBody) (bool, int, string, error) {
+	return requestPolicyFactsBody(incoming, replay, true)
+}
+
+func requestPolicyFactsBody(incoming *http.Request, replay *replayBody, collectText bool) (bool, int, string, error) {
+	nativeStreaming := isNativeGeminiStreamingRequest(incoming)
 	reader, err := replay.Open()
 	if err != nil {
-		return false, 0, err
+		return false, 0, "", err
 	}
 	defer reader.Close()
 	var payload any
 	if err := json.NewDecoder(reader).Decode(&payload); err != nil {
-		return false, 0, err
+		return false, 0, "", err
 	}
 	streaming := false
 	if object, ok := payload.(map[string]any); ok {
 		streaming, _ = object["stream"].(bool)
 	}
+	if nativeStreaming {
+		streaming = true
+	}
 	characters := 0
-	collectInputText(payload, "", &characters)
-	return streaming, (characters + 3) / 4, nil
+	var inputText *strings.Builder
+	var textBuilder strings.Builder
+	if collectText {
+		inputText = &textBuilder
+	}
+	collectInputText(payload, "", &characters, inputText)
+	return streaming, (characters + 3) / 4, textBuilder.String(), nil
 }
 
-func collectInputText(value any, key string, characters *int) {
+func isNativeGeminiStreamingRequest(incoming *http.Request) bool {
+	return strings.HasSuffix(strings.TrimSpace(incoming.URL.Path), ":streamGenerateContent") || incoming.URL.Query().Get("alt") == "sse"
+}
+
+func collectInputText(value any, key string, characters *int, inputText *strings.Builder) {
 	switch current := value.(type) {
 	case string:
 		if isInputTextKey(key) {
 			*characters += len([]rune(current))
+			if inputText != nil {
+				inputText.WriteString(current)
+				inputText.WriteByte('\n')
+			}
 		}
 	case []any:
 		for _, item := range current {
-			collectInputText(item, key, characters)
+			collectInputText(item, key, characters, inputText)
 		}
 	case map[string]any:
 		for childKey, child := range current {
-			collectInputText(child, childKey, characters)
+			collectInputText(child, childKey, characters, inputText)
 		}
 	}
+}
+
+func containsExcludedKeyword(input string, keywords []string) bool {
+	for _, keyword := range keywords {
+		keyword = strings.ToLower(strings.TrimSpace(keyword))
+		if keyword != "" && strings.Contains(input, keyword) {
+			return true
+		}
+	}
+	return false
 }
 
 func isInputTextKey(key string) bool {

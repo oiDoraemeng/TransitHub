@@ -162,6 +162,10 @@ export default {
           useProvidedKey: 'Use a prepared upstream key (no temporary key)', providedKey: 'Prepared upstream key',
           providedKeyHelp: 'This member uses the prepared key for model calls without creating or deleting a temporary key. Leave blank to keep the saved key.',
           providedKeyError: 'An upstream key is required when prepared-key mode is enabled.', providedKeySummary: 'Prepared key {preview}',
+          keywordCheckEnabled: 'Enable keyword checks (skip this member on match)', excludedKeywords: 'Keywords that skip this route',
+          keywordPlaceholder: 'One keyword per line or comma, for example: pelican\ncandy',
+          keywordHelp: 'Input is parsed only when at least one member enables checks. A matching keyword skips this member route.',
+          keywordError: 'Enter at least one keyword when keyword checks are enabled.', keywordSummary: 'Keyword checks: {count}',
           default: 'No member restrictions'
         }
       },

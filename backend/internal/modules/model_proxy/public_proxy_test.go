@@ -177,6 +177,35 @@ func TestRequestPolicyFactsRecognizesNativeGeminiStream(t *testing.T) {
 	}
 }
 
+func TestRequestPolicyFactsWithTextExtractsChatInputForKeywordChecks(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"model":"test","messages":[{"role":"user","content":"请避开鹈鹕路线"}]}`)), 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replay.Close()
+	streaming, tokens, input, err := requestPolicyFactsWithText(request, replay)
+	if err != nil || streaming || tokens == 0 || !strings.Contains(input, "鹈鹕") {
+		t.Fatalf("streaming=%v tokens=%d input=%q err=%v", streaming, tokens, input, err)
+	}
+	if !containsExcludedKeyword(strings.ToLower(input), []string{"糖果", "鹈鹕"}) {
+		t.Fatal("matching excluded keyword was not detected")
+	}
+}
+
+func TestRequestPolicyFactsWithTextExtractsNativeGeminiInput(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/v1beta/models/test:streamGenerateContent", nil)
+	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"contents":[{"parts":[{"text":"糖果"}]}]}`)), 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replay.Close()
+	streaming, _, input, err := requestPolicyFactsWithText(request, replay)
+	if err != nil || !streaming || !strings.Contains(input, "糖果") {
+		t.Fatalf("streaming=%v input=%q err=%v", streaming, input, err)
+	}
+}
+
 func TestPublicAPIKeySupportsNativeProtocolHeaders(t *testing.T) {
 	tests := []struct {
 		name   string

@@ -96,7 +96,8 @@ func scanRouteWithPolicy(row routeScanner) (Route, error) {
 		&route.KeyPreview, &route.ModelCount, &route.CleanupPending, &route.ModelSyncedAt,
 		&route.ModelSyncError, &route.CreatedAt, &route.UpdatedAt,
 		&route.StreamOnly, &route.MinInputTokens, &route.RequestsPerMinute, &route.Priority,
-		&route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext)
+		&route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext,
+		&route.KeywordCheckEnabled, &route.ExcludedKeywords)
 	return route, err
 }
 
@@ -348,7 +349,7 @@ func (r *Repository) AddMember(ctx context.Context, userID, accountID, groupID, 
 	return nil
 }
 
-func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, useProvidedKey *bool, keyCiphertext, keyPreview *string) error {
+func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, useProvidedKey *bool, keyCiphertext, keyPreview *string, keywordCheckEnabled *bool, excludedKeywords []string) error {
 	result, err := r.db.Exec(ctx, `
 		UPDATE proxy_smart_group_members m
 		SET stream_only=COALESCE($5::boolean,m.stream_only),
@@ -365,12 +366,17 @@ func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, 
 				WHEN $11::text IS NULL THEN m.upstream_key_preview
 				WHEN $11::text='' THEN ''
 				ELSE $11::text
+			END,
+			keyword_check_enabled=COALESCE($12::boolean,m.keyword_check_enabled),
+			excluded_keywords=CASE
+				WHEN $13::text[] IS NULL THEN m.excluded_keywords
+				ELSE $13::text[]
 			END
 		FROM proxy_smart_groups g, proxy_routes r
 		WHERE m.smart_group_id=g.id AND g.id=$1 AND m.route_id=$2 AND r.id=m.route_id
 			AND g.user_id=$3 AND g.admin_account_id=$4
 			AND r.user_id=$3 AND r.admin_account_id=$4
-	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, useProvidedKey, keyCiphertext, keyPreview)
+	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, useProvidedKey, keyCiphertext, keyPreview, keywordCheckEnabled, excludedKeywords)
 	if err != nil {
 		return err
 	}
@@ -378,6 +384,23 @@ func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, 
 		return pgx.ErrNoRows
 	}
 	return nil
+}
+
+func (r *Repository) MemberHasExcludedKeywords(ctx context.Context, userID, accountID, groupID, routeID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT cardinality(COALESCE(m.excluded_keywords, ARRAY[]::text[])) > 0
+		FROM proxy_smart_group_members m
+		JOIN proxy_smart_groups g ON g.id=m.smart_group_id
+		JOIN proxy_routes r ON r.id=m.route_id
+		WHERE g.id=$1 AND m.route_id=$2
+			AND g.user_id=$3 AND g.admin_account_id=$4
+			AND r.user_id=$3 AND r.admin_account_id=$4
+	`, groupID, routeID, userID, accountID).Scan(&exists)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, pgx.ErrNoRows
+	}
+	return exists, err
 }
 
 func (r *Repository) MemberHasProvidedKey(ctx context.Context, userID, accountID, groupID, routeID string) (bool, error) {
@@ -432,7 +455,8 @@ func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enable
 			(SELECT count(*) FROM proxy_cleanup_jobs j WHERE j.route_id=r.id AND j.status <> 'done'),
 			r.model_synced_at,r.model_sync_error,r.created_at,r.updated_at,
 			gm.stream_only,gm.min_input_tokens,gm.requests_per_minute,gm.priority,
-			gm.use_upstream_key,COALESCE(gm.upstream_key_preview,''),COALESCE(gm.upstream_key_ciphertext,'')
+			gm.use_upstream_key,COALESCE(gm.upstream_key_preview,''),COALESCE(gm.upstream_key_ciphertext,''),
+			gm.keyword_check_enabled,COALESCE(gm.excluded_keywords, ARRAY[]::text[])
 		FROM proxy_smart_group_members gm JOIN proxy_routes r ON r.id=gm.route_id
 		LEFT JOIN upstream_sites s ON s.id=r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id

@@ -21,6 +21,8 @@ export interface ProxyRoute {
   priority?: number
   useProvidedKey?: boolean
   upstreamKeyPreview?: string
+  keywordCheckEnabled?: boolean
+  excludedKeywords?: string[]
   modelSyncedAt: string | null
   modelSyncError: string
   createdAt: string
@@ -99,6 +101,8 @@ export interface SmartGroupMemberPolicyInput {
   priority: number
   useProvidedKey: boolean
   upstreamKey?: string
+  keywordCheckEnabled: boolean
+  excludedKeywords: string[]
 }
 
 export interface KeyResponse {

@@ -33,6 +33,8 @@ type Route struct {
 	UseProvidedKey        bool       `json:"useProvidedKey,omitempty"`
 	UpstreamKeyPreview    string     `json:"upstreamKeyPreview,omitempty"`
 	UpstreamKeyCiphertext string     `json:"-"`
+	KeywordCheckEnabled   bool       `json:"keywordCheckEnabled,omitempty"`
+	ExcludedKeywords      []string   `json:"excludedKeywords,omitempty"`
 	ModelSyncedAt         *time.Time `json:"modelSyncedAt"`
 	ModelSyncError        string     `json:"modelSyncError"`
 	CreatedAt             time.Time  `json:"createdAt"`
@@ -157,12 +159,14 @@ type AddMemberRequest struct {
 }
 
 type UpdateMemberPolicyRequest struct {
-	StreamOnly        *bool  `json:"streamOnly,omitempty"`
-	MinInputTokens    *int   `json:"minInputTokens,omitempty"`
-	RequestsPerMinute *int   `json:"requestsPerMinute,omitempty"`
-	Priority          *int   `json:"priority,omitempty"`
-	UseProvidedKey    *bool  `json:"useProvidedKey,omitempty"`
-	UpstreamKey       string `json:"upstreamKey,omitempty"`
+	StreamOnly          *bool    `json:"streamOnly,omitempty"`
+	MinInputTokens      *int     `json:"minInputTokens,omitempty"`
+	RequestsPerMinute   *int     `json:"requestsPerMinute,omitempty"`
+	Priority            *int     `json:"priority,omitempty"`
+	UseProvidedKey      *bool    `json:"useProvidedKey,omitempty"`
+	UpstreamKey         string   `json:"upstreamKey,omitempty"`
+	KeywordCheckEnabled *bool    `json:"keywordCheckEnabled,omitempty"`
+	ExcludedKeywords    []string `json:"excludedKeywords,omitempty"`
 }
 
 type KeyResponse struct {
