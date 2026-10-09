@@ -154,8 +154,8 @@ export default {
         modelCapacity: '有效并发 {count}', entryKey: '普通长期入口 Key', addMember: '添加成员',
         policy: {
           edit: '成员策略', streamOnly: '仅接收流式请求', minInput: '最少输入 Token',
-          minInputHelp: '0 表示不限；启用时至少为 2000，低于门槛会跳过此成员。',
-          minInputError: '最少输入 Token 必须为 0 或不低于 2000。',
+          minInputHelp: '0 表示不限；可填写任意非负整数，低于门槛会跳过此成员。',
+          minInputError: '最少输入 Token 必须是非负整数。',
           minInputSummary: '输入不少于 {count} Token', rpm: '每分钟请求数', priority: '成员优先级',
           priorityHelp: '数值越大越优先；同优先级再按并发容量选择。', prioritySummary: '优先级 {count}',
           rpmHelp: '0 表示不限；达到上限后本分钟内切换到其他成员。', rpmSummary: '每分钟最多 {count} 次',

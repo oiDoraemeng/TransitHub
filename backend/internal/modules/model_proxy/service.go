@@ -452,9 +452,6 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	if err != nil {
 		return err
 	}
-	if input.MinInputTokens != nil && *input.MinInputTokens != 0 && *input.MinInputTokens < 2000 {
-		return &requestError{Status: 400, Message: "minInputTokens must be 0 or at least 2000"}
-	}
 	if input.MinInputTokens != nil && *input.MinInputTokens < 0 {
 		return &requestError{Status: 400, Message: "minInputTokens cannot be negative"}
 	}

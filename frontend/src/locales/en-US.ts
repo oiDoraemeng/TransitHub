@@ -154,8 +154,8 @@ export default {
         modelCapacity: 'Effective concurrency {count}', entryKey: 'Regular durable entry key', addMember: 'Add member',
         policy: {
           edit: 'Member policy', streamOnly: 'Accept streaming requests only', minInput: 'Minimum input tokens',
-          minInputHelp: '0 disables this rule. Set at least 2000; smaller requests skip this member.',
-          minInputError: 'Minimum input tokens must be 0 or at least 2000.',
+          minInputHelp: '0 disables this rule. Enter any non-negative integer; smaller requests skip this member.',
+          minInputError: 'Minimum input tokens must be a non-negative integer.',
           minInputSummary: 'Input of at least {count} tokens', rpm: 'Requests per minute', priority: 'Member priority',
           priorityHelp: 'Higher values are selected first; capacity is used as the tie-breaker.', prioritySummary: 'Priority {count}',
           rpmHelp: '0 is unlimited. Once reached, this member is skipped for the rest of the minute.', rpmSummary: 'Up to {count} per minute',

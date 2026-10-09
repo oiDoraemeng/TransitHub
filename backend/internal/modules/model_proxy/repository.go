@@ -537,7 +537,7 @@ func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enable
 		)`
 		args = append(args, modelID)
 	}
-	query += ` ORDER BY r.created_at ASC,r.id ASC`
+	query += ` ORDER BY gm.priority DESC,gm.created_at ASC,r.id ASC`
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
