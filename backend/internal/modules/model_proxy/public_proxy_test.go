@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -597,6 +598,61 @@ func TestAttemptSmartGroupMemberStopsAfterOneRetry(t *testing.T) {
 	}
 	if calls != smartGroupAttempts {
 		t.Fatalf("attempts=%d want %d", calls, smartGroupAttempts)
+	}
+}
+
+func TestAcquireRouteSecretUsesProvidedKeyWithoutCleanupJob(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString([]byte("01234567890123456789012345678901"))
+	cipher, err := NewKeyCipher(encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ciphertext, err := cipher.Encrypt("sk-prepared")
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := &Service{cipher: cipher}
+	secret, job, needsCleanup, err := service.acquireRouteSecret(context.Background(), Route{
+		UseProvidedKey:        true,
+		UpstreamKeyCiphertext: ciphertext,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secret != "sk-prepared" {
+		t.Fatalf("secret=%q", secret)
+	}
+	if needsCleanup {
+		t.Fatal("prepared key must not create a cleanup job")
+	}
+	if job.ID != "" {
+		t.Fatalf("cleanup job=%+v", job)
+	}
+}
+
+func TestAcquireRouteSecretDoesNotFallbackWhenProvidedKeyUnavailable(t *testing.T) {
+	service := &Service{}
+	_, job, needsCleanup, err := service.acquireRouteSecret(context.Background(), Route{UseProvidedKey: true})
+	if err == nil || err.Error() != "prepared upstream key is unavailable" {
+		t.Fatalf("error=%v", err)
+	}
+	if needsCleanup || job.ID != "" {
+		t.Fatalf("unexpected cleanup fallback: needsCleanup=%t job=%+v", needsCleanup, job)
+	}
+}
+
+func TestModelRefreshCoolingDownAfterSuccessOrFailure(t *testing.T) {
+	now := time.Now()
+	recentSuccess := now.Add(-time.Minute)
+	if !modelRefreshCoolingDown(Route{ModelSyncedAt: &recentSuccess}, now, 5*time.Minute) {
+		t.Fatal("recent successful refresh must cool down")
+	}
+	if !modelRefreshCoolingDown(Route{ModelSyncError: "failed", UpdatedAt: recentSuccess}, now, 5*time.Minute) {
+		t.Fatal("recent failed refresh must cool down")
+	}
+	oldFailure := now.Add(-6 * time.Minute)
+	if modelRefreshCoolingDown(Route{ModelSyncError: "failed", UpdatedAt: oldFailure}, now, 5*time.Minute) {
+		t.Fatal("expired failure cooldown must allow refresh")
 	}
 }
 

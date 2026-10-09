@@ -71,6 +71,39 @@ func (r *Repository) GetRoute(ctx context.Context, routeID string) (*Route, erro
 	return &route, err
 }
 
+func (r *Repository) GetRouteForModelRefresh(ctx context.Context, routeID string) (*Route, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT r.id, r.user_id, r.admin_account_id, r.name, r.site_id,
+			COALESCE(s.name, ''), r.group_id, r.group_name, r.concurrency_limit, r.enabled,
+			COALESCE(r.egress_proxy_id, ''), COALESCE(p.name, ''),
+			COALESCE(k.key_preview, ''),
+			(SELECT count(*) FROM proxy_route_models m WHERE m.route_id = r.id),
+			(SELECT count(*) FROM proxy_cleanup_jobs j WHERE j.route_id = r.id AND j.status <> 'done'),
+			r.model_synced_at, r.model_sync_error, r.created_at, r.updated_at,
+			(prepared.upstream_key_ciphertext IS NOT NULL),
+			COALESCE(prepared.upstream_key_preview, ''),
+			COALESCE(prepared.upstream_key_ciphertext, '')
+		FROM proxy_routes r
+		LEFT JOIN upstream_sites s ON s.id = r.site_id
+		LEFT JOIN model_egress_proxies p ON p.id = r.egress_proxy_id
+		LEFT JOIN proxy_access_keys k ON k.owner_type = 'route' AND k.owner_id = r.id
+		LEFT JOIN LATERAL (
+			SELECT gm.upstream_key_preview, gm.upstream_key_ciphertext
+			FROM proxy_smart_group_members gm
+			WHERE gm.route_id = r.id AND gm.use_upstream_key = true
+				AND NULLIF(gm.upstream_key_ciphertext, '') IS NOT NULL
+			ORDER BY gm.created_at ASC, gm.smart_group_id ASC
+			LIMIT 1
+		) prepared ON true
+		WHERE r.id = $1
+	`, routeID)
+	route, err := scanRouteWithRefreshKey(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return &route, err
+}
+
 type routeScanner interface{ Scan(...any) error }
 
 func scanRoute(row routeScanner) (Route, error) {
@@ -80,6 +113,17 @@ func scanRoute(row routeScanner) (Route, error) {
 		&route.ProxyID, &route.ProxyName,
 		&route.KeyPreview, &route.ModelCount, &route.CleanupPending, &route.ModelSyncedAt,
 		&route.ModelSyncError, &route.CreatedAt, &route.UpdatedAt)
+	return route, err
+}
+
+func scanRouteWithRefreshKey(row routeScanner) (Route, error) {
+	var route Route
+	err := row.Scan(&route.ID, &route.UserID, &route.AdminAccountID, &route.Name, &route.SiteID,
+		&route.SiteName, &route.GroupID, &route.GroupName, &route.ConcurrencyLimit, &route.Enabled,
+		&route.ProxyID, &route.ProxyName,
+		&route.KeyPreview, &route.ModelCount, &route.CleanupPending, &route.ModelSyncedAt,
+		&route.ModelSyncError, &route.CreatedAt, &route.UpdatedAt,
+		&route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext)
 	return route, err
 }
 
@@ -596,12 +640,23 @@ func (r *Repository) RoutesNeedingRefresh(ctx context.Context, staleBefore time.
 			r.concurrency_limit,r.enabled,COALESCE(r.egress_proxy_id,''),COALESCE(p.name,''),COALESCE(k.key_preview,''),
 			(SELECT count(*) FROM proxy_route_models mc WHERE mc.route_id=r.id),
 			(SELECT count(*) FROM proxy_cleanup_jobs j WHERE j.route_id=r.id AND j.status <> 'done'),
-			r.model_synced_at,r.model_sync_error,r.created_at,r.updated_at
+			r.model_synced_at,r.model_sync_error,r.created_at,r.updated_at,
+			(prepared.upstream_key_ciphertext IS NOT NULL),
+			COALESCE(prepared.upstream_key_preview,''),COALESCE(prepared.upstream_key_ciphertext,'')
 		FROM proxy_routes r
 		LEFT JOIN upstream_sites s ON s.id=r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id
 		LEFT JOIN proxy_access_keys k ON k.owner_type='route' AND k.owner_id=r.id
+		LEFT JOIN LATERAL (
+			SELECT gm.upstream_key_preview,gm.upstream_key_ciphertext
+			FROM proxy_smart_group_members gm
+			WHERE gm.route_id=r.id AND gm.use_upstream_key=true
+				AND NULLIF(gm.upstream_key_ciphertext,'') IS NOT NULL
+			ORDER BY gm.created_at ASC,gm.smart_group_id ASC
+			LIMIT 1
+		) prepared ON true
 		WHERE r.enabled=true AND (r.model_synced_at IS NULL OR r.model_synced_at < $1)
+			AND (r.model_sync_error='' OR r.updated_at < $1)
 	`, staleBefore)
 	if err != nil {
 		return nil, err
@@ -609,7 +664,7 @@ func (r *Repository) RoutesNeedingRefresh(ctx context.Context, staleBefore time.
 	defer rows.Close()
 	var result []Route
 	for rows.Next() {
-		route, err := scanRoute(rows)
+		route, err := scanRouteWithRefreshKey(rows)
 		if err != nil {
 			return nil, err
 		}

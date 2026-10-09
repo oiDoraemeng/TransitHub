@@ -445,17 +445,7 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 	if err != nil {
 		return nil, true, err
 	}
-	var secret string
-	var cleanupJob CleanupJob
-	needsCleanup := !route.UseProvidedKey
-	if route.UseProvidedKey {
-		if s.cipher == nil || !s.cipher.Available() || strings.TrimSpace(route.UpstreamKeyCiphertext) == "" {
-			return nil, true, errors.New("prepared upstream key is unavailable")
-		}
-		secret, err = s.cipher.Decrypt(route.UpstreamKeyCiphertext)
-	} else {
-		secret, cleanupJob, err = s.createRemoteKey(incoming.Context(), route)
-	}
+	secret, cleanupJob, needsCleanup, err := s.acquireRouteSecret(incoming.Context(), route)
 	if err != nil {
 		return nil, true, err
 	}

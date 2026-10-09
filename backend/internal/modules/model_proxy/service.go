@@ -742,6 +742,18 @@ func (s *Service) createRemoteKey(ctx context.Context, route Route) (string, Cle
 	return secret, job, nil
 }
 
+func (s *Service) acquireRouteSecret(ctx context.Context, route Route) (string, CleanupJob, bool, error) {
+	if route.UseProvidedKey {
+		if s.cipher == nil || !s.cipher.Available() || strings.TrimSpace(route.UpstreamKeyCiphertext) == "" {
+			return "", CleanupJob{}, false, errors.New("prepared upstream key is unavailable")
+		}
+		secret, err := s.cipher.Decrypt(route.UpstreamKeyCiphertext)
+		return secret, CleanupJob{}, false, err
+	}
+	secret, job, err := s.createRemoteKey(ctx, route)
+	return secret, job, true, err
+}
+
 func (s *Service) beginDelete(job CleanupJob) {
 	if err := s.repository.MarkCleanupPending(context.Background(), job.ID); err != nil {
 		log.Printf("[model-proxy] mark cleanup pending job_id=%s err=%v", job.ID, err)
@@ -1093,50 +1105,59 @@ func (s *Service) refreshStaleModels(ctx context.Context) {
 		return
 	}
 	for _, route := range routes {
-		_ = s.refreshRouteModels(ctx, route.ID)
+		_ = s.refreshRouteModelsWithRoute(ctx, route)
 	}
 }
 
 func (s *Service) refreshRouteModels(ctx context.Context, routeID string) error {
-	_, err, _ := s.modelRefresh.Do(routeID, func() (any, error) {
-		route, err := s.repository.GetRoute(ctx, routeID)
-		if err != nil || route == nil || !route.Enabled {
+	route, err := s.repository.GetRouteForModelRefresh(ctx, routeID)
+	if err != nil || route == nil || !route.Enabled {
+		return err
+	}
+	return s.refreshRouteModelsWithRoute(ctx, *route)
+}
+
+func (s *Service) refreshRouteModelsWithRoute(ctx context.Context, route Route) error {
+	_, err, _ := s.modelRefresh.Do(route.ID, func() (any, error) {
+		client, err := s.dataClientForRoute(ctx, route)
+		if err != nil {
+			_ = s.repository.SetModelSyncError(ctx, route.ID, err)
 			return nil, err
 		}
-		client, err := s.dataClientForRoute(ctx, *route)
+		secret, job, needsCleanup, err := s.acquireRouteSecret(ctx, route)
 		if err != nil {
-			_ = s.repository.SetModelSyncError(ctx, routeID, err)
+			_ = s.repository.SetModelSyncError(ctx, route.ID, err)
 			return nil, err
 		}
-		secret, job, err := s.createRemoteKey(ctx, *route)
-		if err != nil {
-			_ = s.repository.SetModelSyncError(ctx, routeID, err)
-			return nil, err
+		cleanup := func() {
+			if needsCleanup {
+				s.beginDelete(job)
+			}
 		}
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(s.mustSiteBaseURL(ctx, route.SiteID), "/")+"/v1/models", nil)
 		if err != nil {
-			s.beginDelete(job)
+			cleanup()
 			return nil, err
 		}
 		request.Header.Set("Authorization", "Bearer "+secret)
 		response, err := client.Do(request)
 		if err != nil {
-			s.beginDelete(job)
-			_ = s.repository.SetModelSyncError(ctx, routeID, err)
+			cleanup()
+			_ = s.repository.SetModelSyncError(ctx, route.ID, err)
 			return nil, err
 		}
-		s.beginDelete(job)
+		cleanup()
 		defer response.Body.Close()
 		if response.StatusCode < 200 || response.StatusCode >= 300 {
 			err = fmt.Errorf("models endpoint returned %d", response.StatusCode)
-			_ = s.repository.SetModelSyncError(ctx, routeID, err)
+			_ = s.repository.SetModelSyncError(ctx, route.ID, err)
 			return nil, err
 		}
 		var payload struct {
 			Data []map[string]any `json:"data"`
 		}
 		if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
-			_ = s.repository.SetModelSyncError(ctx, routeID, err)
+			_ = s.repository.SetModelSyncError(ctx, route.ID, err)
 			return nil, err
 		}
 		models := make([]Model, 0, len(payload.Data))
@@ -1149,7 +1170,7 @@ func (s *Service) refreshRouteModels(ctx context.Context, routeID string) error 
 			ownedBy, _ := raw["owned_by"].(string)
 			models = append(models, Model{ID: id, Object: object, OwnedBy: ownedBy, Raw: raw})
 		}
-		if err := s.repository.ReplaceRouteModels(ctx, routeID, models); err != nil {
+		if err := s.repository.ReplaceRouteModels(ctx, route.ID, models); err != nil {
 			return nil, err
 		}
 		return nil, nil
@@ -1162,9 +1183,21 @@ func (s *Service) refreshGroupModels(ctx context.Context, groupID string) {
 	if err != nil {
 		return
 	}
+	now := time.Now()
 	for _, route := range routes {
-		_ = s.refreshRouteModels(ctx, route.ID)
+		if modelRefreshCoolingDown(route, now, s.refreshInterval) {
+			continue
+		}
+		_ = s.refreshRouteModelsWithRoute(ctx, route)
 	}
+}
+
+func modelRefreshCoolingDown(route Route, now time.Time, interval time.Duration) bool {
+	cutoff := now.Add(-interval)
+	if route.ModelSyncError != "" {
+		return route.UpdatedAt.After(cutoff)
+	}
+	return route.ModelSyncedAt != nil && route.ModelSyncedAt.After(cutoff)
 }
 
 func (s *Service) mustSiteBaseURL(ctx context.Context, siteID string) string {
