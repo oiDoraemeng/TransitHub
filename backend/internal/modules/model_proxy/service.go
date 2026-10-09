@@ -23,14 +23,17 @@ import (
 )
 
 const (
-	cleanupBatchSize      = 50
-	cleanupWorkerCount    = 2
-	cleanupRequestTimeout = 60 * time.Second
-	cleanupStateTimeout   = 5 * time.Second
-	cleanupSiteInterval   = 500 * time.Millisecond
-	cleanup429BaseDelay   = 30 * time.Second
-	cleanup429MaxDelay    = 30 * time.Minute
-	forceRefreshCooldown  = 30 * time.Second
+	cleanupBatchSize            = 50
+	cleanupWorkerCount          = 2
+	cleanupRequestTimeout       = 60 * time.Second
+	cleanupStateTimeout         = 5 * time.Second
+	cleanupSiteInterval         = 500 * time.Millisecond
+	cleanup429BaseDelay         = 30 * time.Second
+	cleanup429MaxDelay          = 30 * time.Minute
+	forceRefreshCooldown        = 30 * time.Second
+	cleanupMaxRetries           = 3
+	defaultSyncKeyDeleteDelayMS = 500
+	maxSyncKeyDeleteDelayMS     = 60000
 )
 
 type AccountResolver interface {
@@ -461,6 +464,9 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	if input.Priority != nil && *input.Priority < 0 {
 		return &requestError{Status: 400, Message: "priority cannot be negative"}
 	}
+	if input.SyncKeyDeleteDelayMS != nil && (*input.SyncKeyDeleteDelayMS < 1 || *input.SyncKeyDeleteDelayMS > maxSyncKeyDeleteDelayMS) {
+		return &requestError{Status: 400, Message: "syncKeyDeleteDelayMs must be between 1 and 60000"}
+	}
 	var modelMappingJSON *string
 	var normalizedModelMapping map[string]string
 	if input.ModelMapping != nil {
@@ -507,7 +513,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 			return &requestError{Status: 400, Message: "at least one excluded keyword is required when keyword checking is enabled"}
 		}
 	}
-	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordCheckEnabled == nil && !keywordsProvided {
+	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordCheckEnabled == nil && !keywordsProvided && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
 	var keyCiphertext, keyPreviewValue *string
@@ -560,7 +566,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
 		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
 		input.ModelMappingEnabled, modelMappingJSON, input.UseProvidedKey, keyCiphertext, keyPreviewValue,
-		input.KeywordCheckEnabled, excludedKeywords)
+		input.KeywordCheckEnabled, excludedKeywords, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS)
 }
 
 const (
@@ -704,9 +710,6 @@ func (s *Service) createRemoteKey(ctx context.Context, route Route) (string, Cle
 		return "", CleanupJob{}, err
 	}
 	job := CleanupJob{ID: jobID, UserID: route.UserID, AdminAccountID: route.AdminAccountID, RouteID: route.ID, SiteID: route.SiteID, RemoteKeyName: "transithub-" + jobID}
-	if err := s.repository.CreateCleanupJob(ctx, job); err != nil {
-		return "", CleanupJob{}, err
-	}
 	session, err := s.freshSession(ctx, route.SiteID)
 	if err != nil {
 		return "", job, err
@@ -714,6 +717,12 @@ func (s *Service) createRemoteKey(ctx context.Context, route Route) (string, Cle
 	groupID, err := strconv.Atoi(route.GroupID)
 	if err != nil {
 		return "", job, fmt.Errorf("invalid Sub2API group id: %w", err)
+	}
+	// Persist immediately before the remote create call. Failures while resolving
+	// a session or validating local configuration cannot have created a remote key
+	// and therefore must not leave recovery jobs behind.
+	if err := s.repository.CreateCleanupJob(ctx, job); err != nil {
+		return "", CleanupJob{}, err
 	}
 	remoteID, secret, err := s.platform.CreateSub2APIKey(session, job.RemoteKeyName, groupID)
 	if isUpstreamUnauthorized(err) {
@@ -801,21 +810,37 @@ func (s *Service) deleteCleanupJob(ctx context.Context, job CleanupJob) error {
 	return err
 }
 
-// deleteCleanupJobNow is used by the SSE gate. It completes the remote-key
-// deletion before the first response event is released downstream.
+// deleteCleanupJobNow is used by response gates and deadline cleanup. The job
+// lock prevents the background worker from deleting the same key concurrently.
 func (s *Service) deleteCleanupJobNow(job CleanupJob) error {
-	_ = s.repository.MarkCleanupPending(context.Background(), job.ID)
+	stateCtx, stateCancel := context.WithTimeout(context.Background(), cleanupStateTimeout)
+	lockErr := s.repository.LockCleanupJob(stateCtx, job.ID)
+	stateCancel()
+	if lockErr != nil {
+		log.Printf("[model-proxy] lock immediate cleanup job_id=%s err=%v", job.ID, lockErr)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := s.deleteCleanupJob(ctx, job); err != nil {
-		s.retryCleanup(context.Background(), job, err)
+		retryCtx, retryCancel := context.WithTimeout(context.Background(), cleanupStateTimeout)
+		s.retryCleanup(retryCtx, job, err)
+		retryCancel()
 		return err
 	}
-	return s.repository.CompleteCleanupJob(context.Background(), job.ID)
+	completeCtx, completeCancel := context.WithTimeout(context.Background(), cleanupStateTimeout)
+	err := s.repository.CompleteCleanupJob(completeCtx, job.ID)
+	completeCancel()
+	return err
 }
 
 func (s *Service) retryCleanup(ctx context.Context, job CleanupJob, cleanupErr error) {
 	job.Attempts++
+	if cleanupRetryLimitExceeded(job.Attempts) {
+		if err := s.repository.DiscardCleanupJob(ctx, job.ID); err != nil {
+			log.Printf("[model-proxy] discard exhausted cleanup job_id=%s attempts=%d err=%v", job.ID, job.Attempts, err)
+		}
+		return
+	}
 	if requestErr, ok := cleanupRequestError(cleanupErr); ok && isCleanupUpstreamThrottle(requestErr.StatusCode) {
 		exponent := math.Min(float64(job.Attempts-1), 5)
 		delay := time.Duration(math.Pow(2, exponent)) * cleanup429BaseDelay
@@ -833,6 +858,10 @@ func (s *Service) retryCleanup(ctx context.Context, job CleanupJob, cleanupErr e
 	}
 	delay += time.Duration(mathrand.Int64N(int64(time.Second)))
 	_ = s.repository.RetryCleanupJob(ctx, job.ID, job.Attempts, time.Now().Add(delay), cleanupError(cleanupErr))
+}
+
+func cleanupRetryLimitExceeded(attempts int) bool {
+	return attempts > cleanupMaxRetries
 }
 
 func isCleanupUpstreamThrottle(status int) bool {

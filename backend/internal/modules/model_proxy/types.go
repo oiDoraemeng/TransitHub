@@ -37,6 +37,8 @@ type Route struct {
 	ExcludedKeywords      []string          `json:"excludedKeywords,omitempty"`
 	ModelMappingEnabled   bool              `json:"modelMappingEnabled,omitempty"`
 	ModelMapping          map[string]string `json:"modelMapping,omitempty"`
+	SyncKeyDeleteEnabled  bool              `json:"syncKeyDeleteEnabled,omitempty"`
+	SyncKeyDeleteDelayMS  int               `json:"syncKeyDeleteDelayMs,omitempty"`
 	ModelSyncedAt         *time.Time        `json:"modelSyncedAt"`
 	ModelSyncError        string            `json:"modelSyncError"`
 	CreatedAt             time.Time         `json:"createdAt"`
@@ -161,16 +163,18 @@ type AddMemberRequest struct {
 }
 
 type UpdateMemberPolicyRequest struct {
-	StreamOnly          *bool              `json:"streamOnly,omitempty"`
-	MinInputTokens      *int               `json:"minInputTokens,omitempty"`
-	RequestsPerMinute   *int               `json:"requestsPerMinute,omitempty"`
-	Priority            *int               `json:"priority,omitempty"`
-	ModelMappingEnabled *bool              `json:"modelMappingEnabled,omitempty"`
-	ModelMapping        *map[string]string `json:"modelMapping,omitempty"`
-	UseProvidedKey      *bool              `json:"useProvidedKey,omitempty"`
-	UpstreamKey         string             `json:"upstreamKey,omitempty"`
-	KeywordCheckEnabled *bool              `json:"keywordCheckEnabled,omitempty"`
-	ExcludedKeywords    []string           `json:"excludedKeywords,omitempty"`
+	StreamOnly           *bool              `json:"streamOnly,omitempty"`
+	MinInputTokens       *int               `json:"minInputTokens,omitempty"`
+	RequestsPerMinute    *int               `json:"requestsPerMinute,omitempty"`
+	Priority             *int               `json:"priority,omitempty"`
+	ModelMappingEnabled  *bool              `json:"modelMappingEnabled,omitempty"`
+	ModelMapping         *map[string]string `json:"modelMapping,omitempty"`
+	UseProvidedKey       *bool              `json:"useProvidedKey,omitempty"`
+	UpstreamKey          string             `json:"upstreamKey,omitempty"`
+	KeywordCheckEnabled  *bool              `json:"keywordCheckEnabled,omitempty"`
+	ExcludedKeywords     []string           `json:"excludedKeywords,omitempty"`
+	SyncKeyDeleteEnabled *bool              `json:"syncKeyDeleteEnabled,omitempty"`
+	SyncKeyDeleteDelayMS *int               `json:"syncKeyDeleteDelayMs,omitempty"`
 }
 
 type KeyResponse struct {

@@ -25,6 +25,8 @@ export interface ProxyRoute {
   excludedKeywords?: string[]
   modelMappingEnabled?: boolean
   modelMapping?: Record<string, string>
+  syncKeyDeleteEnabled?: boolean
+  syncKeyDeleteDelayMs?: number
   modelSyncedAt: string | null
   modelSyncError: string
   createdAt: string
@@ -107,6 +109,8 @@ export interface SmartGroupMemberPolicyInput {
   upstreamKey?: string
   keywordCheckEnabled: boolean
   excludedKeywords: string[]
+  syncKeyDeleteEnabled: boolean
+  syncKeyDeleteDelayMs: number
 }
 
 export interface KeyResponse {

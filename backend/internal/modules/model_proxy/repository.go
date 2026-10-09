@@ -98,7 +98,8 @@ func scanRouteWithPolicy(row routeScanner) (Route, error) {
 		&route.ModelSyncError, &route.CreatedAt, &route.UpdatedAt,
 		&route.StreamOnly, &route.MinInputTokens, &route.RequestsPerMinute, &route.Priority,
 		&route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext,
-		&route.KeywordCheckEnabled, &route.ExcludedKeywords, &route.ModelMappingEnabled, &mappingJSON)
+		&route.KeywordCheckEnabled, &route.ExcludedKeywords, &route.ModelMappingEnabled, &mappingJSON,
+		&route.SyncKeyDeleteEnabled, &route.SyncKeyDeleteDelayMS)
 	route.ModelMapping = decodeModelMapping(mappingJSON)
 	return route, err
 }
@@ -362,7 +363,7 @@ func (r *Repository) AddMember(ctx context.Context, userID, accountID, groupID, 
 	return nil
 }
 
-func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, modelMappingEnabled *bool, modelMappingJSON *string, useProvidedKey *bool, keyCiphertext, keyPreview *string, keywordCheckEnabled *bool, excludedKeywords []string) error {
+func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, modelMappingEnabled *bool, modelMappingJSON *string, useProvidedKey *bool, keyCiphertext, keyPreview *string, keywordCheckEnabled *bool, excludedKeywords []string, syncKeyDeleteEnabled *bool, syncKeyDeleteDelayMS *int) error {
 	result, err := r.db.Exec(ctx, `
 		UPDATE proxy_smart_group_members m
 		SET stream_only=COALESCE($5::boolean,m.stream_only),
@@ -386,12 +387,14 @@ func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, 
 			excluded_keywords=CASE
 				WHEN $15::text[] IS NULL THEN m.excluded_keywords
 				ELSE $15::text[]
-			END
+			END,
+			sync_key_delete_enabled=COALESCE($16::boolean,m.sync_key_delete_enabled),
+			sync_key_delete_delay_ms=COALESCE($17::integer,m.sync_key_delete_delay_ms)
 		FROM proxy_smart_groups g, proxy_routes r
 		WHERE m.smart_group_id=g.id AND g.id=$1 AND m.route_id=$2 AND r.id=m.route_id
 			AND g.user_id=$3 AND g.admin_account_id=$4
 			AND r.user_id=$3 AND r.admin_account_id=$4
-	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, modelMappingEnabled, modelMappingJSON, useProvidedKey, keyCiphertext, keyPreview, keywordCheckEnabled, excludedKeywords)
+	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, modelMappingEnabled, modelMappingJSON, useProvidedKey, keyCiphertext, keyPreview, keywordCheckEnabled, excludedKeywords, syncKeyDeleteEnabled, syncKeyDeleteDelayMS)
 	if err != nil {
 		return err
 	}
@@ -472,7 +475,7 @@ func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enable
 			gm.stream_only,gm.min_input_tokens,gm.requests_per_minute,gm.priority,
 			gm.use_upstream_key,COALESCE(gm.upstream_key_preview,''),COALESCE(gm.upstream_key_ciphertext,''),
 			gm.keyword_check_enabled,COALESCE(gm.excluded_keywords, ARRAY[]::text[]),gm.model_mapping_enabled,
-			COALESCE(gm.model_mapping,'{}'::jsonb)
+			COALESCE(gm.model_mapping,'{}'::jsonb),gm.sync_key_delete_enabled,gm.sync_key_delete_delay_ms
 		FROM proxy_smart_group_members gm JOIN proxy_routes r ON r.id=gm.route_id
 		LEFT JOIN upstream_sites s ON s.id=r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id
@@ -638,6 +641,11 @@ func (r *Repository) MarkCleanupPending(ctx context.Context, id string) error {
 	return err
 }
 
+func (r *Repository) LockCleanupJob(ctx context.Context, id string) error {
+	_, err := r.db.Exec(ctx, `UPDATE proxy_cleanup_jobs SET status='delete_pending',next_attempt_at=now(),locked_until=now()+interval '2 minutes',updated_at=now() WHERE id=$1 AND status <> 'done'`, id)
+	return err
+}
+
 func (r *Repository) CompleteCleanupJob(ctx context.Context, id string) error {
 	_, err := r.db.Exec(ctx, `UPDATE proxy_cleanup_jobs SET status='done',last_error='',locked_until=NULL,completed_at=now(),updated_at=now() WHERE id=$1`, id)
 	return err
@@ -649,6 +657,11 @@ func (r *Repository) RetryCleanupJob(ctx context.Context, id string, attempts in
 		message = message[:500]
 	}
 	_, err := r.db.Exec(ctx, `UPDATE proxy_cleanup_jobs SET status='delete_pending',attempts=$2,next_attempt_at=$3,locked_until=NULL,last_error=$4,updated_at=now() WHERE id=$1`, id, attempts, retryAt, message)
+	return err
+}
+
+func (r *Repository) DiscardCleanupJob(ctx context.Context, id string) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM proxy_cleanup_jobs WHERE id=$1`, id)
 	return err
 }
 
@@ -692,7 +705,7 @@ func (r *Repository) CleanupSummary(ctx context.Context, userID, accountID strin
 	var lastError string
 	err := r.db.QueryRow(ctx, `
 		SELECT count(*) FILTER (WHERE status <> 'done'),
-			count(*) FILTER (WHERE status <> 'done' AND attempts > 0 AND next_attempt_at <= now() AND (locked_until IS NULL OR locked_until < now())),
+			count(*) FILTER (WHERE status <> 'done' AND attempts > 0 AND (locked_until IS NULL OR locked_until < now())),
 			count(*) FILTER (WHERE status <> 'done' AND locked_until > now()),
 			COALESCE((array_agg(last_error ORDER BY updated_at DESC) FILTER (WHERE last_error <> ''))[1],'')
 		FROM proxy_cleanup_jobs WHERE user_id=$1 AND admin_account_id=$2

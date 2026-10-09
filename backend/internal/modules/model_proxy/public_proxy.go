@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -20,6 +21,7 @@ import (
 const (
 	memoryReplayLimit  = 1 << 20
 	directMaxAttempts  = 3
+	smartGroupAttempts = 2
 	firstSSEEventLimit = 1 << 20
 )
 
@@ -167,7 +169,7 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 
 	var lastStatus int
 	for attempt := 0; attempt < directMaxAttempts; attempt++ {
-		response, retryable, attemptErr := s.performAttempt(incoming, route, replay.Open, nil, mappedResponseContext{})
+		response, retryable, attemptErr := s.performAttempt(incoming, route, replay.Open, nil, mappedResponseContext{}, false)
 		if attemptErr == nil && !retryable {
 			s.writeUpstreamResponse(w, response)
 			return
@@ -305,16 +307,16 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			lease.Release(context.Background())
 			continue
 		}
-		response, retryable, attemptErr := s.performAttempt(incoming, *route, replay.Open, route.ModelMapping, responseMapping)
+		response, attemptErr := attemptSmartGroupMember(incoming.Context(), func() (*http.Response, error) {
+			response, _, err := s.performAttempt(incoming, *route, replay.Open, route.ModelMapping, responseMapping, !streaming)
+			return response, err
+		})
 		if attemptErr != nil {
-			lastErr = attemptErr
+			lastErr = fmt.Errorf("member %s failed after %d attempts: %w", route.Name, smartGroupAttempts, attemptErr)
 			lease.Release(context.Background())
-			continue
-		}
-		if retryable {
-			lastErr = fmt.Errorf("upstream returned %d", response.StatusCode)
-			response.Body.Close()
-			lease.Release(context.Background())
+			if incoming.Context().Err() != nil {
+				return
+			}
 			continue
 		}
 		s.writeUpstreamResponse(w, response)
@@ -331,6 +333,31 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		return
 	}
 	writeOpenAIError(w, http.StatusTooManyRequests, "smart_group_concurrency_exceeded", "all eligible smart group members are at capacity")
+}
+
+// attemptSmartGroupMember retries once after the selected member's first failure.
+// Any non-2xx response is an upstream failure here, including authentication
+// and request errors, because another member may accept the same request.
+func attemptSmartGroupMember(ctx context.Context, attempt func() (*http.Response, error)) (*http.Response, error) {
+	var lastErr error
+	for attemptIndex := 0; attemptIndex < smartGroupAttempts; attemptIndex++ {
+		response, err := attempt()
+		if err == nil && response != nil && response.StatusCode >= 200 && response.StatusCode < 300 {
+			return response, nil
+		}
+		if response != nil {
+			lastErr = fmt.Errorf("upstream returned %d", response.StatusCode)
+			response.Body.Close()
+		} else if err != nil {
+			lastErr = err
+		} else {
+			lastErr = errors.New("upstream returned no response")
+		}
+		if attemptIndex+1 < smartGroupAttempts && !waitForProxyRetry(ctx, attemptIndex) {
+			return nil, ctx.Err()
+		}
+	}
+	return nil, lastErr
 }
 
 func (s *Service) smartGroupCandidates(ctx context.Context, group SmartGroup, modelID string) ([]Route, error) {
@@ -413,7 +440,7 @@ func nativeGeminiModelAction(path string) (string, string, bool) {
 	return model, action, true
 }
 
-func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string, responseMapping mappedResponseContext) (*http.Response, bool, error) {
+func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string, responseMapping mappedResponseContext, synchronousRequest bool) (*http.Response, bool, error) {
 	client, err := s.dataClientForRoute(incoming.Context(), route)
 	if err != nil {
 		return nil, true, err
@@ -468,23 +495,44 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 	copyRequestHeaders(request.Header, incoming.Header)
 	request.Header.Set("Authorization", "Bearer "+secret)
 	request.Header.Set("User-Agent", upstream.BrowserUserAgent)
+	var deadlineCleanup *headerDeadlineCleanup
+	if synchronousRequest && route.SyncKeyDeleteEnabled && needsCleanup {
+		delayMS := route.SyncKeyDeleteDelayMS
+		if delayMS <= 0 {
+			delayMS = defaultSyncKeyDeleteDelayMS
+		}
+		deadlineCleanup = newHeaderDeadlineCleanup(time.Duration(delayMS)*time.Millisecond, func() error {
+			return s.deleteCleanupJobNow(cleanupJob)
+		})
+	}
 	response, err := client.Do(request)
+	if deadlineCleanup != nil {
+		if cleanupErr := deadlineCleanup.finishAtHeaders(); cleanupErr != nil {
+			log.Printf("[model-proxy] synchronous key cleanup job_id=%s err=%v", cleanupJob.ID, cleanupErr)
+		}
+	}
 	if err != nil {
-		cleanup()
+		if deadlineCleanup == nil {
+			cleanup()
+		}
 		return nil, true, err
 	}
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
 	if !retryable && responseMapping.Enabled && route.ModelMappingEnabled {
 		if err := rewriteMappedResponse(response, responseMapping); err != nil {
 			response.Body.Close()
-			cleanup()
+			if deadlineCleanup == nil {
+				cleanup()
+			}
 			return nil, true, err
 		}
 	}
 	if !retryable && protocolRequest.responseAdapter != nil {
 		if err := protocolRequest.responseAdapter(response); err != nil {
 			response.Body.Close()
-			cleanup()
+			if deadlineCleanup == nil {
+				cleanup()
+			}
 			return nil, true, err
 		}
 	}
@@ -492,16 +540,44 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 	// SSE response, defer cleanup until the first complete event has arrived, then
 	// delete synchronously before the event is exposed to the downstream client.
 	// This removes the timing dependency on downstream/TCP buffering when testing
-	// an in-flight streaming request. Retryable and non-streaming responses retain
-	// the asynchronous cleanup path.
-	if !retryable && isEventStream(response.Header) && needsCleanup {
+	// an in-flight streaming request. Non-streaming smart-group members may use
+	// the separate header-deadline cleanup configured above.
+	if !retryable && isEventStream(response.Header) && needsCleanup && deadlineCleanup == nil {
 		response.Body = newCleanupGateBody(response.Body, func() error {
 			return s.deleteCleanupJobNow(cleanupJob)
 		})
-	} else {
+	} else if deadlineCleanup == nil {
 		cleanup()
 	}
 	return response, retryable, nil
+}
+
+// headerDeadlineCleanup starts at the configured deadline unless response
+// headers arrive first. finishAtHeaders also waits for the single cleanup call,
+// so a fast synchronous response is not exposed before deletion completes.
+type headerDeadlineCleanup struct {
+	once    sync.Once
+	timer   *time.Timer
+	done    chan error
+	cleanup func() error
+}
+
+func newHeaderDeadlineCleanup(delay time.Duration, cleanup func() error) *headerDeadlineCleanup {
+	result := &headerDeadlineCleanup{done: make(chan error, 1), cleanup: cleanup}
+	result.timer = time.AfterFunc(delay, result.start)
+	return result
+}
+
+func (c *headerDeadlineCleanup) start() {
+	c.once.Do(func() {
+		go func() { c.done <- c.cleanup() }()
+	})
+}
+
+func (c *headerDeadlineCleanup) finishAtHeaders() error {
+	c.timer.Stop()
+	c.start()
+	return <-c.done
 }
 
 func isEventStream(header http.Header) bool {

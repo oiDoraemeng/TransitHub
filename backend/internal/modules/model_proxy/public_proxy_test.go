@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -562,6 +563,43 @@ func TestWaitForProxyRetryHonorsCancellation(t *testing.T) {
 	}
 }
 
+func TestAttemptSmartGroupMemberRetriesAnyStatusOnce(t *testing.T) {
+	statuses := []int{http.StatusUnauthorized, http.StatusOK}
+	calls := 0
+	response, err := attemptSmartGroupMember(context.Background(), func() (*http.Response, error) {
+		status := statuses[calls]
+		calls++
+		return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader("response"))}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if calls != smartGroupAttempts {
+		t.Fatalf("attempts=%d want %d", calls, smartGroupAttempts)
+	}
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d want 200", response.StatusCode)
+	}
+}
+
+func TestAttemptSmartGroupMemberStopsAfterOneRetry(t *testing.T) {
+	calls := 0
+	response, err := attemptSmartGroupMember(context.Background(), func() (*http.Response, error) {
+		calls++
+		return nil, errors.New("network failure")
+	})
+	if response != nil {
+		t.Fatal("failed member must not return a response")
+	}
+	if err == nil || err.Error() != "network failure" {
+		t.Fatalf("error=%v", err)
+	}
+	if calls != smartGroupAttempts {
+		t.Fatalf("attempts=%d want %d", calls, smartGroupAttempts)
+	}
+}
+
 func TestReplayBodyMemoryAndModel(t *testing.T) {
 	body, err := newReplayBody(io.NopCloser(strings.NewReader(`{"model":"gpt-test","input":"hello"}`)), 1024)
 	if err != nil {
@@ -666,6 +704,54 @@ func TestCleanupGateBodyStartsCleanupWhileWaitingForFirstEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = body.Close()
+}
+
+func TestHeaderDeadlineCleanupStartsWhenHeadersArriveFirst(t *testing.T) {
+	calls := 0
+	cleanup := newHeaderDeadlineCleanup(time.Hour, func() error {
+		calls++
+		return nil
+	})
+	started := time.Now()
+	if err := cleanup.finishAtHeaders(); err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
+		t.Fatalf("header-triggered cleanup took %s", elapsed)
+	}
+	if calls != 1 {
+		t.Fatalf("cleanup calls=%d want 1", calls)
+	}
+}
+
+func TestHeaderDeadlineCleanupStartsBeforeLateHeaders(t *testing.T) {
+	started := make(chan struct{})
+	calls := 0
+	cleanup := newHeaderDeadlineCleanup(10*time.Millisecond, func() error {
+		calls++
+		close(started)
+		return nil
+	})
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("deadline cleanup did not start")
+	}
+	if err := cleanup.finishAtHeaders(); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("cleanup calls=%d want 1", calls)
+	}
+}
+
+func TestCleanupRetryLimitAllowsThreeRetries(t *testing.T) {
+	if cleanupRetryLimitExceeded(3) {
+		t.Fatal("third retry must still be allowed")
+	}
+	if !cleanupRetryLimitExceeded(4) {
+		t.Fatal("failure after the third retry must discard the cleanup job")
+	}
 }
 
 func TestReadFirstSSEEventPreservesBufferedBytes(t *testing.T) {
