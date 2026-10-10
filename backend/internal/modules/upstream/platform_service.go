@@ -1328,11 +1328,7 @@ func (s *PlatformService) fetchSub2APIMetrics(session Session) (Metrics, error) 
 		log.Printf("[sub2api-metrics] /api/v1/auth/me 失败 base_url=%s err=%v", session.BaseURL, err)
 		return Metrics{}, err
 	}
-	stats, err := s.httpClient.requestJSON(session.BaseURL+"/api/v1/usage/dashboard/stats", authOptions)
-	if err != nil {
-		log.Printf("[sub2api-metrics] /api/v1/usage/dashboard/stats 失败 base_url=%s err=%v", session.BaseURL, err)
-		return Metrics{}, err
-	}
+	stats, legacyStats := s.fetchSub2APIUserUsageStats(session, authOptions)
 	groups, err := s.fetchSub2APIAvailableGroupsWithRates(session)
 	if err != nil {
 		log.Printf("[sub2api-metrics] 分组列表拉取失败 base_url=%s err=%v", session.BaseURL, err)
@@ -1343,7 +1339,7 @@ func (s *PlatformService) fetchSub2APIMetrics(session Session) (Metrics, error) 
 	statsData := dataRecord(stats.Payload)
 	balance := firstNumber(meData, []string{"balance"})
 	totalRecharged := firstNumber(meData, []string{"total_recharged"})
-	if totalRecharged == nil || *totalRecharged == 0 {
+	if legacyStats && (totalRecharged == nil || *totalRecharged == 0) {
 		if totalActualCost := firstNumber(statsData, []string{"total_actual_cost"}); totalActualCost != nil && balance != nil {
 			fallbackTotal := *totalActualCost + *balance
 			totalRecharged = &fallbackTotal
@@ -1356,11 +1352,36 @@ func (s *PlatformService) fetchSub2APIMetrics(session Session) (Metrics, error) 
 	}
 	return Metrics{
 		Balance:         metric(balance),
-		TodayConsume:    metric(firstNumber(statsData, []string{"today_actual_cost"})),
+		TodayConsume:    metric(firstNumber(statsData, []string{"today_actual_cost", "todayActualCost", "total_actual_cost", "totalActualCost"})),
 		HistoryRecharge: metric(totalRecharged),
 		Group:           firstGroup,
 		Groups:          groups,
 	}, nil
+}
+
+// fetchSub2APIUserUsageStats supports both the legacy dashboard endpoint and
+// the current user usage endpoint. Usage statistics are optional metadata: an
+// unavailable endpoint must not hide the balance already returned by auth/me.
+func (s *PlatformService) fetchSub2APIUserUsageStats(session Session, authOptions requestOptions) (jsonResponse, bool) {
+	legacyURL := session.BaseURL + "/api/v1/usage/dashboard/stats"
+	stats, err := s.httpClient.requestJSON(legacyURL, authOptions)
+	if err == nil {
+		return stats, true
+	}
+	log.Printf("[sub2api-metrics] 旧版用量接口失败，尝试新版接口 base_url=%s err=%v", session.BaseURL, err)
+
+	today := time.Now().Format("2006-01-02")
+	values := url.Values{}
+	values.Set("start_date", today)
+	values.Set("end_date", today)
+	values.Set("timezone", "Asia/Shanghai")
+	currentURL := session.BaseURL + "/api/v1/usage/stats?" + values.Encode()
+	stats, err = s.httpClient.requestJSON(currentURL, authOptions)
+	if err == nil {
+		return stats, false
+	}
+	log.Printf("[sub2api-metrics] 新版用量接口失败，保留余额并忽略用量统计 base_url=%s err=%v", session.BaseURL, err)
+	return jsonResponse{Payload: map[string]any{}}, false
 }
 
 func cookieHeader(headers http.Header) string {

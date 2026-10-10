@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestLoginWithTokenPrefersValidAccessToken(t *testing.T) {
@@ -101,5 +102,90 @@ func TestSub2APIAccessTokenExpiry(t *testing.T) {
 	}
 	if sub2APIAccessTokenExpiry("opaque-token") != nil {
 		t.Fatal("opaque token must not produce a JWT expiry")
+	}
+}
+
+func TestFetchSub2APIMetricsFallsBackToCurrentUsageStats(t *testing.T) {
+	var legacyCalls int32
+	var currentCalls int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer access-token" {
+			t.Fatalf("expected bearer authentication, got %q", r.Header.Get("Authorization"))
+		}
+		switch r.URL.Path {
+		case "/api/v1/auth/me":
+			writeJSON(w, map[string]any{"data": map[string]any{"balance": 14.5, "total_recharged": 20.0}})
+		case "/api/v1/usage/dashboard/stats":
+			atomic.AddInt32(&legacyCalls, 1)
+			w.WriteHeader(http.StatusNotFound)
+			writeJSON(w, map[string]any{"message": "not found"})
+		case "/api/v1/usage/stats":
+			atomic.AddInt32(&currentCalls, 1)
+			today := time.Now().Format("2006-01-02")
+			if r.URL.Query().Get("start_date") != today || r.URL.Query().Get("end_date") != today {
+				t.Fatalf("expected today's date range, got %q", r.URL.RawQuery)
+			}
+			if r.URL.Query().Get("timezone") != "Asia/Shanghai" {
+				t.Fatalf("expected Asia/Shanghai timezone, got %q", r.URL.Query().Get("timezone"))
+			}
+			writeJSON(w, map[string]any{"data": map[string]any{"total_actual_cost": 1.25}})
+		case "/api/v1/groups/available":
+			writeJSON(w, map[string]any{"data": []any{}})
+		case "/api/v1/groups/rates":
+			writeJSON(w, map[string]any{"data": map[string]any{}})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	service := NewPlatformService(NewHTTPClient(server.Client()))
+	metrics, err := service.fetchSub2APIMetrics(Session{
+		Platform: PlatformSub2API, BaseURL: server.URL, AccessToken: "access-token", TokenType: "Bearer",
+	})
+	if err != nil {
+		t.Fatalf("expected current usage endpoint fallback to succeed, got %v", err)
+	}
+	if atomic.LoadInt32(&legacyCalls) != 1 || atomic.LoadInt32(&currentCalls) != 1 {
+		t.Fatalf("unexpected usage calls: legacy=%d current=%d", legacyCalls, currentCalls)
+	}
+	if metrics.Balance.Value == nil || *metrics.Balance.Value != 14.5 {
+		t.Fatalf("unexpected balance: %+v", metrics.Balance)
+	}
+	if metrics.TodayConsume.Value == nil || *metrics.TodayConsume.Value != 1.25 {
+		t.Fatalf("unexpected today consume: %+v", metrics.TodayConsume)
+	}
+}
+
+func TestFetchSub2APIMetricsKeepsBalanceWhenUsageStatsUnavailable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/auth/me":
+			writeJSON(w, map[string]any{"data": map[string]any{"balance": 3.25, "total_recharged": 8.0}})
+		case "/api/v1/usage/dashboard/stats", "/api/v1/usage/stats":
+			w.WriteHeader(http.StatusNotFound)
+			writeJSON(w, map[string]any{"message": "not found"})
+		case "/api/v1/groups/available":
+			writeJSON(w, map[string]any{"data": []any{}})
+		case "/api/v1/groups/rates":
+			writeJSON(w, map[string]any{"data": map[string]any{}})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	service := NewPlatformService(NewHTTPClient(server.Client()))
+	metrics, err := service.fetchSub2APIMetrics(Session{
+		Platform: PlatformSub2API, BaseURL: server.URL, AccessToken: "access-token", TokenType: "Bearer",
+	})
+	if err != nil {
+		t.Fatalf("usage endpoint failure must not hide balance, got %v", err)
+	}
+	if metrics.Balance.Value == nil || *metrics.Balance.Value != 3.25 {
+		t.Fatalf("unexpected balance: %+v", metrics.Balance)
+	}
+	if metrics.TodayConsume.Value != nil {
+		t.Fatalf("today consume should be unavailable, got %+v", metrics.TodayConsume)
 	}
 }
