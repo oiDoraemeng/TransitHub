@@ -70,6 +70,45 @@ func newModelHTTPClient(proxyURL string) (*http.Client, error) {
 	}, nil
 }
 
+type cancelOnCloseBody struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (b *cancelOnCloseBody) Close() error {
+	err := b.ReadCloser.Close()
+	b.cancel()
+	return err
+}
+
+// doWithResponseHeaderTimeout limits only the wait for response headers. Once
+// headers arrive, streaming may continue for as long as the caller permits.
+func doWithResponseHeaderTimeout(client *http.Client, request *http.Request, timeout time.Duration) (*http.Response, error) {
+	if timeout <= 0 {
+		return client.Do(request)
+	}
+	requestContext, cancel := context.WithCancel(request.Context())
+	timer := time.AfterFunc(timeout, cancel)
+	response, err := client.Do(request.WithContext(requestContext))
+	if !timer.Stop() && request.Context().Err() == nil {
+		if response != nil && response.Body != nil {
+			_ = response.Body.Close()
+		}
+		cancel()
+		return nil, fmt.Errorf("upstream response header timeout after %s", timeout)
+	}
+	if err != nil {
+		cancel()
+		return response, err
+	}
+	if response == nil || response.Body == nil {
+		cancel()
+		return response, nil
+	}
+	response.Body = &cancelOnCloseBody{ReadCloser: response.Body, cancel: cancel}
+	return response, nil
+}
+
 func (s *Service) ListEgressProxies(ctx context.Context, userID string) ([]EgressProxy, error) {
 	accountID, err := s.currentWorkspace(ctx, userID)
 	if err != nil {

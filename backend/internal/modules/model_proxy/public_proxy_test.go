@@ -593,7 +593,9 @@ func TestWaitForProxyRetryHonorsCancellation(t *testing.T) {
 func TestAttemptSmartGroupMemberRetriesAnyStatusOnce(t *testing.T) {
 	statuses := []int{http.StatusUnauthorized, http.StatusOK}
 	calls := 0
-	response, err := attemptSmartGroupMember(context.Background(), func() (*http.Response, error) {
+	var timeouts []time.Duration
+	response, err := attemptSmartGroupMember(context.Background(), func(timeout time.Duration) (*http.Response, error) {
+		timeouts = append(timeouts, timeout)
 		status := statuses[calls]
 		calls++
 		return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader("response"))}, nil
@@ -608,11 +610,14 @@ func TestAttemptSmartGroupMemberRetriesAnyStatusOnce(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status=%d want 200", response.StatusCode)
 	}
+	if len(timeouts) != 2 || timeouts[0] != 15*time.Second || timeouts[1] != 10*time.Second {
+		t.Fatalf("timeouts=%v want [15s 10s]", timeouts)
+	}
 }
 
 func TestAttemptSmartGroupMemberStopsAfterOneRetry(t *testing.T) {
 	calls := 0
-	response, err := attemptSmartGroupMember(context.Background(), func() (*http.Response, error) {
+	response, err := attemptSmartGroupMember(context.Background(), func(time.Duration) (*http.Response, error) {
 		calls++
 		return nil, errors.New("network failure")
 	})
@@ -826,6 +831,32 @@ func TestHeaderDeadlineCleanupStartsBeforeLateHeaders(t *testing.T) {
 	if calls != 1 {
 		t.Fatalf("cleanup calls=%d want 1", calls)
 	}
+}
+
+func TestHeaderDeadlineCleanupDoesNotBlockFailedAttempt(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	cleanup := newHeaderDeadlineCleanup(time.Hour, func() error {
+		close(started)
+		<-release
+		return nil
+	})
+	done := make(chan struct{})
+	go func() {
+		cleanup.continueAfterFailure()
+		close(done)
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("failed attempt cleanup did not start")
+	}
+	select {
+	case <-done:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("failed attempt waited for cleanup")
+	}
+	close(release)
 }
 
 func TestCleanupRetryLimitAllowsThreeRetries(t *testing.T) {

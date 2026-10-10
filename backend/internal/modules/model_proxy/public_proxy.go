@@ -19,10 +19,12 @@ import (
 )
 
 const (
-	memoryReplayLimit  = 1 << 20
-	directMaxAttempts  = 3
-	smartGroupAttempts = 2
-	firstSSEEventLimit = 1 << 20
+	memoryReplayLimit                     = 1 << 20
+	directMaxAttempts                     = 3
+	smartGroupAttempts                    = 2
+	smartGroupFirstResponseHeaderTimeout  = 15 * time.Second
+	smartGroupSecondResponseHeaderTimeout = 10 * time.Second
+	firstSSEEventLimit                    = 1 << 20
 )
 
 func (s *Service) PublicHandler() http.Handler {
@@ -299,8 +301,8 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			lease.Release(context.Background())
 			continue
 		}
-		response, attemptErr := attemptSmartGroupMember(incoming.Context(), func() (*http.Response, error) {
-			response, _, err := s.performAttempt(incoming, *route, replay.Open, route.ModelMapping, responseMapping, !streaming)
+		response, attemptErr := attemptSmartGroupMember(incoming.Context(), func(responseHeaderTimeout time.Duration) (*http.Response, error) {
+			response, _, err := s.performAttemptWithResponseHeaderTimeout(incoming, *route, replay.Open, route.ModelMapping, responseMapping, !streaming, responseHeaderTimeout)
 			return response, err
 		})
 		if attemptErr != nil {
@@ -330,10 +332,10 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 // attemptSmartGroupMember retries once after the selected member's first failure.
 // Any non-2xx response is an upstream failure here, including authentication
 // and request errors, because another member may accept the same request.
-func attemptSmartGroupMember(ctx context.Context, attempt func() (*http.Response, error)) (*http.Response, error) {
+func attemptSmartGroupMember(ctx context.Context, attempt func(time.Duration) (*http.Response, error)) (*http.Response, error) {
 	var lastErr error
 	for attemptIndex := 0; attemptIndex < smartGroupAttempts; attemptIndex++ {
-		response, err := attempt()
+		response, err := attempt(smartGroupResponseHeaderTimeout(attemptIndex))
 		if err == nil && response != nil && response.StatusCode >= 200 && response.StatusCode < 300 {
 			return response, nil
 		}
@@ -350,6 +352,13 @@ func attemptSmartGroupMember(ctx context.Context, attempt func() (*http.Response
 		}
 	}
 	return nil, lastErr
+}
+
+func smartGroupResponseHeaderTimeout(attemptIndex int) time.Duration {
+	if attemptIndex == 0 {
+		return smartGroupFirstResponseHeaderTimeout
+	}
+	return smartGroupSecondResponseHeaderTimeout
 }
 
 func (s *Service) smartGroupCandidates(ctx context.Context, group SmartGroup, modelID string) ([]Route, error) {
@@ -433,6 +442,10 @@ func nativeGeminiModelAction(path string) (string, string, bool) {
 }
 
 func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string, responseMapping mappedResponseContext, synchronousRequest bool) (*http.Response, bool, error) {
+	return s.performAttemptWithResponseHeaderTimeout(incoming, route, bodyFactory, modelMapping, responseMapping, synchronousRequest, 0)
+}
+
+func (s *Service) performAttemptWithResponseHeaderTimeout(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string, responseMapping mappedResponseContext, synchronousRequest bool, responseHeaderTimeout time.Duration) (*http.Response, bool, error) {
 	client, err := s.dataClientForRoute(incoming.Context(), route)
 	if err != nil {
 		return nil, true, err
@@ -487,9 +500,11 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 			return s.deleteCleanupJobNow(cleanupJob)
 		})
 	}
-	response, err := client.Do(request)
+	response, err := doWithResponseHeaderTimeout(client, request, responseHeaderTimeout)
 	if deadlineCleanup != nil {
-		if cleanupErr := deadlineCleanup.finishAtHeaders(); cleanupErr != nil {
+		if err != nil {
+			deadlineCleanup.continueAfterFailure()
+		} else if cleanupErr := deadlineCleanup.finishAtHeaders(); cleanupErr != nil {
 			log.Printf("[model-proxy] synchronous key cleanup job_id=%s err=%v", cleanupJob.ID, cleanupErr)
 		}
 	}
@@ -560,6 +575,11 @@ func (c *headerDeadlineCleanup) finishAtHeaders() error {
 	c.timer.Stop()
 	c.start()
 	return <-c.done
+}
+
+func (c *headerDeadlineCleanup) continueAfterFailure() {
+	c.timer.Stop()
+	c.start()
 }
 
 func isEventStream(header http.Header) bool {
