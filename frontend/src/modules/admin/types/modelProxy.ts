@@ -22,6 +22,7 @@ export interface ProxyRoute {
   useProvidedKey?: boolean
   upstreamKeyPreview?: string
   keywordCheckEnabled?: boolean
+  keywordMatchMode?: 'skip_on_match' | 'require_match'
   excludedKeywords?: string[]
   modelMappingEnabled?: boolean
   modelMapping?: Record<string, string>
@@ -108,6 +109,7 @@ export interface SmartGroupMemberPolicyInput {
   useProvidedKey: boolean
   upstreamKey?: string
   keywordCheckEnabled: boolean
+  keywordMatchMode: 'skip_on_match' | 'require_match'
   excludedKeywords: string[]
   syncKeyDeleteEnabled: boolean
   syncKeyDeleteDelayMs: number

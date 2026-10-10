@@ -142,7 +142,7 @@ func scanRouteWithPolicy(row routeScanner) (Route, error) {
 		&route.ModelSyncError, &route.CreatedAt, &route.UpdatedAt,
 		&route.StreamOnly, &route.MinInputTokens, &route.RequestsPerMinute, &route.Priority,
 		&route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext,
-		&route.KeywordCheckEnabled, &route.ExcludedKeywords, &route.ModelMappingEnabled, &mappingJSON,
+		&route.KeywordCheckEnabled, &route.KeywordMatchMode, &route.ExcludedKeywords, &route.ModelMappingEnabled, &mappingJSON,
 		&route.SyncKeyDeleteEnabled, &route.SyncKeyDeleteDelayMS)
 	route.ModelMapping = decodeModelMapping(mappingJSON)
 	return route, err
@@ -407,7 +407,7 @@ func (r *Repository) AddMember(ctx context.Context, userID, accountID, groupID, 
 	return nil
 }
 
-func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, modelMappingEnabled *bool, modelMappingJSON *string, useProvidedKey *bool, keyCiphertext, keyPreview *string, keywordCheckEnabled *bool, excludedKeywords []string, syncKeyDeleteEnabled *bool, syncKeyDeleteDelayMS *int) error {
+func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, modelMappingEnabled *bool, modelMappingJSON *string, useProvidedKey *bool, keyCiphertext, keyPreview *string, keywordCheckEnabled *bool, keywordMatchMode *string, excludedKeywords []string, syncKeyDeleteEnabled *bool, syncKeyDeleteDelayMS *int) error {
 	result, err := r.db.Exec(ctx, `
 		UPDATE proxy_smart_group_members m
 		SET stream_only=COALESCE($5::boolean,m.stream_only),
@@ -428,17 +428,18 @@ func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, 
 				ELSE $13::text
 			END,
 			keyword_check_enabled=COALESCE($14::boolean,m.keyword_check_enabled),
+			keyword_match_mode=COALESCE($15::text,m.keyword_match_mode),
 			excluded_keywords=CASE
-				WHEN $15::text[] IS NULL THEN m.excluded_keywords
-				ELSE $15::text[]
+				WHEN $16::text[] IS NULL THEN m.excluded_keywords
+				ELSE $16::text[]
 			END,
-			sync_key_delete_enabled=COALESCE($16::boolean,m.sync_key_delete_enabled),
-			sync_key_delete_delay_ms=COALESCE($17::integer,m.sync_key_delete_delay_ms)
+			sync_key_delete_enabled=COALESCE($17::boolean,m.sync_key_delete_enabled),
+			sync_key_delete_delay_ms=COALESCE($18::integer,m.sync_key_delete_delay_ms)
 		FROM proxy_smart_groups g, proxy_routes r
 		WHERE m.smart_group_id=g.id AND g.id=$1 AND m.route_id=$2 AND r.id=m.route_id
 			AND g.user_id=$3 AND g.admin_account_id=$4
 			AND r.user_id=$3 AND r.admin_account_id=$4
-	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, modelMappingEnabled, modelMappingJSON, useProvidedKey, keyCiphertext, keyPreview, keywordCheckEnabled, excludedKeywords, syncKeyDeleteEnabled, syncKeyDeleteDelayMS)
+	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, modelMappingEnabled, modelMappingJSON, useProvidedKey, keyCiphertext, keyPreview, keywordCheckEnabled, keywordMatchMode, excludedKeywords, syncKeyDeleteEnabled, syncKeyDeleteDelayMS)
 	if err != nil {
 		return err
 	}
@@ -518,7 +519,7 @@ func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enable
 			r.model_synced_at,r.model_sync_error,r.created_at,r.updated_at,
 			gm.stream_only,gm.min_input_tokens,gm.requests_per_minute,gm.priority,
 			gm.use_upstream_key,COALESCE(gm.upstream_key_preview,''),COALESCE(gm.upstream_key_ciphertext,''),
-			gm.keyword_check_enabled,COALESCE(gm.excluded_keywords, ARRAY[]::text[]),gm.model_mapping_enabled,
+			gm.keyword_check_enabled,gm.keyword_match_mode,COALESCE(gm.excluded_keywords, ARRAY[]::text[]),gm.model_mapping_enabled,
 			COALESCE(gm.model_mapping,'{}'::jsonb),gm.sync_key_delete_enabled,gm.sync_key_delete_delay_ms
 		FROM proxy_smart_group_members gm JOIN proxy_routes r ON r.id=gm.route_id
 		LEFT JOIN upstream_sites s ON s.id=r.site_id

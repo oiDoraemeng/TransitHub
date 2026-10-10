@@ -499,6 +499,13 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 		}
 	}
 	input.UpstreamKey = strings.TrimSpace(input.UpstreamKey)
+	if input.KeywordMatchMode != nil {
+		mode := strings.TrimSpace(*input.KeywordMatchMode)
+		if mode != KeywordMatchModeSkipOnMatch && mode != KeywordMatchModeRequireMatch {
+			return &requestError{Status: 400, Message: "invalid keywordMatchMode"}
+		}
+		input.KeywordMatchMode = &mode
+	}
 	keywordsProvided := input.ExcludedKeywords != nil
 	if keywordsProvided {
 		keywords, normalizeErr := normalizeExcludedKeywords(input.ExcludedKeywords)
@@ -510,7 +517,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 			return &requestError{Status: 400, Message: "at least one excluded keyword is required when keyword checking is enabled"}
 		}
 	}
-	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordCheckEnabled == nil && !keywordsProvided && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
+	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordCheckEnabled == nil && input.KeywordMatchMode == nil && !keywordsProvided && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
 	var keyCiphertext, keyPreviewValue *string
@@ -563,7 +570,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
 		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
 		input.ModelMappingEnabled, modelMappingJSON, input.UseProvidedKey, keyCiphertext, keyPreviewValue,
-		input.KeywordCheckEnabled, excludedKeywords, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS)
+		input.KeywordCheckEnabled, input.KeywordMatchMode, excludedKeywords, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS)
 }
 
 const (

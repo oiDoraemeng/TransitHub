@@ -5,6 +5,9 @@ import "time"
 const (
 	OwnerRoute      = "route"
 	OwnerSmartGroup = "smart_group"
+
+	KeywordMatchModeSkipOnMatch  = "skip_on_match"
+	KeywordMatchModeRequireMatch = "require_match"
 )
 
 type Route struct {
@@ -34,6 +37,7 @@ type Route struct {
 	UpstreamKeyPreview    string            `json:"upstreamKeyPreview,omitempty"`
 	UpstreamKeyCiphertext string            `json:"-"`
 	KeywordCheckEnabled   bool              `json:"keywordCheckEnabled,omitempty"`
+	KeywordMatchMode      string            `json:"keywordMatchMode,omitempty"`
 	ExcludedKeywords      []string          `json:"excludedKeywords,omitempty"`
 	ModelMappingEnabled   bool              `json:"modelMappingEnabled,omitempty"`
 	ModelMapping          map[string]string `json:"modelMapping,omitempty"`
@@ -172,6 +176,7 @@ type UpdateMemberPolicyRequest struct {
 	UseProvidedKey       *bool              `json:"useProvidedKey,omitempty"`
 	UpstreamKey          string             `json:"upstreamKey,omitempty"`
 	KeywordCheckEnabled  *bool              `json:"keywordCheckEnabled,omitempty"`
+	KeywordMatchMode     *string            `json:"keywordMatchMode,omitempty"`
 	ExcludedKeywords     []string           `json:"excludedKeywords,omitempty"`
 	SyncKeyDeleteEnabled *bool              `json:"syncKeyDeleteEnabled,omitempty"`
 	SyncKeyDeleteDelayMS *int               `json:"syncKeyDeleteDelayMs,omitempty"`

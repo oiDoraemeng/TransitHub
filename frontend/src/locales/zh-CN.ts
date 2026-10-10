@@ -165,10 +165,10 @@ export default {
           useProvidedKey: '使用预置上游 Key（不创建临时 Key）', providedKey: '预置上游 Key',
           providedKeyHelp: '开启后使用该成员的预置 Key 调用模型，不会创建或删除临时 Key。留空表示保留已保存的 Key。',
           providedKeyError: '启用预置上游 Key 时必须提供 Key。', providedKeySummary: '预置 Key {preview}',
-          keywordCheckEnabled: '启用关键词检测（命中后跳过此成员）', excludedKeywords: '跳过路由的关键词',
+          keywordCheckEnabled: '启用关键词检测', keywordMatchMode: '命中策略', keywordSkipOnMatch: '命中后跳过此成员', keywordRequireMatch: '命中后才选择此成员', excludedKeywords: '匹配关键词',
           keywordPlaceholder: '每行或用逗号填写一个关键词，例如：鹈鹕\n糖果',
-          keywordHelp: '只有至少一个成员启用检测时才会解析输入内容；命中任一关键词后不会使用此成员路由。',
-          keywordError: '启用关键词检测时至少填写一个关键词。', keywordSummary: '关键词检测 {count} 个',
+          keywordHelp: '只有至少一个成员启用检测时才会解析一次输入内容；匹配不区分大小写。',
+          keywordError: '启用关键词检测时至少填写一个关键词。', keywordSkipOnMatchSummary: '命中跳过 · {count} 个关键词', keywordRequireMatchSummary: '命中才选 · {count} 个关键词',
           modelMappingEnabled: '启用模型映射', modelMapping: '成员模型映射', modelMappingPlaceholder: '例如：gpt-6-astra = gpt-6-luna', modelMappingHelp: '每行一条，格式为“客户端模型 = 上游模型”。仅此成员使用这些映射。', modelMappingError: '模型映射格式无效，请使用“客户端模型 = 上游模型”，每行一条。', modelMappingRequired: '启用模型映射时至少填写一条映射。', default: '未设置成员限制'
         }
       },

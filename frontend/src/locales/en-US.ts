@@ -165,10 +165,10 @@ export default {
           useProvidedKey: 'Use a prepared upstream key (no temporary key)', providedKey: 'Prepared upstream key',
           providedKeyHelp: 'This member uses the prepared key for model calls without creating or deleting a temporary key. Leave blank to keep the saved key.',
           providedKeyError: 'An upstream key is required when prepared-key mode is enabled.', providedKeySummary: 'Prepared key {preview}',
-          keywordCheckEnabled: 'Enable keyword checks (skip this member on match)', excludedKeywords: 'Keywords that skip this route',
+          keywordCheckEnabled: 'Enable keyword checks', keywordMatchMode: 'Match behavior', keywordSkipOnMatch: 'Skip this member on match', keywordRequireMatch: 'Select this member only on match', excludedKeywords: 'Match keywords',
           keywordPlaceholder: 'One keyword per line or comma, for example: pelican\ncandy',
-          keywordHelp: 'Input is parsed only when at least one member enables checks. A matching keyword skips this member route.',
-          keywordError: 'Enter at least one keyword when keyword checks are enabled.', keywordSummary: 'Keyword checks: {count}',
+          keywordHelp: 'Input is parsed once only when at least one member enables checks. Matching is case-insensitive.',
+          keywordError: 'Enter at least one keyword when keyword checks are enabled.', keywordSkipOnMatchSummary: 'Skip on match · {count} keywords', keywordRequireMatchSummary: 'Require match · {count} keywords',
           modelMappingEnabled: 'Model mapping enabled', modelMapping: 'Member model mapping', modelMappingPlaceholder: 'For example: gpt-6-astra = gpt-6-luna', modelMappingHelp: 'One entry per line in the form “client model = upstream model”. Only this member uses these mappings.', modelMappingError: 'Invalid model mapping. Use “client model = upstream model”, one entry per line.', modelMappingRequired: 'Enter at least one mapping when model mapping is enabled.', default: 'No member restrictions'
         }
       },

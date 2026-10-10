@@ -262,15 +262,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		eligible = append(eligible, candidate)
 	}
 	if keywordFiltering {
-		matchedRoutes := matchExcludedKeywordRoutes(strings.ToLower(inputText), eligible)
-		filtered := eligible[:0]
-		for _, candidate := range eligible {
-			if _, matched := matchedRoutes[candidate.ID]; matched {
-				continue
-			}
-			filtered = append(filtered, candidate)
-		}
-		eligible = filtered
+		eligible = filterRoutesByKeywords(inputText, eligible)
 	}
 	if len(eligible) == 0 {
 		writeOpenAIError(w, http.StatusNotFound, "no_eligible_member", "no smart group member matches the request policy")
@@ -873,7 +865,8 @@ func collectInputText(value any, key string, characters *int, inputText *strings
 	}
 }
 
-func matchExcludedKeywordRoutes(input string, routes []Route) map[string]struct{} {
+func matchKeywordRoutes(input string, routes []Route) map[string]struct{} {
+	input = strings.ToLower(input)
 	keywordRoutes := make(map[string][]string)
 	for _, route := range routes {
 		if !route.KeywordCheckEnabled {
@@ -903,6 +896,25 @@ func matchExcludedKeywordRoutes(input string, routes []Route) map[string]struct{
 		}
 	}
 	return matchedRoutes
+}
+
+func filterRoutesByKeywords(input string, routes []Route) []Route {
+	matchedRoutes := matchKeywordRoutes(input, routes)
+	filtered := make([]Route, 0, len(routes))
+	for _, route := range routes {
+		if route.KeywordCheckEnabled {
+			_, matched := matchedRoutes[route.ID]
+			if route.KeywordMatchMode == KeywordMatchModeRequireMatch {
+				if !matched {
+					continue
+				}
+			} else if matched {
+				continue
+			}
+		}
+		filtered = append(filtered, route)
+	}
+	return filtered
 }
 
 func isInputTextKey(key string) bool {

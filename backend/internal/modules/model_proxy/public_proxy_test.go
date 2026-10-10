@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -425,12 +426,37 @@ func TestRequestPolicyFactsWithTextExtractsChatInputForKeywordChecks(t *testing.
 	if err != nil || streaming || tokens == 0 || !strings.Contains(input, "鹈鹕") {
 		t.Fatalf("streaming=%v tokens=%d input=%q err=%v", streaming, tokens, input, err)
 	}
-	matched := matchExcludedKeywordRoutes(strings.ToLower(input), []Route{
+	matched := matchKeywordRoutes(input, []Route{
 		{ID: "route-a", KeywordCheckEnabled: true, ExcludedKeywords: []string{"糖果", "鹈鹕"}},
 	})
 	if _, ok := matched["route-a"]; !ok {
 		t.Fatal("matching excluded keyword was not detected")
 	}
+}
+
+func TestFilterRoutesByKeywordMode(t *testing.T) {
+	routes := []Route{
+		{ID: "skip", KeywordCheckEnabled: true, KeywordMatchMode: KeywordMatchModeSkipOnMatch, ExcludedKeywords: []string{"OpenAI"}},
+		{ID: "legacy-skip", KeywordCheckEnabled: true, ExcludedKeywords: []string{"legacy"}},
+		{ID: "require", KeywordCheckEnabled: true, KeywordMatchMode: KeywordMatchModeRequireMatch, ExcludedKeywords: []string{"Premium"}},
+		{ID: "unchecked"},
+	}
+
+	assertRouteIDs := func(input string, want ...string) {
+		t.Helper()
+		filtered := filterRoutesByKeywords(input, routes)
+		got := make([]string, 0, len(filtered))
+		for _, route := range filtered {
+			got = append(got, route.ID)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("input=%q routes=%v want=%v", input, got, want)
+		}
+	}
+
+	assertRouteIDs("use OPENAI", "legacy-skip", "unchecked")
+	assertRouteIDs("use PREMIUM", "skip", "legacy-skip", "require", "unchecked")
+	assertRouteIDs("use LEGACY", "skip", "unchecked")
 }
 
 func TestRequestPolicyFactsWithTextExtractsNativeGeminiInput(t *testing.T) {
@@ -446,13 +472,13 @@ func TestRequestPolicyFactsWithTextExtractsNativeGeminiInput(t *testing.T) {
 	}
 }
 
-func TestMatchExcludedKeywordRoutesDeduplicatesKeywordsAcrossMembers(t *testing.T) {
+func TestMatchKeywordRoutesDeduplicatesKeywordsAcrossMembers(t *testing.T) {
 	routes := []Route{
 		{ID: "route-a", KeywordCheckEnabled: true, ExcludedKeywords: []string{"糖果", "鹈鹕"}},
 		{ID: "route-b", KeywordCheckEnabled: true, ExcludedKeywords: []string{"糖果", "糖果"}},
 		{ID: "route-c", KeywordCheckEnabled: false, ExcludedKeywords: []string{"糖果"}},
 	}
-	matched := matchExcludedKeywordRoutes("请使用糖果路由", routes)
+	matched := matchKeywordRoutes("请使用糖果路由", routes)
 	if _, ok := matched["route-a"]; !ok {
 		t.Fatal("route-a should be skipped")
 	}
