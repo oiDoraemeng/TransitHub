@@ -640,6 +640,7 @@ func TestAcquireRouteSecretUsesProvidedKeyWithoutCleanupJob(t *testing.T) {
 	service := &Service{cipher: cipher}
 	secret, job, needsCleanup, err := service.acquireRouteSecret(context.Background(), Route{
 		UseProvidedKey:        true,
+		RouteProvidedKey:      true,
 		UpstreamKeyCiphertext: ciphertext,
 	})
 	if err != nil {

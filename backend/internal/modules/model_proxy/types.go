@@ -34,6 +34,8 @@ type Route struct {
 	RequestsPerMinute     int               `json:"requestsPerMinute,omitempty"`
 	Priority              int               `json:"priority,omitempty"`
 	UseProvidedKey        bool              `json:"useProvidedKey,omitempty"`
+	RouteProvidedKey      bool              `json:"routeProvidedKey,omitempty"`
+	MemberProvidedKey     bool              `json:"memberProvidedKey,omitempty"`
 	UpstreamKeyPreview    string            `json:"upstreamKeyPreview,omitempty"`
 	UpstreamKeyCiphertext string            `json:"-"`
 	KeywordCheckEnabled   bool              `json:"keywordCheckEnabled,omitempty"`
@@ -117,6 +119,7 @@ type CreateRouteRequest struct {
 	GroupName        string `json:"groupName"`
 	ConcurrencyLimit int    `json:"concurrencyLimit"`
 	ProxyID          string `json:"proxyId"`
+	UpstreamKey      string `json:"upstreamKey,omitempty"`
 	Enabled          *bool  `json:"enabled,omitempty"`
 }
 
@@ -127,6 +130,7 @@ type UpdateRouteRequest struct {
 	GroupName        *string `json:"groupName,omitempty"`
 	ConcurrencyLimit *int    `json:"concurrencyLimit,omitempty"`
 	ProxyID          *string `json:"proxyId,omitempty"`
+	UpstreamKey      string  `json:"upstreamKey,omitempty"`
 	Enabled          *bool   `json:"enabled,omitempty"`
 }
 

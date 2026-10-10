@@ -142,9 +142,9 @@ export default {
       pending: '等待首次同步',
       stale: '目录已过期',
       routes: {
-        tab: '代理路由', heading: '代理路由', description: '每条路由固定绑定一个已登录站点和分组。',
+        tab: '代理路由', heading: '代理路由', description: '路由可绑定站点分组，或直接使用预置上游 Key。',
         add: '新增路由', edit: '编辑路由', count: '条路由', empty: '还没有代理路由。',
-        formHelp: '长期 Key 只进入 TransitHub，远端临时 Key 会在每次请求后自动删除。'
+        formHelp: '选择分组时可创建远端临时 Key；不选择分组时必须填写预置上游 Key，调用时不会创建临时 Key。'
       },
       groups: {
         tab: '智能分组', heading: '智能分组', description: '一个 Key 调用所有成员模型，并自动汇总可用并发。',
@@ -164,7 +164,7 @@ export default {
           syncKeyDeleteDelayError: '删除阈值必须是 1 到 60000 之间的整数。', syncKeyDeleteSummary: '同步请求 {count}ms 内删除 Key',
           useProvidedKey: '使用预置上游 Key（不创建临时 Key）', providedKey: '预置上游 Key',
           providedKeyHelp: '开启后使用该成员的预置 Key 调用模型，不会创建或删除临时 Key。留空表示保留已保存的 Key。',
-          providedKeyError: '启用预置上游 Key 时必须提供 Key。', providedKeySummary: '预置 Key {preview}',
+          providedKeyError: '启用预置上游 Key 时必须提供 Key。', providedKeySummary: '成员预置 Key {preview}', routeProvidedKeySummary: '路由默认 Key {preview}',
           keywordCheckEnabled: '启用关键词检测', keywordMatchMode: '命中策略', keywordSkipOnMatch: '命中后跳过此成员', keywordRequireMatch: '命中后才选择此成员', excludedKeywords: '匹配关键词',
           keywordPlaceholder: '每行或用逗号填写一个关键词，例如：鹈鹕\n糖果',
           keywordHelp: '只有至少一个成员启用检测时才会解析一次输入内容；匹配不区分大小写。',
@@ -182,7 +182,7 @@ export default {
         testStatus: { untested: '未测试', healthy: '可用', failed: '不可用' }
       },
       table: { route: '路由', binding: '站点 / 分组', proxy: '模型出口', concurrency: '并发', models: '模型', status: '状态', actions: '操作' },
-      form: { name: '名称', site: 'Sub2API 站点', group: '分组', proxy: '模型出口代理（可选）', proxyHelp: '仅模型请求使用此代理。代理停用或不可用时请求会失败，不会回退到直连。', concurrency: '并发额度', enabled: '创建后立即启用', selectSite: '选择站点', selectGroup: '选择分组' },
+      form: { name: '名称', site: 'Sub2API 站点', group: '分组（可选）', proxy: '模型出口代理（可选）', proxyHelp: '仅模型请求使用此代理。代理停用或不可用时请求会失败，不会回退到直连。', concurrency: '并发额度', enabled: '创建后立即启用', selectSite: '选择站点', selectGroup: '选择分组', noGroup: '不选择分组，使用预置上游 Key', preparedKeyBinding: '预置上游 Key', upstreamKey: '预置上游 Key', upstreamKeyKeep: '留空则保留当前 Key', upstreamKeyHelp: 'Key 会加密保存，并作为该路由在所有智能分组中的默认上游凭据。', upstreamKeyRequired: '不选择分组时必须填写预置上游 Key。' },
       actions: { reveal: '查看 Key', rotate: '轮换 Key', edit: '编辑', delete: '删除', test: '测试代理', copy: '复制', addMember: '添加成员', removeMember: '移除成员' },
       cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个待自动重试', processing: '{count} 个正在清理', routePending: '{count} 个待清理' },
       key: { newRoute: '新代理路由 Key', newGroup: '新智能分组 Key', storeSafely: '此 Key 可随时在管理页再次查看，请勿发送给不可信客户端。' },

@@ -142,9 +142,9 @@ export default {
       pending: 'Waiting for first sync',
       stale: 'Catalog stale',
       routes: {
-        tab: 'Proxy routes', heading: 'Proxy routes', description: 'Each route binds one connected site and group.',
+        tab: 'Proxy routes', heading: 'Proxy routes', description: 'A route can bind a site group or use a prepared upstream key directly.',
         add: 'Add route', edit: 'Edit route', count: 'routes', empty: 'No proxy routes yet.',
-        formHelp: 'The durable key stays in TransitHub; each remote temporary key is deleted automatically after its request.'
+        formHelp: 'With a group, remote temporary keys can be created. Without a group, a prepared upstream key is required and no temporary key is created.'
       },
       groups: {
         tab: 'Smart groups', heading: 'Smart groups', description: 'Use one key for every member model and combine available concurrency.',
@@ -164,7 +164,7 @@ export default {
           syncKeyDeleteDelayError: 'The deletion threshold must be an integer between 1 and 60000.', syncKeyDeleteSummary: 'Delete sync-request key within {count}ms',
           useProvidedKey: 'Use a prepared upstream key (no temporary key)', providedKey: 'Prepared upstream key',
           providedKeyHelp: 'This member uses the prepared key for model calls without creating or deleting a temporary key. Leave blank to keep the saved key.',
-          providedKeyError: 'An upstream key is required when prepared-key mode is enabled.', providedKeySummary: 'Prepared key {preview}',
+          providedKeyError: 'An upstream key is required when prepared-key mode is enabled.', providedKeySummary: 'Member key {preview}', routeProvidedKeySummary: 'Route default key {preview}',
           keywordCheckEnabled: 'Enable keyword checks', keywordMatchMode: 'Match behavior', keywordSkipOnMatch: 'Skip this member on match', keywordRequireMatch: 'Select this member only on match', excludedKeywords: 'Match keywords',
           keywordPlaceholder: 'One keyword per line or comma, for example: pelican\ncandy',
           keywordHelp: 'Input is parsed once only when at least one member enables checks. Matching is case-insensitive.',
@@ -182,7 +182,7 @@ export default {
         testStatus: { untested: 'Untested', healthy: 'Available', failed: 'Unavailable' }
       },
       table: { route: 'Route', binding: 'Site / group', proxy: 'Model egress', concurrency: 'Concurrency', models: 'Models', status: 'Status', actions: 'Actions' },
-      form: { name: 'Name', site: 'Sub2API site', group: 'Group', proxy: 'Model egress proxy (optional)', proxyHelp: 'Only model requests use this proxy. A disabled or unavailable proxy fails closed instead of falling back to a direct connection.', concurrency: 'Concurrency limit', enabled: 'Enable immediately', selectSite: 'Select site', selectGroup: 'Select group' },
+      form: { name: 'Name', site: 'Sub2API site', group: 'Group (optional)', proxy: 'Model egress proxy (optional)', proxyHelp: 'Only model requests use this proxy. A disabled or unavailable proxy fails closed instead of falling back to a direct connection.', concurrency: 'Concurrency limit', enabled: 'Enable immediately', selectSite: 'Select site', selectGroup: 'Select group', noGroup: 'No group; use a prepared upstream key', preparedKeyBinding: 'Prepared upstream key', upstreamKey: 'Prepared upstream key', upstreamKeyKeep: 'Leave blank to keep the current key', upstreamKeyHelp: 'The key is encrypted and becomes this route’s default upstream credential in every smart group.', upstreamKeyRequired: 'A prepared upstream key is required when no group is selected.' },
       actions: { reveal: 'Reveal key', rotate: 'Rotate key', edit: 'Edit', delete: 'Delete', test: 'Test proxy', copy: 'Copy', addMember: 'Add member', removeMember: 'Remove member' },
       cleanup: { pending: '{count} temporary keys pending cleanup', retrying: '{count} scheduled for retry', processing: '{count} being cleaned up', routePending: '{count} pending cleanup' },
       key: { newRoute: 'New proxy route key', newGroup: 'New smart group key', storeSafely: 'This key can be revealed here again. Do not share it with untrusted clients.' },

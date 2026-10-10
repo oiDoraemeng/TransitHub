@@ -20,6 +20,8 @@ export interface ProxyRoute {
   requestsPerMinute?: number
   priority?: number
   useProvidedKey?: boolean
+  routeProvidedKey?: boolean
+  memberProvidedKey?: boolean
   upstreamKeyPreview?: string
   keywordCheckEnabled?: boolean
   keywordMatchMode?: 'skip_on_match' | 'require_match'
@@ -60,6 +62,7 @@ export interface ProxyRouteInput {
   groupName: string
   concurrencyLimit: number
   proxyId: string
+  upstreamKey?: string
   enabled: boolean
 }
 

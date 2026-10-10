@@ -37,7 +37,7 @@ let pollTimer: number | undefined
 
 const routeModalOpen = ref(false)
 const editingRouteId = ref('')
-const routeForm = reactive<ProxyRouteInput>({ name: '', siteId: '', groupId: '', groupName: '', concurrencyLimit: 50, proxyId: '', enabled: true })
+const routeForm = reactive<ProxyRouteInput>({ name: '', siteId: '', groupId: '', groupName: '', concurrencyLimit: 50, proxyId: '', upstreamKey: '', enabled: true })
 
 const proxyModalOpen = ref(false)
 const editingProxyId = ref('')
@@ -56,6 +56,7 @@ const memberPolicyTarget = ref<{ group: ProxySmartGroup; route: ProxyRoute } | n
 const memberPolicyForm = reactive({ streamOnly: false, minInputTokens: 0, requestsPerMinute: 0, priority: 0, modelMappingEnabled: false, modelMapping: '', useProvidedKey: false, upstreamKey: '', keywordCheckEnabled: false, keywordMatchMode: 'skip_on_match' as 'skip_on_match' | 'require_match', excludedKeywords: '', syncKeyDeleteEnabled: false, syncKeyDeleteDelayMs: 500 })
 
 const enabledRoutes = computed(() => routes.value.filter(route => route.enabled))
+const editingRouteHasProvidedKey = computed(() => routes.value.find(route => route.id === editingRouteId.value)?.routeProvidedKey ?? false)
 const availableMemberRoutes = computed(() => {
   const existing = new Set(memberModalGroup.value?.members.map(member => member.id) ?? [])
   return enabledRoutes.value.filter(route => !existing.has(route.id))
@@ -113,32 +114,37 @@ watch(() => routeForm.siteId, async (siteId, previous) => {
 
 const openCreateRoute = () => {
   editingRouteId.value = ''
-  Object.assign(routeForm, { name: '', siteId: sites.value[0]?.id ?? '', groupId: '', groupName: '', concurrencyLimit: 50, proxyId: '', enabled: true })
+  Object.assign(routeForm, { name: '', siteId: sites.value[0]?.id ?? '', groupId: '', groupName: '', concurrencyLimit: 50, proxyId: '', upstreamKey: '', enabled: true })
   routeModalOpen.value = true
   void loadGroups(routeForm.siteId)
 }
 
 const openEditRoute = async (route: ProxyRoute) => {
   editingRouteId.value = route.id
-  Object.assign(routeForm, { name: route.name, siteId: route.siteId, groupId: route.groupId, groupName: route.groupName, concurrencyLimit: route.concurrencyLimit, proxyId: route.proxyId, enabled: route.enabled })
+  Object.assign(routeForm, { name: route.name, siteId: route.siteId, groupId: route.groupId, groupName: route.groupName, concurrencyLimit: route.concurrencyLimit, proxyId: route.proxyId, upstreamKey: '', enabled: route.enabled })
   routeModalOpen.value = true
   await loadGroups(route.siteId)
   routeForm.groupId = route.groupId
 }
 
 const onGroupSelected = () => {
-  routeForm.groupName = availableGroups.value.find(group => group.id === routeForm.groupId)?.name ?? routeForm.groupId
+  routeForm.groupName = routeForm.groupId ? (availableGroups.value.find(group => group.id === routeForm.groupId)?.name ?? routeForm.groupId) : ''
 }
 
 const submitRoute = async () => {
+  const existingRoute = routes.value.find(route => route.id === editingRouteId.value)
+  if (!routeForm.groupId && !routeForm.upstreamKey?.trim() && !existingRoute?.routeProvidedKey) {
+    errorMessage.value = t('admin.modelProxy.form.upstreamKeyRequired')
+    return
+  }
   saving.value = true
   errorMessage.value = ''
   try {
     if (editingRouteId.value) {
-      await updateProxyRoute(editingRouteId.value, { ...routeForm })
+      await updateProxyRoute(editingRouteId.value, { ...routeForm, upstreamKey: routeForm.upstreamKey?.trim() || undefined })
       flash(t('admin.modelProxy.notices.routeUpdated'))
     } else {
-      const created = await createProxyRoute({ ...routeForm })
+      const created = await createProxyRoute({ ...routeForm, upstreamKey: routeForm.upstreamKey?.trim() || undefined })
       await copyText(created.key)
     }
     routeModalOpen.value = false
@@ -474,7 +480,7 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
             <tbody class="divide-y divide-border/60">
               <tr v-for="routeItem in routes" :key="routeItem.id" class="hover:bg-surface/40">
                 <td class="px-4 py-3"><div class="font-medium">{{ routeItem.name }}</div><div class="mt-1 text-xs text-muted-foreground">{{ formatDate(routeItem.modelSyncedAt) }}</div></td>
-                <td class="px-4 py-3"><div>{{ routeItem.siteName }}</div><div class="text-xs text-muted-foreground">{{ routeItem.groupName }}</div></td>
+                <td class="px-4 py-3"><div>{{ routeItem.siteName }}</div><div class="text-xs text-muted-foreground">{{ routeItem.groupName || t('admin.modelProxy.form.preparedKeyBinding') }}</div></td>
                 <td class="px-4 py-3"><span class="inline-flex items-center gap-2"><Network class="h-4 w-4 text-muted-foreground" />{{ routeItem.proxyName || t('admin.modelProxy.proxies.direct') }}</span></td>
                 <td class="px-4 py-3"><span class="font-mono">{{ routeItem.activeConcurrency }} / {{ routeItem.concurrencyLimit }}</span><div class="mt-1 h-1.5 w-24 bg-surface-line"><div class="h-full bg-primary" :style="{ width: `${Math.min(100, routeItem.activeConcurrency / routeItem.concurrencyLimit * 100)}%` }" /></div></td>
                 <td class="px-4 py-3"><span>{{ routeItem.modelCount }}</span><span v-if="routeItem.modelSyncError" class="ml-2 text-xs text-warning" :title="routeItem.modelSyncError">{{ t('admin.modelProxy.stale') }}</span></td>
@@ -499,7 +505,7 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
               <div class="flex justify-end gap-1"><button class="icon-button" :title="t('admin.modelProxy.actions.addMember')" @click="memberRouteId = ''; memberModalGroup = group"><Plus /></button><button class="icon-button" :title="t('admin.modelProxy.actions.copy')" @click="copyOwnerKey(group, 'group')"><Clipboard /></button><button class="icon-button" :title="t('admin.modelProxy.actions.rotate')" @click="rotateKey(group, 'group')"><RefreshCw /></button><button class="icon-button" :title="t('admin.modelProxy.actions.edit')" @click="openEditSmart(group)"><Pencil /></button><button class="icon-button text-destructive" :title="t('admin.modelProxy.actions.delete')" @click="removeSmart(group)"><Trash2 /></button></div>
             </div>
             <div v-if="expandedGroups.has(group.id)" class="grid gap-6 border-t border-border bg-surface/30 px-5 py-5 lg:grid-cols-2">
-              <div><h4 class="mb-3 text-sm font-medium">{{ t('admin.modelProxy.groups.members') }}</h4><div class="space-y-2"><div v-for="member in group.members" :key="member.id" class="flex items-center justify-between gap-3 border-b border-border/50 pb-2 text-sm"><div class="min-w-0"><div class="font-medium">{{ member.name }}</div><div class="mt-0.5 truncate text-xs text-muted-foreground">{{ member.siteName }} / {{ member.groupName || member.groupId }}</div><div class="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground"><span>{{ t('admin.modelProxy.groups.policy.prioritySummary', { count: member.priority ?? 0 }) }}</span><span v-if="member.modelMappingEnabled">{{ t('admin.modelProxy.groups.policy.modelMappingEnabled') }}</span><span v-if="member.streamOnly">{{ t('admin.modelProxy.groups.policy.streamOnly') }}</span><span v-if="member.syncKeyDeleteEnabled && !member.useProvidedKey">{{ t('admin.modelProxy.groups.policy.syncKeyDeleteSummary', { count: member.syncKeyDeleteDelayMs ?? 500 }) }}</span><span v-if="member.minInputTokens">{{ t('admin.modelProxy.groups.policy.minInputSummary', { count: member.minInputTokens }) }}</span><span v-if="member.requestsPerMinute">{{ t('admin.modelProxy.groups.policy.rpmSummary', { count: member.requestsPerMinute }) }}</span><span v-if="member.useProvidedKey">{{ t('admin.modelProxy.groups.policy.providedKeySummary', { preview: member.upstreamKeyPreview || '***' }) }}</span><span v-if="member.keywordCheckEnabled">{{ t(member.keywordMatchMode === 'require_match' ? 'admin.modelProxy.groups.policy.keywordRequireMatchSummary' : 'admin.modelProxy.groups.policy.keywordSkipOnMatchSummary', { count: member.excludedKeywords?.length ?? 0 }) }}</span><span v-if="!member.streamOnly && !member.syncKeyDeleteEnabled && !member.minInputTokens && !member.requestsPerMinute && !member.priority && !member.modelMappingEnabled && !member.useProvidedKey && !member.keywordCheckEnabled">{{ t('admin.modelProxy.groups.policy.default') }}</span></div></div><div class="flex shrink-0 items-center gap-2"><span class="font-mono text-xs">{{ member.activeConcurrency }}/{{ member.concurrencyLimit }}</span><button class="icon-button" :title="t('admin.modelProxy.groups.policy.edit')" @click="openMemberPolicy(group, member)"><Pencil /></button><button class="text-destructive" :title="t('admin.modelProxy.actions.removeMember')" @click="removeMember(group, member)"><X class="h-4 w-4" /></button></div></div></div></div>
+              <div><h4 class="mb-3 text-sm font-medium">{{ t('admin.modelProxy.groups.members') }}</h4><div class="space-y-2"><div v-for="member in group.members" :key="member.id" class="flex items-center justify-between gap-3 border-b border-border/50 pb-2 text-sm"><div class="min-w-0"><div class="font-medium">{{ member.name }}</div><div class="mt-0.5 truncate text-xs text-muted-foreground">{{ member.siteName }} / {{ member.groupName || t('admin.modelProxy.form.preparedKeyBinding') }}</div><div class="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground"><span>{{ t('admin.modelProxy.groups.policy.prioritySummary', { count: member.priority ?? 0 }) }}</span><span v-if="member.modelMappingEnabled">{{ t('admin.modelProxy.groups.policy.modelMappingEnabled') }}</span><span v-if="member.streamOnly">{{ t('admin.modelProxy.groups.policy.streamOnly') }}</span><span v-if="member.syncKeyDeleteEnabled && !member.useProvidedKey">{{ t('admin.modelProxy.groups.policy.syncKeyDeleteSummary', { count: member.syncKeyDeleteDelayMs ?? 500 }) }}</span><span v-if="member.minInputTokens">{{ t('admin.modelProxy.groups.policy.minInputSummary', { count: member.minInputTokens }) }}</span><span v-if="member.requestsPerMinute">{{ t('admin.modelProxy.groups.policy.rpmSummary', { count: member.requestsPerMinute }) }}</span><span v-if="member.useProvidedKey">{{ t(member.memberProvidedKey ? 'admin.modelProxy.groups.policy.providedKeySummary' : 'admin.modelProxy.groups.policy.routeProvidedKeySummary', { preview: member.upstreamKeyPreview || '***' }) }}</span><span v-if="member.keywordCheckEnabled">{{ t(member.keywordMatchMode === 'require_match' ? 'admin.modelProxy.groups.policy.keywordRequireMatchSummary' : 'admin.modelProxy.groups.policy.keywordSkipOnMatchSummary', { count: member.excludedKeywords?.length ?? 0 }) }}</span><span v-if="!member.streamOnly && !member.syncKeyDeleteEnabled && !member.minInputTokens && !member.requestsPerMinute && !member.priority && !member.modelMappingEnabled && !member.useProvidedKey && !member.keywordCheckEnabled">{{ t('admin.modelProxy.groups.policy.default') }}</span></div></div><div class="flex shrink-0 items-center gap-2"><span class="font-mono text-xs">{{ member.activeConcurrency }}/{{ member.concurrencyLimit }}</span><button class="icon-button" :title="t('admin.modelProxy.groups.policy.edit')" @click="openMemberPolicy(group, member)"><Pencil /></button><button class="text-destructive" :title="t('admin.modelProxy.actions.removeMember')" @click="removeMember(group, member)"><X class="h-4 w-4" /></button></div></div></div></div>
               <div><h4 class="mb-3 text-sm font-medium">{{ t('admin.modelProxy.groups.models') }}</h4><div class="max-h-56 overflow-y-auto"><div v-for="model in group.models" :key="model.id" class="flex items-center justify-between border-b border-border/50 py-2 text-sm"><span class="font-mono text-xs">{{ model.id }}</span><span class="text-xs text-muted-foreground">{{ t('admin.modelProxy.groups.modelCapacity', { count: model.effectiveConcurrency }) }}</span></div><p v-if="!group.models.length" class="text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.modelsPending') }}</p></div></div>
             </div>
           </article>
@@ -537,7 +543,8 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
           <div class="grid gap-4 p-5 sm:grid-cols-2">
             <label class="field sm:col-span-2"><span>{{ t('admin.modelProxy.form.name') }}</span><input v-model="routeForm.name" required /></label>
             <label class="field"><span>{{ t('admin.modelProxy.form.site') }}</span><select v-model="routeForm.siteId" required><option value="" disabled>{{ t('admin.modelProxy.form.selectSite') }}</option><option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option></select></label>
-            <label class="field"><span>{{ t('admin.modelProxy.form.group') }}</span><select v-model="routeForm.groupId" required :disabled="groupsLoading" @change="onGroupSelected"><option value="" disabled>{{ groupsLoading ? t('admin.modelProxy.loading') : t('admin.modelProxy.form.selectGroup') }}</option><option v-for="group in availableGroups" :key="group.id" :value="group.id">{{ group.name }}</option></select></label>
+            <label class="field"><span>{{ t('admin.modelProxy.form.group') }}</span><select v-model="routeForm.groupId" :disabled="groupsLoading" @change="onGroupSelected"><option value="">{{ groupsLoading ? t('admin.modelProxy.loading') : t('admin.modelProxy.form.noGroup') }}</option><option v-for="group in availableGroups" :key="group.id" :value="group.id">{{ group.name }}</option></select></label>
+            <label v-if="!routeForm.groupId" class="field sm:col-span-2"><span>{{ t('admin.modelProxy.form.upstreamKey') }}</span><input v-model="routeForm.upstreamKey" type="password" autocomplete="new-password" :required="!editingRouteHasProvidedKey" :placeholder="editingRouteHasProvidedKey ? t('admin.modelProxy.form.upstreamKeyKeep') : 'sk-...'" /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.form.upstreamKeyHelp') }}</small></label>
             <label class="field"><span>{{ t('admin.modelProxy.form.concurrency') }}</span><input v-model.number="routeForm.concurrencyLimit" type="number" min="1" max="100000" required /></label>
             <label class="field"><span>{{ t('admin.modelProxy.form.proxy') }}</span><select v-model="routeForm.proxyId"><option value="">{{ t('admin.modelProxy.proxies.direct') }}</option><option v-for="proxy in proxies" :key="proxy.id" :value="proxy.id" :disabled="!proxy.enabled">{{ proxy.name }} · {{ proxy.address }}{{ proxy.enabled ? '' : ` (${t('admin.modelProxy.disabled')})` }}</option></select></label>
             <p class="sm:col-span-2 text-xs leading-5 text-muted-foreground">{{ t('admin.modelProxy.form.proxyHelp') }}</p>

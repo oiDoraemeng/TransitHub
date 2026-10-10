@@ -176,8 +176,12 @@ func (s *Service) CreateRoute(ctx context.Context, userID string, input CreateRo
 	input.GroupID = strings.TrimSpace(input.GroupID)
 	input.GroupName = strings.TrimSpace(input.GroupName)
 	input.ProxyID = strings.TrimSpace(input.ProxyID)
-	if input.Name == "" || input.SiteID == "" || input.GroupID == "" {
-		return Route{}, "", &requestError{Status: 400, Message: "name, siteId and groupId are required"}
+	input.UpstreamKey = strings.TrimSpace(input.UpstreamKey)
+	if input.Name == "" || input.SiteID == "" {
+		return Route{}, "", &requestError{Status: 400, Message: "name and siteId are required"}
+	}
+	if input.GroupID == "" && input.UpstreamKey == "" {
+		return Route{}, "", &requestError{Status: 400, Message: "upstreamKey is required when groupId is empty"}
 	}
 	if input.ConcurrencyLimit == 0 {
 		input.ConcurrencyLimit = 50
@@ -216,6 +220,19 @@ func (s *Service) CreateRoute(ctx context.Context, userID string, input CreateRo
 		return Route{}, "", err
 	}
 	route := Route{ID: routeID, UserID: userID, AdminAccountID: accountID, Name: input.Name, SiteID: input.SiteID, SiteName: site.Name, GroupID: input.GroupID, GroupName: input.GroupName, ConcurrencyLimit: input.ConcurrencyLimit, Enabled: enabled, ProxyID: input.ProxyID, KeyPreview: preview}
+	if input.UpstreamKey != "" {
+		if s.cipher == nil || !s.cipher.Available() {
+			return Route{}, "", errEncryptionKeyUnavailable
+		}
+		upstreamCiphertext, encryptErr := s.cipher.Encrypt(input.UpstreamKey)
+		if encryptErr != nil {
+			return Route{}, "", encryptErr
+		}
+		route.UseProvidedKey = true
+		route.RouteProvidedKey = true
+		route.UpstreamKeyCiphertext = upstreamCiphertext
+		route.UpstreamKeyPreview = keyPreview(input.UpstreamKey)
+	}
 	if err := s.repository.CreateRoute(ctx, route, keyID, hash, ciphertext, preview); err != nil {
 		return Route{}, "", err
 	}
@@ -237,6 +254,7 @@ func (s *Service) UpdateRoute(ctx context.Context, userID, routeID string, input
 		return Route{}, &requestError{Status: 404, Message: "proxy route not found"}
 	}
 	refreshModels := false
+	input.UpstreamKey = strings.TrimSpace(input.UpstreamKey)
 	if input.Name != nil {
 		route.Name = strings.TrimSpace(*input.Name)
 	}
@@ -264,7 +282,21 @@ func (s *Service) UpdateRoute(ctx context.Context, userID, routeID string, input
 			refreshModels = true
 		}
 	}
-	if route.Name == "" || route.SiteID == "" || route.GroupID == "" || route.ConcurrencyLimit < 1 || route.ConcurrencyLimit > 100000 {
+	if input.UpstreamKey != "" {
+		if s.cipher == nil || !s.cipher.Available() {
+			return Route{}, errEncryptionKeyUnavailable
+		}
+		upstreamCiphertext, encryptErr := s.cipher.Encrypt(input.UpstreamKey)
+		if encryptErr != nil {
+			return Route{}, encryptErr
+		}
+		route.UseProvidedKey = true
+		route.RouteProvidedKey = true
+		route.UpstreamKeyCiphertext = upstreamCiphertext
+		route.UpstreamKeyPreview = keyPreview(input.UpstreamKey)
+		refreshModels = true
+	}
+	if route.Name == "" || route.SiteID == "" || (route.GroupID == "" && strings.TrimSpace(route.UpstreamKeyCiphertext) == "") || route.ConcurrencyLimit < 1 || route.ConcurrencyLimit > 100000 {
 		return Route{}, &requestError{Status: 400, Message: "invalid proxy route"}
 	}
 	site, siteErr := s.sites.GetSite(ctx, route.SiteID)
