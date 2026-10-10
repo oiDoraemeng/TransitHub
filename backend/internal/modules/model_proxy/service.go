@@ -34,7 +34,19 @@ const (
 	cleanupMaxRetries           = 3
 	defaultSyncKeyDeleteDelayMS = 500
 	maxSyncKeyDeleteDelayMS     = 60000
+	latencyObservationBuffer    = 4096
+	latencyObservationInterval  = 500 * time.Millisecond
 )
+
+type routeLatencyObservation struct {
+	routeID string
+	latency time.Duration
+}
+
+type routeLatencyAggregate struct {
+	total time.Duration
+	count int64
+}
 
 type AccountResolver interface {
 	RequireCurrentID(ctx context.Context, userID string) (string, error)
@@ -67,6 +79,7 @@ type Service struct {
 	cleanupNext       map[string]time.Time
 	forceRefreshMu    sync.Mutex
 	forceRefreshUntil map[string]time.Time
+	latencySamples    chan routeLatencyObservation
 }
 
 func NewService(repository *Repository, accounts AccountResolver, sites UpstreamSites, platform *upstream.PlatformService, cipher *KeyCipher, limiter *Limiter, maxRequestBytes int64, refreshInterval time.Duration) *Service {
@@ -85,15 +98,17 @@ func NewService(repository *Repository, accounts AccountResolver, sites Upstream
 		cipher: cipher, limiter: limiter, maxRequestBytes: maxRequestBytes, refreshInterval: refreshInterval,
 		dataClient: dataClient, egressClients: make(map[string]cachedEgressClient),
 		cleanupNext: make(map[string]time.Time), forceRefreshUntil: make(map[string]time.Time),
+		latencySamples: make(chan routeLatencyObservation, latencyObservationBuffer),
 	}
 }
 
 func (s *Service) Start(parent context.Context) {
 	ctx, cancel := context.WithCancel(parent)
 	s.cancel = cancel
-	s.wg.Add(2)
+	s.wg.Add(3)
 	go s.cleanupLoop(ctx)
 	go s.modelRefreshLoop(ctx)
+	go s.latencyObservationLoop(ctx)
 }
 
 func (s *Service) Stop() {
@@ -109,6 +124,39 @@ func (s *Service) Stop() {
 	for _, cached := range s.egressClients {
 		if cached.client != nil {
 			cached.client.CloseIdleConnections()
+		}
+	}
+}
+
+func (s *Service) latencyObservationLoop(ctx context.Context) {
+	defer s.wg.Done()
+	ticker := time.NewTicker(latencyObservationInterval)
+	defer ticker.Stop()
+	pending := make(map[string]routeLatencyAggregate)
+	flush := func() {
+		if len(pending) == 0 || s.limiter == nil {
+			return
+		}
+		writeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		for routeID, aggregate := range pending {
+			if aggregate.count > 0 {
+				_ = s.limiter.ObserveResponseHeaderLatency(writeCtx, routeID, aggregate.total/time.Duration(aggregate.count))
+			}
+		}
+		clear(pending)
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case sample := <-s.latencySamples:
+			aggregate := pending[sample.routeID]
+			aggregate.total += sample.latency
+			aggregate.count++
+			pending[sample.routeID] = aggregate
+		case <-ticker.C:
+			flush()
 		}
 	}
 }

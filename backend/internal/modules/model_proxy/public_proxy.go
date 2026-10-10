@@ -302,7 +302,9 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			continue
 		}
 		response, attemptErr := attemptSmartGroupMember(incoming.Context(), func(responseHeaderTimeout time.Duration) (*http.Response, error) {
+			started := time.Now()
 			response, _, err := s.performAttemptWithResponseHeaderTimeout(incoming, *route, replay.Open, route.ModelMapping, responseMapping, !streaming, responseHeaderTimeout)
+			s.observeSmartGroupLatency(incoming.Context(), route.ID, time.Since(started), responseHeaderTimeout, response, err)
 			return response, err
 		})
 		if attemptErr != nil {
@@ -359,6 +361,21 @@ func smartGroupResponseHeaderTimeout(attemptIndex int) time.Duration {
 		return smartGroupFirstResponseHeaderTimeout
 	}
 	return smartGroupSecondResponseHeaderTimeout
+}
+
+func (s *Service) observeSmartGroupLatency(ctx context.Context, routeID string, elapsed, failurePenalty time.Duration, response *http.Response, attemptErr error) {
+	if s.limiter == nil || s.latencySamples == nil || ctx.Err() != nil {
+		return
+	}
+	if attemptErr != nil || response == nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+		if elapsed < failurePenalty {
+			elapsed = failurePenalty
+		}
+	}
+	select {
+	case s.latencySamples <- routeLatencyObservation{routeID: routeID, latency: elapsed}:
+	default:
+	}
 }
 
 func (s *Service) smartGroupCandidates(ctx context.Context, group SmartGroup, modelID string) ([]Route, error) {
