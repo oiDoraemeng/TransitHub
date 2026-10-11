@@ -42,6 +42,8 @@ func RegisterRoutes(mux *http.ServeMux, service *Service) {
 	mux.HandleFunc("DELETE /api/proxy-smart-groups/{id}/members/{routeId}", h.removeMember)
 	mux.HandleFunc("GET /api/proxy-smart-groups/{id}/key", h.revealSmartGroupKey)
 	mux.HandleFunc("POST /api/proxy-smart-groups/{id}/rotate-key", h.rotateSmartGroupKey)
+	mux.HandleFunc("PATCH /api/proxy-smart-groups/{id}/custom-keys", h.updateSmartGroupCustomKeys)
+	mux.HandleFunc("GET /api/proxy-smart-groups/{id}/custom-keys/{keyId}", h.revealSmartGroupCustomKey)
 }
 
 func (h *Handler) listEgressProxies(w http.ResponseWriter, r *http.Request) {
@@ -201,6 +203,39 @@ func (h *Handler) revealSmartGroupKey(w http.ResponseWriter, r *http.Request) {
 }
 func (h *Handler) rotateSmartGroupKey(w http.ResponseWriter, r *http.Request) {
 	h.keyAction(w, r, OwnerSmartGroup, true)
+}
+
+func (h *Handler) updateSmartGroupCustomKeys(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	userID, ok := h.userID(w, r)
+	if !ok {
+		return
+	}
+	var input UpdateSmartGroupCustomKeysRequest
+	if err := httpjson.Decode(r, &input); err != nil {
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	keys, err := h.service.UpdateSmartGroupCustomKeys(r.Context(), userID, r.PathValue("id"), input)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, keys)
+}
+
+func (h *Handler) revealSmartGroupCustomKey(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	userID, ok := h.userID(w, r)
+	if !ok {
+		return
+	}
+	key, err := h.service.RevealSmartGroupCustomKey(r.Context(), userID, r.PathValue("id"), r.PathValue("keyId"))
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, key)
 }
 
 func (h *Handler) keyAction(w http.ResponseWriter, r *http.Request, ownerType string, rotate bool) {

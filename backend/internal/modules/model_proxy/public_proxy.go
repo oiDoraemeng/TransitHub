@@ -235,7 +235,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	}
 	keywordFiltering := false
 	for _, candidate := range candidates {
-		if candidate.KeywordCheckEnabled {
+		if candidate.KeywordMatchMode != KeywordMatchModeDisabled {
 			keywordFiltering = true
 			break
 		}
@@ -244,7 +244,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	var policyErr error
 	var streaming bool
 	var inputTokens int
-	if keywordFiltering {
+	if keywordFiltering && len(group.Keywords) > 0 {
 		streaming, inputTokens, inputText, policyErr = requestPolicyFactsWithText(incoming, replay)
 	} else {
 		streaming, inputTokens, policyErr = requestPolicyFacts(incoming, replay)
@@ -264,7 +264,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		eligible = append(eligible, candidate)
 	}
 	if keywordFiltering {
-		eligible = filterRoutesByKeywords(inputText, eligible)
+		eligible = filterRoutesByKeywords(inputText, group.Keywords, eligible)
 	}
 	if len(eligible) == 0 {
 		writeOpenAIError(w, http.StatusNotFound, "no_eligible_member", "no smart group member matches the request policy")
@@ -902,50 +902,28 @@ func collectInputText(value any, key string, characters *int, inputText *strings
 	}
 }
 
-func matchKeywordRoutes(input string, routes []Route) map[string]struct{} {
+func matchesAnyKeyword(input string, keywords []string) bool {
 	input = strings.ToLower(input)
-	keywordRoutes := make(map[string][]string)
-	for _, route := range routes {
-		if !route.KeywordCheckEnabled {
-			continue
-		}
-		seen := make(map[string]struct{}, len(route.ExcludedKeywords))
-		for _, keyword := range route.ExcludedKeywords {
-			keyword = strings.ToLower(strings.TrimSpace(keyword))
-			if keyword == "" {
-				continue
-			}
-			if _, duplicate := seen[keyword]; duplicate {
-				continue
-			}
-			seen[keyword] = struct{}{}
-			keywordRoutes[keyword] = append(keywordRoutes[keyword], route.ID)
+	for _, keyword := range keywords {
+		keyword = strings.ToLower(strings.TrimSpace(keyword))
+		if keyword != "" && strings.Contains(input, keyword) {
+			return true
 		}
 	}
-
-	matchedRoutes := make(map[string]struct{})
-	for keyword, routeIDs := range keywordRoutes {
-		if !strings.Contains(input, keyword) {
-			continue
-		}
-		for _, routeID := range routeIDs {
-			matchedRoutes[routeID] = struct{}{}
-		}
-	}
-	return matchedRoutes
+	return false
 }
 
-func filterRoutesByKeywords(input string, routes []Route) []Route {
-	matchedRoutes := matchKeywordRoutes(input, routes)
+func filterRoutesByKeywords(input string, keywords []string, routes []Route) []Route {
+	matched := matchesAnyKeyword(input, keywords)
 	filtered := make([]Route, 0, len(routes))
 	for _, route := range routes {
-		if route.KeywordCheckEnabled {
-			_, matched := matchedRoutes[route.ID]
-			if route.KeywordMatchMode == KeywordMatchModeRequireMatch {
-				if !matched {
-					continue
-				}
-			} else if matched {
+		switch route.KeywordMatchMode {
+		case KeywordMatchModeRequireMatch:
+			if !matched {
+				continue
+			}
+		case KeywordMatchModeSkipOnMatch:
+			if matched {
 				continue
 			}
 		}

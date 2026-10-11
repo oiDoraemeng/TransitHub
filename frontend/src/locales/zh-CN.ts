@@ -151,7 +151,11 @@ export default {
         add: '新增智能分组', edit: '编辑智能分组', empty: '还没有智能分组。', formHelp: '成员只能是当前工作区中的普通代理 Key。',
         selectRoutes: '选择现有代理路由', memberRoute: '代理路由', selectMemberRoute: '选择要加入的代理路由', noAvailableMemberRoutes: '没有可加入的已启用代理路由。',
         members: '成员路由', models: '模型目录', modelsPending: '模型目录正在后台自动同步。',
-        modelCapacity: '有效并发 {count}', entryKey: '普通长期入口 Key', addMember: '添加成员',
+        modelCapacity: '有效并发 {count}', entryKey: '普通长期入口 Key', addMember: '添加成员', keywordCount: '{count} 个关键词', customKeyCount: '{count} 个自定义 Key',
+        keywords: '分组关键词', keywordPlaceholder: '每行或用逗号填写一个关键词，例如：鹈鹕\n糖果',
+        keywordHelp: '所有成员共用这组关键词；仅当至少一个成员启用命中策略时才解析输入，匹配不区分大小写。',
+        customKeys: '自定义入口 Key', customKeyTotal: '当前 {count} 个', noCustomKeys: '尚未设置自定义 Key，系统生成的主 Key 不受影响。',
+        addCustomKeys: '新增自定义 Key', customKeyPlaceholder: '每行填写一个自定义 Key', customKeyHelp: '最多 32 个；保存后与系统生成的主 Key 同时有效。留空不会修改现有自定义 Key。', removeCustomKey: '移除此自定义 Key',
         policy: {
           edit: '成员策略', streamOnly: '仅接收流式请求', minInput: '最少输入 Token',
           minInputHelp: '0 表示不限；可填写任意非负整数，低于门槛会跳过此成员。',
@@ -165,10 +169,9 @@ export default {
           useProvidedKey: '使用预置上游 Key（不创建临时 Key）', providedKey: '预置上游 Key',
           providedKeyHelp: '开启后使用该成员的预置 Key 调用模型，不会创建或删除临时 Key。留空表示保留已保存的 Key。',
           providedKeyError: '启用预置上游 Key 时必须提供 Key。', providedKeySummary: '成员预置 Key {preview}', routeProvidedKeySummary: '路由默认 Key {preview}',
-          keywordCheckEnabled: '启用关键词检测', keywordMatchMode: '命中策略', keywordSkipOnMatch: '命中后跳过此成员', keywordRequireMatch: '命中后才选择此成员', excludedKeywords: '匹配关键词',
-          keywordPlaceholder: '每行或用逗号填写一个关键词，例如：鹈鹕\n糖果',
-          keywordHelp: '只有至少一个成员启用检测时才会解析一次输入内容；匹配不区分大小写。',
-          keywordError: '启用关键词检测时至少填写一个关键词。', keywordSkipOnMatchSummary: '命中跳过 · {count} 个关键词', keywordRequireMatchSummary: '命中才选 · {count} 个关键词',
+          keywordMatchMode: '关键词命中策略', keywordDisabled: '不检测', keywordSkipOnMatch: '命中后跳过此成员', keywordRequireMatch: '命中后才选择此成员',
+          keywordStrategyHelp: '关键词在智能分组中统一设置；此处只决定该成员命中或未命中时的处理方式。',
+          keywordSkipOnMatchSummary: '命中跳过', keywordRequireMatchSummary: '命中才选',
           modelMappingEnabled: '启用模型映射', modelMapping: '成员模型映射', modelMappingPlaceholder: '例如：gpt-6-astra = gpt-6-luna', modelMappingHelp: '每行一条，格式为“客户端模型 = 上游模型”。仅此成员使用这些映射。', modelMappingError: '模型映射格式无效，请使用“客户端模型 = 上游模型”，每行一条。', modelMappingRequired: '启用模型映射时至少填写一条映射。', default: '未设置成员限制'
         }
       },

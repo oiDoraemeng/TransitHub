@@ -6,6 +6,7 @@ const (
 	OwnerRoute      = "route"
 	OwnerSmartGroup = "smart_group"
 
+	KeywordMatchModeDisabled     = "disabled"
 	KeywordMatchModeSkipOnMatch  = "skip_on_match"
 	KeywordMatchModeRequireMatch = "require_match"
 )
@@ -38,9 +39,7 @@ type Route struct {
 	MemberProvidedKey     bool              `json:"memberProvidedKey,omitempty"`
 	UpstreamKeyPreview    string            `json:"upstreamKeyPreview,omitempty"`
 	UpstreamKeyCiphertext string            `json:"-"`
-	KeywordCheckEnabled   bool              `json:"keywordCheckEnabled,omitempty"`
 	KeywordMatchMode      string            `json:"keywordMatchMode,omitempty"`
-	ExcludedKeywords      []string          `json:"excludedKeywords,omitempty"`
 	ModelMappingEnabled   bool              `json:"modelMappingEnabled,omitempty"`
 	ModelMapping          map[string]string `json:"modelMapping,omitempty"`
 	SyncKeyDeleteEnabled  bool              `json:"syncKeyDeleteEnabled,omitempty"`
@@ -71,17 +70,27 @@ type EgressProxy struct {
 }
 
 type SmartGroup struct {
-	ID               string    `json:"id"`
-	UserID           string    `json:"-"`
-	AdminAccountID   string    `json:"-"`
-	Name             string    `json:"name"`
-	Enabled          bool      `json:"enabled"`
-	KeyPreview       string    `json:"keyPreview"`
-	TotalConcurrency int       `json:"totalConcurrency"`
-	Members          []Route   `json:"members"`
-	Models           []Model   `json:"models"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	ID               string      `json:"id"`
+	UserID           string      `json:"-"`
+	AdminAccountID   string      `json:"-"`
+	Name             string      `json:"name"`
+	Enabled          bool        `json:"enabled"`
+	Keywords         []string    `json:"keywords"`
+	CustomKeys       []CustomKey `json:"customKeys"`
+	KeyPreview       string      `json:"keyPreview"`
+	TotalConcurrency int         `json:"totalConcurrency"`
+	Members          []Route     `json:"members"`
+	Models           []Model     `json:"models"`
+	CreatedAt        time.Time   `json:"createdAt"`
+	UpdatedAt        time.Time   `json:"updatedAt"`
+}
+
+type CustomKey struct {
+	ID         string    `json:"id"`
+	Preview    string    `json:"preview"`
+	CreatedAt  time.Time `json:"createdAt"`
+	Hash       string    `json:"-"`
+	Ciphertext string    `json:"-"`
 }
 
 type Model struct {
@@ -157,12 +166,19 @@ type CreateSmartGroupRequest struct {
 	Name       string   `json:"name"`
 	MemberKeys []string `json:"memberKeys,omitempty"`
 	RouteIDs   []string `json:"routeIds,omitempty"`
+	Keywords   []string `json:"keywords,omitempty"`
 	Enabled    *bool    `json:"enabled,omitempty"`
 }
 
 type UpdateSmartGroupRequest struct {
-	Name    *string `json:"name,omitempty"`
-	Enabled *bool   `json:"enabled,omitempty"`
+	Name     *string   `json:"name,omitempty"`
+	Keywords *[]string `json:"keywords,omitempty"`
+	Enabled  *bool     `json:"enabled,omitempty"`
+}
+
+type UpdateSmartGroupCustomKeysRequest struct {
+	AddKeys      []string `json:"addKeys,omitempty"`
+	RemoveKeyIDs []string `json:"removeKeyIds,omitempty"`
 }
 
 type AddMemberRequest struct {
@@ -179,9 +195,7 @@ type UpdateMemberPolicyRequest struct {
 	ModelMapping         *map[string]string `json:"modelMapping,omitempty"`
 	UseProvidedKey       *bool              `json:"useProvidedKey,omitempty"`
 	UpstreamKey          string             `json:"upstreamKey,omitempty"`
-	KeywordCheckEnabled  *bool              `json:"keywordCheckEnabled,omitempty"`
 	KeywordMatchMode     *string            `json:"keywordMatchMode,omitempty"`
-	ExcludedKeywords     []string           `json:"excludedKeywords,omitempty"`
 	SyncKeyDeleteEnabled *bool              `json:"syncKeyDeleteEnabled,omitempty"`
 	SyncKeyDeleteDelayMS *int               `json:"syncKeyDeleteDelayMs,omitempty"`
 }

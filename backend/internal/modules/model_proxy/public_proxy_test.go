@@ -426,25 +426,22 @@ func TestRequestPolicyFactsWithTextExtractsChatInputForKeywordChecks(t *testing.
 	if err != nil || streaming || tokens == 0 || !strings.Contains(input, "鹈鹕") {
 		t.Fatalf("streaming=%v tokens=%d input=%q err=%v", streaming, tokens, input, err)
 	}
-	matched := matchKeywordRoutes(input, []Route{
-		{ID: "route-a", KeywordCheckEnabled: true, ExcludedKeywords: []string{"糖果", "鹈鹕"}},
-	})
-	if _, ok := matched["route-a"]; !ok {
-		t.Fatal("matching excluded keyword was not detected")
+	if !matchesAnyKeyword(input, []string{"糖果", "鹈鹕"}) {
+		t.Fatal("matching group keyword was not detected")
 	}
 }
 
 func TestFilterRoutesByKeywordMode(t *testing.T) {
 	routes := []Route{
-		{ID: "skip", KeywordCheckEnabled: true, KeywordMatchMode: KeywordMatchModeSkipOnMatch, ExcludedKeywords: []string{"OpenAI"}},
-		{ID: "legacy-skip", KeywordCheckEnabled: true, ExcludedKeywords: []string{"legacy"}},
-		{ID: "require", KeywordCheckEnabled: true, KeywordMatchMode: KeywordMatchModeRequireMatch, ExcludedKeywords: []string{"Premium"}},
-		{ID: "unchecked"},
+		{ID: "skip", KeywordMatchMode: KeywordMatchModeSkipOnMatch},
+		{ID: "require", KeywordMatchMode: KeywordMatchModeRequireMatch},
+		{ID: "unchecked", KeywordMatchMode: KeywordMatchModeDisabled},
 	}
+	keywords := []string{"OpenAI", "Premium"}
 
 	assertRouteIDs := func(input string, want ...string) {
 		t.Helper()
-		filtered := filterRoutesByKeywords(input, routes)
+		filtered := filterRoutesByKeywords(input, keywords, routes)
 		got := make([]string, 0, len(filtered))
 		for _, route := range filtered {
 			got = append(got, route.ID)
@@ -454,9 +451,25 @@ func TestFilterRoutesByKeywordMode(t *testing.T) {
 		}
 	}
 
-	assertRouteIDs("use OPENAI", "legacy-skip", "unchecked")
-	assertRouteIDs("use PREMIUM", "skip", "legacy-skip", "require", "unchecked")
+	assertRouteIDs("use OPENAI", "require", "unchecked")
+	assertRouteIDs("use PREMIUM", "require", "unchecked")
 	assertRouteIDs("use LEGACY", "skip", "unchecked")
+}
+
+func TestFilterRoutesByKeywordModeWithoutGroupKeywords(t *testing.T) {
+	routes := []Route{
+		{ID: "skip", KeywordMatchMode: KeywordMatchModeSkipOnMatch},
+		{ID: "require", KeywordMatchMode: KeywordMatchModeRequireMatch},
+		{ID: "unchecked", KeywordMatchMode: KeywordMatchModeDisabled},
+	}
+	filtered := filterRoutesByKeywords("anything", nil, routes)
+	got := make([]string, 0, len(filtered))
+	for _, route := range filtered {
+		got = append(got, route.ID)
+	}
+	if want := []string{"skip", "unchecked"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("routes=%v want=%v", got, want)
+	}
 }
 
 func TestRequestPolicyFactsWithTextExtractsNativeGeminiInput(t *testing.T) {
@@ -472,21 +485,9 @@ func TestRequestPolicyFactsWithTextExtractsNativeGeminiInput(t *testing.T) {
 	}
 }
 
-func TestMatchKeywordRoutesDeduplicatesKeywordsAcrossMembers(t *testing.T) {
-	routes := []Route{
-		{ID: "route-a", KeywordCheckEnabled: true, ExcludedKeywords: []string{"糖果", "鹈鹕"}},
-		{ID: "route-b", KeywordCheckEnabled: true, ExcludedKeywords: []string{"糖果", "糖果"}},
-		{ID: "route-c", KeywordCheckEnabled: false, ExcludedKeywords: []string{"糖果"}},
-	}
-	matched := matchKeywordRoutes("请使用糖果路由", routes)
-	if _, ok := matched["route-a"]; !ok {
-		t.Fatal("route-a should be skipped")
-	}
-	if _, ok := matched["route-b"]; !ok {
-		t.Fatal("route-b should be skipped")
-	}
-	if _, ok := matched["route-c"]; ok {
-		t.Fatal("keyword checks disabled route-c should remain eligible")
+func TestMatchesAnyKeywordIsCaseInsensitive(t *testing.T) {
+	if !matchesAnyKeyword("Use OPENAI", []string{"openai", "openai"}) {
+		t.Fatal("group keyword should match case-insensitively")
 	}
 }
 

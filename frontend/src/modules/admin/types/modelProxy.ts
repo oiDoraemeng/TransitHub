@@ -23,9 +23,7 @@ export interface ProxyRoute {
   routeProvidedKey?: boolean
   memberProvidedKey?: boolean
   upstreamKeyPreview?: string
-  keywordCheckEnabled?: boolean
-  keywordMatchMode?: 'skip_on_match' | 'require_match'
-  excludedKeywords?: string[]
+  keywordMatchMode?: 'disabled' | 'skip_on_match' | 'require_match'
   modelMappingEnabled?: boolean
   modelMapping?: Record<string, string>
   syncKeyDeleteEnabled?: boolean
@@ -47,12 +45,20 @@ export interface ProxySmartGroup {
   id: string
   name: string
   enabled: boolean
+  keywords: string[]
+  customKeys: ProxyCustomKey[]
   keyPreview: string
   totalConcurrency: number
   members: ProxyRoute[]
   models: ProxyModel[]
   createdAt: string
   updatedAt: string
+}
+
+export interface ProxyCustomKey {
+  id: string
+  preview: string
+  createdAt: string
 }
 
 export interface ProxyRouteInput {
@@ -99,6 +105,7 @@ export interface SmartGroupInput {
   name: string
   memberKeys?: string[]
   routeIds?: string[]
+  keywords: string[]
   enabled: boolean
 }
 
@@ -111,9 +118,7 @@ export interface SmartGroupMemberPolicyInput {
   modelMapping: Record<string, string>
   useProvidedKey: boolean
   upstreamKey?: string
-  keywordCheckEnabled: boolean
-  keywordMatchMode: 'skip_on_match' | 'require_match'
-  excludedKeywords: string[]
+  keywordMatchMode: 'disabled' | 'skip_on_match' | 'require_match'
   syncKeyDeleteEnabled: boolean
   syncKeyDeleteDelayMs: number
 }

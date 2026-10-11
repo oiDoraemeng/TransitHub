@@ -151,7 +151,11 @@ export default {
         add: 'Add smart group', edit: 'Edit smart group', empty: 'No smart groups yet.', formHelp: 'Members must be regular proxy keys in the current workspace.',
         selectRoutes: 'Select existing proxy routes', memberRoute: 'Proxy route', selectMemberRoute: 'Select a route to add', noAvailableMemberRoutes: 'No enabled proxy routes are available to add.',
         members: 'Member routes', models: 'Model catalog', modelsPending: 'The model catalog is syncing automatically.',
-        modelCapacity: 'Effective concurrency {count}', entryKey: 'Regular durable entry key', addMember: 'Add member',
+        modelCapacity: 'Effective concurrency {count}', entryKey: 'Regular durable entry key', addMember: 'Add member', keywordCount: '{count} keywords', customKeyCount: '{count} custom keys',
+        keywords: 'Group keywords', keywordPlaceholder: 'One keyword per line or comma, for example: pelican\ncandy',
+        keywordHelp: 'All members share these keywords. Input is parsed only when at least one member uses a match policy. Matching is case-insensitive.',
+        customKeys: 'Custom entry keys', customKeyTotal: '{count} currently', noCustomKeys: 'No custom keys are configured. The system-generated primary key is unchanged.',
+        addCustomKeys: 'Add custom keys', customKeyPlaceholder: 'One custom key per line', customKeyHelp: 'Up to 32. After saving, each custom key works alongside the system-generated primary key. Leaving this empty keeps existing custom keys.', removeCustomKey: 'Remove this custom key',
         policy: {
           edit: 'Member policy', streamOnly: 'Accept streaming requests only', minInput: 'Minimum input tokens',
           minInputHelp: '0 disables this rule. Enter any non-negative integer; smaller requests skip this member.',
@@ -165,10 +169,9 @@ export default {
           useProvidedKey: 'Use a prepared upstream key (no temporary key)', providedKey: 'Prepared upstream key',
           providedKeyHelp: 'This member uses the prepared key for model calls without creating or deleting a temporary key. Leave blank to keep the saved key.',
           providedKeyError: 'An upstream key is required when prepared-key mode is enabled.', providedKeySummary: 'Member key {preview}', routeProvidedKeySummary: 'Route default key {preview}',
-          keywordCheckEnabled: 'Enable keyword checks', keywordMatchMode: 'Match behavior', keywordSkipOnMatch: 'Skip this member on match', keywordRequireMatch: 'Select this member only on match', excludedKeywords: 'Match keywords',
-          keywordPlaceholder: 'One keyword per line or comma, for example: pelican\ncandy',
-          keywordHelp: 'Input is parsed once only when at least one member enables checks. Matching is case-insensitive.',
-          keywordError: 'Enter at least one keyword when keyword checks are enabled.', keywordSkipOnMatchSummary: 'Skip on match · {count} keywords', keywordRequireMatchSummary: 'Require match · {count} keywords',
+          keywordMatchMode: 'Keyword match behavior', keywordDisabled: 'Do not check', keywordSkipOnMatch: 'Skip this member on match', keywordRequireMatch: 'Select this member only on match',
+          keywordStrategyHelp: 'Keywords are configured once on the smart group. This setting controls only how this member handles a match.',
+          keywordSkipOnMatchSummary: 'Skip on match', keywordRequireMatchSummary: 'Require match',
           modelMappingEnabled: 'Model mapping enabled', modelMapping: 'Member model mapping', modelMappingPlaceholder: 'For example: gpt-6-astra = gpt-6-luna', modelMappingHelp: 'One entry per line in the form “client model = upstream model”. Only this member uses these mappings.', modelMappingError: 'Invalid model mapping. Use “client model = upstream model”, one entry per line.', modelMappingRequired: 'Enter at least one mapping when model mapping is enabled.', default: 'No member restrictions'
         }
       },

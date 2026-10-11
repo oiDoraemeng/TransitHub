@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/sync/singleflight"
 
 	"transithub/backend/internal/modules/upstream"
@@ -34,6 +35,8 @@ const (
 	cleanupMaxRetries           = 3
 	defaultSyncKeyDeleteDelayMS = 500
 	maxSyncKeyDeleteDelayMS     = 60000
+	maxSmartGroupCustomKeys     = 32
+	maxSmartGroupCustomKeySize  = 2048
 	latencyObservationBuffer    = 4096
 	latencyObservationInterval  = 500 * time.Millisecond
 )
@@ -448,7 +451,11 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 	if input.Enabled != nil {
 		enabled = *input.Enabled
 	}
-	group := SmartGroup{ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, KeyPreview: preview}
+	keywords, err := normalizeKeywords(input.Keywords)
+	if err != nil {
+		return SmartGroup{}, "", err
+	}
+	group := SmartGroup{ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, Keywords: keywords, KeyPreview: preview}
 	if err := s.repository.CreateSmartGroup(ctx, group, routeIDs, keyID, hash, ciphertext, preview); err != nil {
 		return SmartGroup{}, "", err
 	}
@@ -477,6 +484,13 @@ func (s *Service) UpdateSmartGroup(ctx context.Context, userID, groupID string, 
 	if input.Enabled != nil {
 		group.Enabled = *input.Enabled
 	}
+	if input.Keywords != nil {
+		keywords, normalizeErr := normalizeKeywords(*input.Keywords)
+		if normalizeErr != nil {
+			return SmartGroup{}, normalizeErr
+		}
+		group.Keywords = keywords
+	}
 	if group.Name == "" {
 		return SmartGroup{}, &requestError{Status: 400, Message: "name is required"}
 	}
@@ -484,6 +498,57 @@ func (s *Service) UpdateSmartGroup(ctx context.Context, userID, groupID string, 
 		return SmartGroup{}, err
 	}
 	return *group, nil
+}
+
+func (s *Service) UpdateSmartGroupCustomKeys(ctx context.Context, userID, groupID string, input UpdateSmartGroupCustomKeysRequest) ([]CustomKey, error) {
+	accountID, err := s.currentWorkspace(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if s.cipher == nil || !s.cipher.Available() {
+		return nil, errEncryptionKeyUnavailable
+	}
+	addValues, err := normalizeSmartGroupCustomKeys(input.AddKeys)
+	if err != nil {
+		return nil, err
+	}
+	removeIDs := normalizeIDs(input.RemoveKeyIDs)
+	if len(addValues) == 0 && len(removeIDs) == 0 {
+		return nil, &requestError{Status: 400, Message: "at least one custom key change is required"}
+	}
+	addKeys := make([]CustomKey, 0, len(addValues))
+	for _, value := range addValues {
+		id, idErr := randomID("pkey_")
+		if idErr != nil {
+			return nil, idErr
+		}
+		ciphertext, encryptErr := s.cipher.Encrypt(value)
+		if encryptErr != nil {
+			return nil, encryptErr
+		}
+		addKeys = append(addKeys, CustomKey{ID: id, Preview: keyPreview(value), Hash: hashKey(value), Ciphertext: ciphertext})
+	}
+	if err := s.repository.UpdateSmartGroupCustomKeys(ctx, userID, accountID, groupID, addKeys, removeIDs, maxSmartGroupCustomKeys); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, &requestError{Status: 409, Message: "custom key already exists"}
+		}
+		return nil, err
+	}
+	return s.repository.ListSmartGroupCustomKeys(ctx, userID, accountID, groupID)
+}
+
+func (s *Service) RevealSmartGroupCustomKey(ctx context.Context, userID, groupID, keyID string) (KeyResponse, error) {
+	accountID, err := s.currentWorkspace(ctx, userID)
+	if err != nil {
+		return KeyResponse{}, err
+	}
+	ciphertext, preview, err := s.repository.RevealSmartGroupCustomKey(ctx, userID, accountID, groupID, keyID)
+	if err != nil {
+		return KeyResponse{}, err
+	}
+	key, err := s.cipher.Decrypt(ciphertext)
+	return KeyResponse{Key: key, Preview: preview}, err
 }
 
 func (s *Service) DeleteSmartGroup(ctx context.Context, userID, groupID string) error {
@@ -581,23 +646,12 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	input.UpstreamKey = strings.TrimSpace(input.UpstreamKey)
 	if input.KeywordMatchMode != nil {
 		mode := strings.TrimSpace(*input.KeywordMatchMode)
-		if mode != KeywordMatchModeSkipOnMatch && mode != KeywordMatchModeRequireMatch {
+		if mode != KeywordMatchModeDisabled && mode != KeywordMatchModeSkipOnMatch && mode != KeywordMatchModeRequireMatch {
 			return &requestError{Status: 400, Message: "invalid keywordMatchMode"}
 		}
 		input.KeywordMatchMode = &mode
 	}
-	keywordsProvided := input.ExcludedKeywords != nil
-	if keywordsProvided {
-		keywords, normalizeErr := normalizeExcludedKeywords(input.ExcludedKeywords)
-		if normalizeErr != nil {
-			return normalizeErr
-		}
-		input.ExcludedKeywords = keywords
-		if input.KeywordCheckEnabled != nil && *input.KeywordCheckEnabled && len(keywords) == 0 {
-			return &requestError{Status: 400, Message: "at least one excluded keyword is required when keyword checking is enabled"}
-		}
-	}
-	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordCheckEnabled == nil && input.KeywordMatchMode == nil && !keywordsProvided && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
+	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordMatchMode == nil && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
 	var keyCiphertext, keyPreviewValue *string
@@ -634,30 +688,17 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 		keyCiphertext = &empty
 		keyPreviewValue = &empty
 	}
-	if input.KeywordCheckEnabled != nil && *input.KeywordCheckEnabled && !keywordsProvided {
-		hasKeywords, lookupErr := s.repository.MemberHasExcludedKeywords(ctx, userID, accountID, groupID, routeID)
-		if lookupErr != nil {
-			return lookupErr
-		}
-		if !hasKeywords {
-			return &requestError{Status: 400, Message: "excludedKeywords is required when keyword checking is enabled"}
-		}
-	}
-	var excludedKeywords []string
-	if keywordsProvided {
-		excludedKeywords = input.ExcludedKeywords
-	}
 	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
 		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
 		input.ModelMappingEnabled, modelMappingJSON, input.UseProvidedKey, keyCiphertext, keyPreviewValue,
-		input.KeywordCheckEnabled, input.KeywordMatchMode, excludedKeywords, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS)
+		input.KeywordMatchMode, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS)
 }
 
 const (
 	maxModelMappings        = 128
 	maxModelMappingPartSize = 256
-	maxExcludedKeywords     = 64
-	maxExcludedKeywordSize  = 256
+	maxKeywords             = 64
+	maxKeywordSize          = 256
 )
 
 func normalizeModelMapping(values map[string]string) (map[string]string, error) {
@@ -679,7 +720,7 @@ func normalizeModelMapping(values map[string]string) (map[string]string, error) 
 	return result, nil
 }
 
-func normalizeExcludedKeywords(values []string) ([]string, error) {
+func normalizeKeywords(values []string) ([]string, error) {
 	result := make([]string, 0, len(values))
 	seen := make(map[string]struct{}, len(values))
 	for _, value := range values {
@@ -687,8 +728,8 @@ func normalizeExcludedKeywords(values []string) ([]string, error) {
 		if value == "" {
 			continue
 		}
-		if len([]rune(value)) > maxExcludedKeywordSize {
-			return nil, &requestError{Status: 400, Message: "excluded keyword is too long"}
+		if len([]rune(value)) > maxKeywordSize {
+			return nil, &requestError{Status: 400, Message: "keyword is too long"}
 		}
 		key := strings.ToLower(value)
 		if _, exists := seen[key]; exists {
@@ -696,11 +737,54 @@ func normalizeExcludedKeywords(values []string) ([]string, error) {
 		}
 		seen[key] = struct{}{}
 		result = append(result, value)
-		if len(result) > maxExcludedKeywords {
-			return nil, &requestError{Status: 400, Message: "too many excluded keywords"}
+		if len(result) > maxKeywords {
+			return nil, &requestError{Status: 400, Message: "too many keywords"}
 		}
 	}
 	return result, nil
+}
+
+func normalizeSmartGroupCustomKeys(values []string) ([]string, error) {
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if len(value) > maxSmartGroupCustomKeySize {
+			return nil, &requestError{Status: 400, Message: "custom key is too long"}
+		}
+		if strings.ContainsAny(value, "\r\n\t ") {
+			return nil, &requestError{Status: 400, Message: "custom key cannot contain whitespace"}
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+		if len(result) > maxSmartGroupCustomKeys {
+			return nil, &requestError{Status: 400, Message: "too many custom keys"}
+		}
+	}
+	return result, nil
+}
+
+func normalizeIDs(values []string) []string {
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }
 
 func (s *Service) RevealKey(ctx context.Context, userID, ownerType, ownerID string) (KeyResponse, error) {

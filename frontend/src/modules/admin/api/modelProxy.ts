@@ -6,6 +6,7 @@ import type {
   ModelEgressProxyInput,
   ModelEgressProxyTestResult,
   ProxyGroup,
+  ProxyCustomKey,
   ProxyRoute,
   ProxyRouteInput,
   ProxySite,
@@ -68,10 +69,12 @@ export const testModelEgressProxy = (id: string) => request<ModelEgressProxyTest
 
 export const listProxySmartGroups = () => request<ProxySmartGroup[]>('/proxy-smart-groups')
 export const createProxySmartGroup = (input: SmartGroupInput) => request<{ group: ProxySmartGroup; key: string }>('/proxy-smart-groups', { method: 'POST', body: JSON.stringify(input) })
-export const updateProxySmartGroup = (id: string, input: { name?: string; enabled?: boolean }) => request<ProxySmartGroup>(`/proxy-smart-groups/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+export const updateProxySmartGroup = (id: string, input: { name?: string; keywords?: string[]; enabled?: boolean }) => request<ProxySmartGroup>(`/proxy-smart-groups/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
 export const deleteProxySmartGroup = (id: string) => request<{ success: boolean }>(`/proxy-smart-groups/${id}`, { method: 'DELETE' })
 export const addProxySmartGroupMember = (id: string, input: { routeId?: string; entryKey?: string }) => request<{ success: boolean }>(`/proxy-smart-groups/${id}/members`, { method: 'POST', body: JSON.stringify(input) })
 export const updateProxySmartGroupMemberPolicy = (id: string, routeId: string, input: Partial<SmartGroupMemberPolicyInput>) => request<{ success: boolean }>(`/proxy-smart-groups/${id}/members/${routeId}`, { method: 'PATCH', body: JSON.stringify(input) })
 export const removeProxySmartGroupMember = (id: string, routeId: string) => request<{ success: boolean }>(`/proxy-smart-groups/${id}/members/${routeId}`, { method: 'DELETE' })
 export const revealProxySmartGroupKey = (id: string) => request<KeyResponse>(`/proxy-smart-groups/${id}/key`)
 export const rotateProxySmartGroupKey = (id: string) => request<KeyResponse>(`/proxy-smart-groups/${id}/rotate-key`, { method: 'POST' })
+export const updateProxySmartGroupCustomKeys = (id: string, input: { addKeys: string[]; removeKeyIds: string[] }) => request<ProxyCustomKey[]>(`/proxy-smart-groups/${id}/custom-keys`, { method: 'PATCH', body: JSON.stringify(input) })
+export const revealProxySmartGroupCustomKey = (id: string, keyId: string) => request<KeyResponse>(`/proxy-smart-groups/${id}/custom-keys/${keyId}`)
