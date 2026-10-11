@@ -1213,8 +1213,26 @@ func (s *PlatformService) loginNewAPI(baseURL string, username string, password 
 	}
 	loginData := dataRecord(response.Payload)
 	userID := newAPIUserID(loginData)
-	session := Session{Platform: PlatformNewAPI, BaseURL: baseURL, Cookie: cookieHeader(response.Header), UserID: userID}
-	if strings.TrimSpace(session.Cookie) == "" {
+	accessToken := ""
+	if value := firstString(loginData, []string{"access_token", "accessToken"}); value != nil {
+		accessToken = strings.TrimSpace(*value)
+	}
+	tokenType := ""
+	if accessToken != "" {
+		tokenType = "Bearer"
+		if value := firstString(loginData, []string{"token_type", "tokenType"}); value != nil && strings.TrimSpace(*value) != "" {
+			tokenType = strings.TrimSpace(*value)
+		}
+	}
+	session := Session{
+		Platform:    PlatformNewAPI,
+		BaseURL:     baseURL,
+		Cookie:      cookieHeader(response.Header),
+		UserID:      userID,
+		AccessToken: accessToken,
+		TokenType:   tokenType,
+	}
+	if strings.TrimSpace(session.Cookie) == "" && session.AccessToken == "" {
 		return LoginResult{}, newRequestError(ErrorAuth, PlatformNewAPI)
 	}
 	if strings.TrimSpace(session.UserID) == "" {
@@ -1397,8 +1415,11 @@ func cookieHeader(headers http.Header) string {
 }
 
 func newAPIUserID(loginData map[string]any) string {
-	if value := firstNumber(loginData, []string{"id", "user_id", "userId"}); value != nil {
-		return strconv.FormatInt(int64(*value), 10)
+	if value := strings.TrimSpace(firstStringy(loginData, []string{"id", "user_id", "userId"})); value != "" {
+		return value
+	}
+	if user, ok := loginData["user"].(map[string]any); ok {
+		return strings.TrimSpace(firstStringy(user, []string{"id", "user_id", "userId"}))
 	}
 	return ""
 }
