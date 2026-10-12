@@ -133,7 +133,7 @@ export default {
     },
     modelProxy: {
       title: 'Model Proxy',
-      subtitle: 'Call Sub2API with durable entry keys and aggregate models and concurrency in smart groups.',
+      subtitle: 'Call Sub2API or New-API with durable entry keys and aggregate models and concurrency in smart groups.',
       loading: 'Loading...',
       save: 'Save',
       cancel: 'Cancel',
@@ -185,7 +185,7 @@ export default {
         testStatus: { untested: 'Untested', healthy: 'Available', failed: 'Unavailable' }
       },
       table: { route: 'Route', binding: 'Site / group', proxy: 'Model egress', concurrency: 'Concurrency', models: 'Models', status: 'Status', actions: 'Actions' },
-      form: { name: 'Name', site: 'Sub2API site', group: 'Group (optional)', proxy: 'Model egress proxy (optional)', proxyHelp: 'Only model requests use this proxy. A disabled or unavailable proxy fails closed instead of falling back to a direct connection.', concurrency: 'Concurrency limit', enabled: 'Enable immediately', selectSite: 'Select site', selectGroup: 'Select group', noGroup: 'No group; use a prepared upstream key', preparedKeyBinding: 'Prepared upstream key', upstreamKey: 'Prepared upstream key', upstreamKeyKeep: 'Leave blank to keep the current key', upstreamKeyHelp: 'The key is encrypted and becomes this route’s default upstream credential in every smart group.', upstreamKeyRequired: 'A prepared upstream key is required when no group is selected.' },
+      form: { name: 'Name', site: 'Upstream site', group: 'Group (optional)', proxy: 'Model egress proxy (optional)', proxyHelp: 'Only model requests use this proxy. A disabled or unavailable proxy fails closed instead of falling back to a direct connection.', concurrency: 'Concurrency limit', enabled: 'Enable immediately', selectSite: 'Select site', selectGroup: 'Select group', noGroup: 'No group; use a prepared upstream key', preparedKeyBinding: 'Prepared upstream key', upstreamKey: 'Prepared upstream key', upstreamKeyKeep: 'Leave blank to keep the current key', upstreamKeyHelp: 'The key is encrypted and becomes this route’s default upstream credential in every smart group.', upstreamKeyRequired: 'A prepared upstream key is required when no group is selected.' },
       actions: { reveal: 'Reveal key', rotate: 'Rotate key', edit: 'Edit', delete: 'Delete', test: 'Test proxy', copy: 'Copy', addMember: 'Add member', removeMember: 'Remove member' },
       cleanup: { pending: '{count} temporary keys pending cleanup', retrying: '{count} scheduled for retry', processing: '{count} being cleaned up', routePending: '{count} pending cleanup' },
       key: { newRoute: 'New proxy route key', newGroup: 'New smart group key', storeSafely: 'This key can be revealed here again. Do not share it with untrusted clients.' },

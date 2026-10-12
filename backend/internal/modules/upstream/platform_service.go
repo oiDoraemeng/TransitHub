@@ -1959,7 +1959,7 @@ func strconvInt(value int64) string {
 //  2. 按 name 搜索回查 token ID；
 //  3. 调用 /api/token/:id/key 获取完整 key。
 func (s *PlatformService) CreateNewAPIToken(session Session, name string, group string) (string, string, error) {
-	if session.Platform != PlatformNewAPI {
+	if session.Platform != PlatformNewAPI || !session.IsAuthenticated() {
 		return "", "", newRequestError(ErrorAuth, PlatformNewAPI)
 	}
 
@@ -1995,7 +1995,7 @@ func (s *PlatformService) CreateNewAPIToken(session Session, name string, group 
 	// 步骤 3：获取完整 key
 	fullKey, err := s.FetchNewAPITokenKey(session, tokenID)
 	if err != nil {
-		return "", "", err
+		return tokenID, "", err
 	}
 
 	return tokenID, fullKey, nil
@@ -2003,37 +2003,12 @@ func (s *PlatformService) CreateNewAPIToken(session Session, name string, group 
 
 // searchNewAPITokenByName 通过分页查询 token 列表，按 name 精确匹配回查 token ID。
 func (s *PlatformService) searchNewAPITokenByName(session Session, name string) (string, error) {
-	for page := 1; page <= 10; page++ {
-		endpoint := session.BaseURL + "/api/token/?p=" + strconv.Itoa(page) + "&page_size=100"
-		response, err := s.httpClient.requestJSON(endpoint, requestOptions{
-			Cookie:      session.Cookie,
-			UserID:      session.UserID,
-			AccessToken: session.AccessToken,
-			TokenType:   session.TokenType,
-		})
-		if err != nil {
-			return "", err
-		}
-		items := dataArray(response.Payload)
-		if len(items) == 0 {
-			break
-		}
-		for _, item := range items {
-			record, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			if safeString(record, "name") == name {
-				id := groupID2(record)
-				if id != "" {
-					return id, nil
-				}
-			}
-		}
-		total, ok := paginationTotal(response.Payload)
-		if ok && page*100 >= total {
-			break
-		}
+	key, err := s.FindUserKeyByName(session, name)
+	if err != nil {
+		return "", err
+	}
+	if key != nil && key.ID != "" {
+		return key.ID, nil
 	}
 	return "", newRequestError(ErrorInvalidResponse, PlatformNewAPI)
 }
@@ -2051,7 +2026,7 @@ func (s *PlatformService) FetchNewAPITokenKey(session Session, tokenID string) (
 		return "", err
 	}
 	data := dataRecord(response.Payload)
-	if key := firstString(data, []string{"key"}); key != nil && *key != "" {
+	if key := firstString(data, []string{"key"}); key != nil && *key != "" && !isMaskedSub2APIKey(*key) {
 		return *key, nil
 	}
 	return "", newRequestError(ErrorInvalidResponse, PlatformNewAPI)
@@ -2060,17 +2035,25 @@ func (s *PlatformService) FetchNewAPITokenKey(session Session, tokenID string) (
 // ListNewAPITokens 列出上游 new-api 站点的 token 列表。
 // 返回与 Sub2APIKeyItem 相同的结构，便于前端统一使用。
 func (s *PlatformService) ListNewAPITokens(session Session) ([]Sub2APIKeyItem, error) {
-	if session.Platform != PlatformNewAPI {
-		return nil, newRequestError(ErrorAuth, PlatformNewAPI)
+	tokens, _, err := s.listNewAPITokensPage(session, 1, 100)
+	return tokens, err
+}
+
+func (s *PlatformService) listNewAPITokensPage(session Session, page, pageSize int) ([]Sub2APIKeyItem, bool, error) {
+	if session.Platform != PlatformNewAPI || !session.IsAuthenticated() {
+		return nil, false, newRequestError(ErrorAuth, PlatformNewAPI)
 	}
-	response, err := s.httpClient.requestJSON(session.BaseURL+"/api/token/?p=1&page_size=100", requestOptions{
-		Cookie:      session.Cookie,
-		UserID:      session.UserID,
-		AccessToken: session.AccessToken,
-		TokenType:   session.TokenType,
-	})
+	endpoint := fmt.Sprintf("%s/api/token/?p=%d&page_size=%d", session.BaseURL, page, pageSize)
+	response, err := s.httpClient.requestJSON(endpoint, newAPIAuthOptions(session))
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	}
+	// An unrecognized envelope is not evidence that a recovery key is absent.
+	record := dataRecord(response.Payload)
+	_, direct := record["data"].([]any)
+	_, itemsArray := record["items"].([]any)
+	if !direct && !itemsArray {
+		return nil, false, newRequestError(ErrorInvalidResponse, PlatformNewAPI)
 	}
 	items := dataArray(response.Payload)
 	tokens := make([]Sub2APIKeyItem, 0, len(items))
@@ -2097,12 +2080,19 @@ func (s *PlatformService) ListNewAPITokens(session Session) ([]Sub2APIKeyItem, e
 		}
 		tokens = append(tokens, token)
 	}
-	return tokens, nil
+	if size := firstNumber(record, []string{"page_size"}); size != nil && *size > 0 {
+		pageSize = int(*size)
+	}
+	more := len(items) >= pageSize
+	if total, ok := paginationTotal(response.Payload); ok {
+		more = len(items) > 0 && page*pageSize < total
+	}
+	return tokens, more, nil
 }
 
 // DeleteNewAPIToken 删除上游 new-api 站点的指定 token。
 func (s *PlatformService) DeleteNewAPIToken(session Session, tokenID string) error {
-	if session.Platform != PlatformNewAPI {
+	if session.Platform != PlatformNewAPI || !session.IsAuthenticated() {
 		return newRequestError(ErrorAuth, PlatformNewAPI)
 	}
 	_, err := s.httpClient.requestJSON(session.BaseURL+"/api/token/"+tokenID, requestOptions{

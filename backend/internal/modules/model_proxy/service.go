@@ -175,7 +175,7 @@ func (s *Service) ListSites(ctx context.Context, userID string) []upstream.Respo
 	all := s.sites.List(ctx, userID)
 	result := make([]upstream.Response, 0, len(all))
 	for _, site := range all {
-		if site.Platform == upstream.PlatformSub2API && site.Status == upstream.StatusConnected {
+		if supportsProxyPlatform(site.Platform) && site.Status == upstream.StatusConnected {
 			result = append(result, site)
 		}
 	}
@@ -188,7 +188,7 @@ func (s *Service) ListGroups(ctx context.Context, userID, siteID string) ([]upst
 		return nil, err
 	}
 	site, err := s.sites.GetSite(ctx, siteID)
-	if err != nil || site == nil || site.UserID != userID || site.AdminAccountID != accountID || site.Platform != upstream.PlatformSub2API {
+	if err != nil || site == nil || site.UserID != userID || site.AdminAccountID != accountID || !supportsProxyPlatform(site.Platform) {
 		return nil, &requestError{Status: 404, Message: "upstream site not found"}
 	}
 	session, err := s.freshSession(ctx, siteID)
@@ -241,8 +241,8 @@ func (s *Service) CreateRoute(ctx context.Context, userID string, input CreateRo
 		return Route{}, "", &requestError{Status: 400, Message: "concurrencyLimit must be between 1 and 100000"}
 	}
 	site, err := s.sites.GetSite(ctx, input.SiteID)
-	if err != nil || site == nil || site.UserID != userID || site.AdminAccountID != accountID || site.Platform != upstream.PlatformSub2API || site.Session == nil {
-		return Route{}, "", &requestError{Status: 400, Message: "a connected Sub2API site is required"}
+	if err != nil || site == nil || site.UserID != userID || site.AdminAccountID != accountID || !supportsProxyPlatform(site.Platform) || site.Session == nil {
+		return Route{}, "", &requestError{Status: 400, Message: "a connected Sub2API or New-API site is required"}
 	}
 	if err := s.validateEgressProxy(ctx, userID, accountID, input.ProxyID); err != nil {
 		return Route{}, "", err
@@ -351,8 +351,8 @@ func (s *Service) UpdateRoute(ctx context.Context, userID, routeID string, input
 		return Route{}, &requestError{Status: 400, Message: "invalid proxy route"}
 	}
 	site, siteErr := s.sites.GetSite(ctx, route.SiteID)
-	if siteErr != nil || site == nil || site.UserID != userID || site.AdminAccountID != accountID || site.Platform != upstream.PlatformSub2API || site.Session == nil {
-		return Route{}, &requestError{Status: 400, Message: "a connected Sub2API site is required"}
+	if siteErr != nil || site == nil || site.UserID != userID || site.AdminAccountID != accountID || !supportsProxyPlatform(site.Platform) || site.Session == nil {
+		return Route{}, &requestError{Status: 400, Message: "a connected Sub2API or New-API site is required"}
 	}
 	if err := s.validateEgressProxy(ctx, userID, accountID, route.ProxyID); err != nil {
 		return Route{}, err
@@ -872,19 +872,29 @@ func (s *Service) freshSession(ctx context.Context, siteID string) (upstream.Ses
 	return value.(upstream.Session), nil
 }
 
+func supportsProxyPlatform(platform upstream.Platform) bool {
+	return platform == upstream.PlatformSub2API || platform == upstream.PlatformNewAPI
+}
+
+func temporaryKeyName(jobID string) string {
+	// New-API limits names to 50 bytes. Keep the full 128-bit random suffix.
+	return "transithub-" + strings.TrimPrefix(jobID, "pcleanup_")
+}
+
 func (s *Service) createRemoteKey(ctx context.Context, route Route) (string, CleanupJob, error) {
 	jobID, err := randomID("pcleanup_")
 	if err != nil {
 		return "", CleanupJob{}, err
 	}
-	job := CleanupJob{ID: jobID, UserID: route.UserID, AdminAccountID: route.AdminAccountID, RouteID: route.ID, SiteID: route.SiteID, RemoteKeyName: "transithub-" + jobID}
+	job := CleanupJob{ID: jobID, UserID: route.UserID, AdminAccountID: route.AdminAccountID, RouteID: route.ID, SiteID: route.SiteID, RemoteKeyName: temporaryKeyName(jobID)}
 	session, err := s.freshSession(ctx, route.SiteID)
 	if err != nil {
 		return "", job, err
 	}
-	groupID, err := strconv.Atoi(route.GroupID)
-	if err != nil {
-		return "", job, fmt.Errorf("invalid Sub2API group id: %w", err)
+	if session.Platform == upstream.PlatformSub2API {
+		if _, err := strconv.Atoi(route.GroupID); err != nil {
+			return "", job, fmt.Errorf("invalid Sub2API group id: %w", err)
+		}
 	}
 	// Persist immediately before the remote create call. Failures while resolving
 	// a session or validating local configuration cannot have created a remote key
@@ -892,19 +902,31 @@ func (s *Service) createRemoteKey(ctx context.Context, route Route) (string, Cle
 	if err := s.repository.CreateCleanupJob(ctx, job); err != nil {
 		return "", CleanupJob{}, err
 	}
-	remoteID, secret, err := s.platform.CreateSub2APIKey(session, job.RemoteKeyName, groupID)
+	remoteID, secret, err := s.platform.CreateUserKey(session, job.RemoteKeyName, route.GroupID)
 	if isUpstreamUnauthorized(err) {
 		session, err = s.forceSession(ctx, route.SiteID)
 		if err == nil {
-			remoteID, secret, err = s.platform.CreateSub2APIKey(session, job.RemoteKeyName, groupID)
+			if session.Platform == upstream.PlatformNewAPI {
+				remoteID, secret, err = s.platform.RecoverUserKey(session, job.RemoteKeyName)
+			} else {
+				remoteID = ""
+			}
+			if err == nil && remoteID == "" {
+				remoteID, secret, err = s.platform.CreateUserKey(session, job.RemoteKeyName, route.GroupID)
+			}
 		}
 	}
+	job.RemoteKeyID = remoteID
 	if err != nil {
+		if remoteID != "" {
+			_ = s.repository.SetCleanupRemoteKey(ctx, job.ID, remoteID)
+		}
+		s.beginDelete(job)
 		return "", job, err
 	}
-	job.RemoteKeyID = remoteID
 	job.Status = "active"
 	if err := s.repository.ActivateCleanupJob(ctx, job.ID, remoteID); err != nil {
+		s.beginDelete(job)
 		return "", job, err
 	}
 	return secret, job, nil
@@ -954,11 +976,11 @@ func (s *Service) deleteCleanupJob(ctx context.Context, job CleanupJob) error {
 		if err != nil {
 			return err
 		}
-		key, err := s.platform.FindSub2APIKeyByName(session, job.RemoteKeyName)
+		key, err := s.platform.FindUserKeyByName(session, job.RemoteKeyName)
 		if isUpstreamUnauthorized(err) {
 			session, err = s.forceSession(ctx, job.SiteID)
 			if err == nil {
-				key, err = s.platform.FindSub2APIKeyByName(session, job.RemoteKeyName)
+				key, err = s.platform.FindUserKeyByName(session, job.RemoteKeyName)
 			}
 		}
 		if err != nil {
@@ -976,12 +998,12 @@ func (s *Service) deleteCleanupJob(ctx context.Context, job CleanupJob) error {
 	}
 	session, err := s.freshSession(ctx, job.SiteID)
 	if err == nil {
-		err = s.platform.DeleteSub2APIKey(session, job.RemoteKeyID)
+		err = s.platform.DeleteUserKey(session, job.RemoteKeyID)
 	}
 	if isUpstreamUnauthorized(err) {
 		session, err = s.forceSession(ctx, job.SiteID)
 		if err == nil {
-			err = s.platform.DeleteSub2APIKey(session, job.RemoteKeyID)
+			err = s.platform.DeleteUserKey(session, job.RemoteKeyID)
 		}
 	}
 	if err == nil || isUpstreamNotFound(err) {
@@ -1164,11 +1186,11 @@ func (s *Service) prepareCleanupJobs(ctx context.Context, jobs []CleanupJob) []C
 				names = append(names, jobs[index].RemoteKeyName)
 			}
 			var found map[string]upstream.Sub2APIKeyItem
-			found, err = s.platform.FindSub2APIKeysByNames(session, names)
+			found, err = s.platform.FindUserKeysByNames(session, names)
 			if isUpstreamUnauthorized(err) {
 				session, err = s.forceSession(ctx, siteID)
 				if err == nil {
-					found, err = s.platform.FindSub2APIKeysByNames(session, names)
+					found, err = s.platform.FindUserKeysByNames(session, names)
 				}
 			}
 			if err == nil {
