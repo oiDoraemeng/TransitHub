@@ -907,7 +907,11 @@ func (s *Service) createRemoteKey(ctx context.Context, route Route) (string, Cle
 		session, err = s.forceSession(ctx, route.SiteID)
 		if err == nil {
 			if session.Platform == upstream.PlatformNewAPI {
-				remoteID, secret, err = s.platform.RecoverUserKey(session, job.RemoteKeyName)
+				if remoteID != "" {
+					secret, err = s.platform.FetchNewAPITokenKey(session, remoteID)
+				} else {
+					remoteID, secret, err = s.platform.RecoverUserKey(session, job.RemoteKeyName)
+				}
 			} else {
 				remoteID = ""
 			}
@@ -920,8 +924,10 @@ func (s *Service) createRemoteKey(ctx context.Context, route Route) (string, Cle
 	if err != nil {
 		if remoteID != "" {
 			_ = s.repository.SetCleanupRemoteKey(ctx, job.ID, remoteID)
+			s.beginDelete(job)
 		}
-		s.beginDelete(job)
+		// An ambiguous create failure retains the recovery grace period: the
+		// upstream may still commit the key after its response was lost.
 		return "", job, err
 	}
 	job.Status = "active"
