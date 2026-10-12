@@ -28,7 +28,8 @@ func jsonMarshal(v any) ([]byte, error) {
 const refreshSkewMS int64 = 60_000
 
 type PlatformService struct {
-	httpClient *HTTPClient
+	httpClient                    *HTTPClient
+	sub2APIKeyIdempotencyRequired sync.Map
 }
 
 func NewPlatformService(httpClient *HTTPClient) *PlatformService {
@@ -1563,11 +1564,11 @@ func (s *PlatformService) CreateSub2APIKey(session Session, name string, groupID
 		Method:      http.MethodPost,
 		Body:        body,
 	}
-	response, err := s.httpClient.requestJSON(session.BaseURL+"/api/v1/keys", options)
+	response, err := s.createSub2APIKeyRequest(session.BaseURL+"/api/v1/keys", options)
 	usedCustomKey := true
 	if isSub2APICustomKeyValidationError(err) {
 		delete(body, "custom_key")
-		response, err = s.httpClient.requestJSON(session.BaseURL+"/api/v1/keys", options)
+		response, err = s.createSub2APIKeyRequest(session.BaseURL+"/api/v1/keys", options)
 		usedCustomKey = false
 	}
 	if err != nil {
@@ -1582,6 +1583,34 @@ func (s *PlatformService) CreateSub2APIKey(session Session, name string, groupID
 		return "", "", newRequestError(ErrorInvalidResponse, PlatformSub2API)
 	}
 	return keyID, customKey, nil
+}
+
+func (s *PlatformService) createSub2APIKeyRequest(endpoint string, options requestOptions) (jsonResponse, error) {
+	if _, known := s.sub2APIKeyIdempotencyRequired.Load(endpoint); known {
+		idempotencyKey, err := generateSub2APIIdempotencyKey()
+		if err != nil {
+			return jsonResponse{}, err
+		}
+		options.IdempotencyKey = idempotencyKey
+		return s.httpClient.requestJSON(endpoint, options)
+	}
+	response, err := s.httpClient.requestJSON(endpoint, options)
+	if !isSub2APIIdempotencyKeyRequired(err) {
+		return response, err
+	}
+	s.sub2APIKeyIdempotencyRequired.Store(endpoint, struct{}{})
+	idempotencyKey, generateErr := generateSub2APIIdempotencyKey()
+	if generateErr != nil {
+		return jsonResponse{}, generateErr
+	}
+	options.IdempotencyKey = idempotencyKey
+	return s.httpClient.requestJSON(endpoint, options)
+}
+
+func isSub2APIIdempotencyKeyRequired(err error) bool {
+	requestErr, ok := err.(*RequestError)
+	return ok && requestErr.StatusCode == http.StatusBadRequest &&
+		strings.EqualFold(strings.TrimSpace(requestErr.Reason), "IDEMPOTENCY_KEY_REQUIRED")
 }
 
 func isSub2APICustomKeyValidationError(err error) bool {
@@ -1599,6 +1628,14 @@ func generateSub2APICustomKey() (string, error) {
 		return "", fmt.Errorf("generate Sub2API custom key: %w", err)
 	}
 	return "th_" + base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+func generateSub2APIIdempotencyKey() (string, error) {
+	buf := make([]byte, 24)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate Sub2API idempotency key: %w", err)
+	}
+	return "transithub-" + base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
 // groupID2 从响应记录中提取 ID 并转为字符串，复用 groupID 的逻辑。

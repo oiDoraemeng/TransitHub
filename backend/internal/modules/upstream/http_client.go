@@ -16,13 +16,14 @@ type HTTPClient struct {
 }
 
 type requestOptions struct {
-	Method      string
-	Body        any
-	Cookie      string
-	UserID      string
-	AccessToken string
-	TokenType   string
-	AdminAPIKey string
+	Method         string
+	Body           any
+	Cookie         string
+	UserID         string
+	AccessToken    string
+	TokenType      string
+	AdminAPIKey    string
+	IdempotencyKey string
 }
 
 type jsonResponse struct {
@@ -63,6 +64,9 @@ func (c *HTTPClient) requestJSON(reqURL string, options requestOptions) (jsonRes
 	if options.AdminAPIKey != "" {
 		req.Header.Set("x-api-key", options.AdminAPIKey)
 	}
+	if options.IdempotencyKey != "" {
+		req.Header.Set("Idempotency-Key", options.IdempotencyKey)
+	}
 
 	req.Header.Set("User-Agent", BrowserUserAgent)
 	if options.Cookie != "" {
@@ -86,12 +90,13 @@ func (c *HTTPClient) requestJSON(reqURL string, options requestOptions) (jsonRes
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		log.Printf("[http-client] 非 2xx 响应 url=%s status=%d", reqURL, response.StatusCode)
+		reason := responseErrorReason(payload)
 		// 保留原有全局行为（仅 401 归类为 ErrorAuth），但把真实 status code 一并带出，
 		// 供需要区分 403 等细分状态的调用方判断，不改变其它调用方的既有语义。
 		if response.StatusCode == http.StatusUnauthorized {
-			return jsonResponse{}, newRequestErrorWithStatus(ErrorAuth, "", response.StatusCode)
+			return jsonResponse{}, newRequestErrorWithDetails(ErrorAuth, "", response.StatusCode, reason)
 		}
-		return jsonResponse{}, newRequestErrorWithStatus(ErrorRequest, "", response.StatusCode)
+		return jsonResponse{}, newRequestErrorWithDetails(ErrorRequest, "", response.StatusCode, reason)
 	}
 	// new-api commonly reports authentication/authorization failures as HTTP 200
 	// with {"success": false}. Treat that envelope as an error so Root/Admin
@@ -102,6 +107,25 @@ func (c *HTTPClient) requestJSON(reqURL string, options requestOptions) (jsonRes
 		}
 	}
 	return jsonResponse{Payload: payload, Header: response.Header}, nil
+}
+
+func responseErrorReason(payload any) string {
+	record, ok := payload.(map[string]any)
+	if !ok {
+		return ""
+	}
+	if reason, ok := record["reason"].(string); ok {
+		return reason
+	}
+	if nested, ok := record["error"].(map[string]any); ok {
+		if reason, ok := nested["reason"].(string); ok {
+			return reason
+		}
+		if code, ok := nested["code"].(string); ok {
+			return code
+		}
+	}
+	return ""
 }
 
 func encodeBody(body any) (io.Reader, error) {
