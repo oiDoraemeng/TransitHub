@@ -2,6 +2,7 @@ package model_proxy
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -153,8 +154,17 @@ func TestMemberPausePostgresRedisStopsTrafficAndRecoveryProbes(t *testing.T) {
 	repo := memberPauseTestRepository(t)
 	limiter, redisClient := redisTestLimiter(t)
 	var calls atomic.Int64
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
+		if r.Header.Get("Accept") == "text/event-stream" {
+			var payload map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || payload["stream"] != true {
+				t.Errorf("automatic recovery didn't request streaming: %v %v", payload, err)
+			}
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = io.WriteString(w, "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[]}}\n\n")
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"id":"ok","output":[]}`)
 	}))

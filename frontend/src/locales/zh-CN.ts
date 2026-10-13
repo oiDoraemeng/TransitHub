@@ -188,7 +188,7 @@ export default {
       form: { name: '名称', site: '上游站点', group: '分组（可选）', proxy: '模型出口代理（可选）', proxyHelp: '仅模型请求使用此代理。代理停用或不可用时请求会失败，不会回退到直连。', concurrency: '并发额度', enabled: '创建后立即启用', selectSite: '选择站点', selectGroup: '选择分组', noGroup: '不选择分组，使用预置上游 Key', preparedKeyBinding: '预置上游 Key', upstreamKey: '预置上游 Key', upstreamKeyKeep: '留空则保留当前 Key', upstreamKeyHelp: 'Key 会加密保存，并作为该路由在所有智能分组中的默认上游凭据。', upstreamKeyRequired: '不选择分组时必须填写预置上游 Key。' },
       actions: { reveal: '查看 Key', rotate: '轮换 Key', edit: '编辑', delete: '删除', test: '测试代理', copy: '复制', addMember: '添加成员', removeMember: '移除成员' },
       cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个待自动重试', processing: '{count} 个正在清理', routePending: '{count} 个待清理' },
-      circuit: { paused: '调度暂停至 {time}', nextProbe: '下次恢复探测 {time}', help: '连续失败 3 次暂停 30 分钟，每 3 分钟探测，成功后恢复。' },
+      circuit: { paused: '调度暂停至 {time}', nextProbe: '下次恢复探测 {time}', help: '连续 3 个请求（含重试）最终失败后暂停 30 分钟，每 3 分钟流式探测，成功后恢复。' },
       manualTest: {
         customModel: '手动输入模型', modelCount: '共 {count} 个模型（含可用映射别名）',
         action: '模型测试', title: '测试模型并恢复调度', model: '测试模型', modelPlaceholder: '选择或输入模型名称', protocol: '请求协议', refreshModels: '刷新模型',

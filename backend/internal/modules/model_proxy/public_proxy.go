@@ -176,6 +176,8 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 	probeSpec := routeProbeSpec{ModelID: modelID, Path: incoming.URL.Path}
 
 	var lastStatus int
+	var lastResponse *http.Response
+	var lastAttemptErr error
 	attempts := 0
 	for attempt := 0; attempt < directMaxAttempts; attempt++ {
 		if attempt > 0 {
@@ -186,26 +188,24 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 		}
 		attempts++
 		response, retryable, attemptErr := s.performAttempt(incoming, route, replay.Open, nil, mappedResponseContext{}, false)
+		lastResponse, lastAttemptErr = response, attemptErr
 		if attemptErr == nil && !retryable {
 			completed, readErr := s.writeUpstreamResponse(w, response)
 			if completed || readErr != nil || response.StatusCode >= 300 {
-				s.observeRouteAttempt(incoming.Context(), lease, probeSpec, response, readErr)
+				s.observeRouteRequest(incoming.Context(), lease, probeSpec, response, readErr)
 			}
 			return
 		}
-		paused := s.observeRouteAttempt(incoming.Context(), lease, probeSpec, response, attemptErr)
 		if response != nil {
 			lastStatus = response.StatusCode
 			response.Body.Close()
-		}
-		if paused {
-			break
 		}
 		if attempt+1 < directMaxAttempts && waitForProxyRetry(incoming.Context(), attempt) {
 			continue
 		}
 		break
 	}
+	s.observeRouteRequest(incoming.Context(), lease, probeSpec, lastResponse, lastAttemptErr)
 	message := fmt.Sprintf("upstream remained unavailable after %d automatic attempts", attempts)
 	if lastStatus != 0 {
 		message += fmt.Sprintf(" (last status %d)", lastStatus)
@@ -327,6 +327,9 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			continue
 		}
 		attempts := 0
+		var lastResponse *http.Response
+		var lastAttemptErr error
+		probeSpec := routeProbeSpec{GroupID: group.ID, ModelID: modelID, Path: incoming.URL.Path}
 		response, attemptErr := attemptSmartGroupMember(incoming.Context(), func(responseHeaderTimeout time.Duration) (*http.Response, error) {
 			if attempts > 0 {
 				allowed, err := s.limiter.routeRetryAllowed(incoming.Context(), lease)
@@ -340,15 +343,14 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			attempts++
 			started := time.Now()
 			response, _, err := s.performAttemptWithResponseHeaderTimeout(incoming, *route, replay.Open, route.ModelMapping, responseMapping, !streaming, responseHeaderTimeout)
+			lastResponse, lastAttemptErr = response, err
 			s.observeSmartGroupLatency(incoming.Context(), route.ID, time.Since(started), responseHeaderTimeout, response, err)
-			if err != nil || response == nil || response.StatusCode < 200 || response.StatusCode >= 300 {
-				if s.observeRouteAttempt(incoming.Context(), lease, routeProbeSpec{GroupID: group.ID, ModelID: modelID, Path: incoming.URL.Path}, response, err) {
-					return response, errRoutePaused
-				}
-			}
 			return response, err
 		})
 		if attemptErr != nil {
+			// A member's first attempt and retry are one request outcome. Record
+			// it once before falling back to another member, which has its own health.
+			s.observeRouteRequest(incoming.Context(), lease, probeSpec, lastResponse, lastAttemptErr)
 			lastErr = fmt.Errorf("member %s failed after %d attempts: %w", route.Name, attempts, attemptErr)
 			lease.Release(context.Background())
 			if incoming.Context().Err() != nil {
@@ -358,7 +360,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		}
 		completed, readErr := s.writeUpstreamResponse(w, response)
 		if completed || readErr != nil {
-			s.observeRouteAttempt(incoming.Context(), lease, routeProbeSpec{GroupID: group.ID, ModelID: modelID, Path: incoming.URL.Path}, response, readErr)
+			s.observeRouteRequest(incoming.Context(), lease, probeSpec, response, readErr)
 		}
 		lease.Release(context.Background())
 		return

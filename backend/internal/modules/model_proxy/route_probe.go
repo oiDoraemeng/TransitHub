@@ -20,8 +20,8 @@ func writeRoutePaused(w http.ResponseWriter) {
 
 // Client cancellation and invalid request parameters say nothing about route
 // health. Other failures (including authentication, quota and transport errors)
-// count per actual attempt, so retries cannot hide a persistently broken route.
-func routeAttemptResult(ctx context.Context, response *http.Response, err error) (success, observe bool) {
+// count once per completed route request, after all its retries have finished.
+func routeRequestResult(ctx context.Context, response *http.Response, err error) (success, observe bool) {
 	if ctx.Err() != nil {
 		return false, false
 	}
@@ -31,11 +31,11 @@ func routeAttemptResult(ctx context.Context, response *http.Response, err error)
 	return err == nil && response != nil && response.StatusCode >= 200 && response.StatusCode < 300, true
 }
 
-func (s *Service) observeRouteAttempt(ctx context.Context, lease *Lease, spec routeProbeSpec, response *http.Response, attemptErr error) bool {
+func (s *Service) observeRouteRequest(ctx context.Context, lease *Lease, spec routeProbeSpec, response *http.Response, requestErr error) bool {
 	if s.limiter == nil || lease == nil {
 		return false
 	}
-	success, observe := routeAttemptResult(ctx, response, attemptErr)
+	success, observe := routeRequestResult(ctx, response, requestErr)
 	if !observe {
 		return false
 	}
@@ -191,7 +191,24 @@ func newRouteProbeRequest(ctx context.Context, spec routeProbeSpec) (*http.Reque
 }
 
 func (s *Service) performRouteProbe(ctx context.Context, route Route, spec routeProbeSpec) bool {
-	return s.executeRouteProbe(ctx, route, spec).Success
+	request, body, streaming, err := newStreamingRouteProbeRequest(ctx, spec)
+	if err != nil {
+		return false
+	}
+	// Catalog, embedding and compact endpoints have no streaming protocol.
+	if !streaming {
+		return s.executeRouteProbe(ctx, route, spec).Success
+	}
+	response, _, err := s.performAttemptWithResponseHeaderTimeout(request, route,
+		func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil },
+		route.ModelMapping, mappedResponseContext{}, false, smartGroupFirstResponseHeaderTimeout)
+	if response != nil {
+		defer response.Body.Close()
+	}
+	if err != nil || response == nil || response.StatusCode < 200 || response.StatusCode >= 300 || !isEventStream(response.Header) {
+		return false
+	}
+	return validateRouteProbeStream(response.Body, spec.Path)
 }
 
 func (s *Service) executeRouteProbe(ctx context.Context, route Route, spec routeProbeSpec) (result RouteTestResult) {

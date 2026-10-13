@@ -16,19 +16,19 @@ import (
 	"transithub/backend/internal/modules/upstream"
 )
 
-func TestRouteAttemptResultIgnoresClientErrorsAndCancellation(t *testing.T) {
+func TestRouteRequestResultIgnoresClientErrorsAndCancellation(t *testing.T) {
 	for _, status := range []int{200, 400, 401, 403, 404, 422, 429, 500, 503} {
-		success, observe := routeAttemptResult(context.Background(), &http.Response{StatusCode: status}, nil)
+		success, observe := routeRequestResult(context.Background(), &http.Response{StatusCode: status}, nil)
 		if success != (status == 200) || observe != (status != 400 && status != 422) {
 			t.Fatalf("status=%d success=%v observe=%v", status, success, observe)
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, observe := routeAttemptResult(ctx, nil, errors.New("transport canceled")); observe {
+	if _, observe := routeRequestResult(ctx, nil, errors.New("transport canceled")); observe {
 		t.Fatal("client cancellation counted as a route failure")
 	}
-	if success, observe := routeAttemptResult(context.Background(), &http.Response{StatusCode: 200}, io.ErrUnexpectedEOF); success || !observe {
+	if success, observe := routeRequestResult(context.Background(), &http.Response{StatusCode: 200}, io.ErrUnexpectedEOF); success || !observe {
 		t.Fatal("truncated upstream body was not a failure")
 	}
 }
@@ -59,11 +59,13 @@ func TestRouteProbeUsesRealInferenceCredentialAndMapping(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Error(err)
 		}
-		if payload["model"] != "upstream-model" || payload["input"] != "Reply OK." || payload["stream"] != false {
+		if payload["model"] != "upstream-model" || payload["input"] != "Reply OK." || payload["stream"] != true || r.Header.Get("Accept") != "text/event-stream" {
 			t.Errorf("probe payload=%v", payload)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"probe-response","output":[]}`))
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "event: response.created\ndata: {\"type\":\"response.created\"}\n\n")
+		w.(http.Flusher).Flush()
+		_, _ = io.WriteString(w, "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[]}}\n\n")
 	}))
 	defer server.Close()
 	service, route := preparedProbeService(t, server)
@@ -140,16 +142,21 @@ func TestProxyDirectRedisStopsRequestsDuringPause(t *testing.T) {
 		service.proxyDirect(w, httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"model","input":"sensitive user content"}`)), route)
 		return w
 	}
-	if w := request(); w.Code != http.StatusBadGateway {
-		t.Fatalf("first status=%d", w.Code)
-	}
-	if calls.Load() != routeFailureThreshold {
-		t.Fatalf("upstream calls=%d want %d", calls.Load(), routeFailureThreshold)
+	for index := 1; index <= routeFailureThreshold; index++ {
+		if w := request(); w.Code != http.StatusBadGateway {
+			t.Fatalf("request %d status=%d", index, w.Code)
+		}
+		if calls.Load() != int64(index*directMaxAttempts) {
+			t.Fatalf("request %d upstream calls=%d", index, calls.Load())
+		}
+		if failures, err := client.HGet(context.Background(), healthKey(route.ID), "failures").Int(); err != nil || failures != index {
+			t.Fatalf("request %d failures=%d err=%v", index, failures, err)
+		}
 	}
 	if w := request(); w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") != "180" {
 		t.Fatalf("paused status=%d headers=%v", w.Code, w.Header())
 	}
-	if calls.Load() != routeFailureThreshold {
+	if calls.Load() != routeFailureThreshold*directMaxAttempts {
 		t.Fatal("paused route received real traffic")
 	}
 	state, err := client.HGetAll(context.Background(), healthKey(route.ID)).Result()
