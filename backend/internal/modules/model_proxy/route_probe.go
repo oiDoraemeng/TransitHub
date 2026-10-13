@@ -191,34 +191,42 @@ func newRouteProbeRequest(ctx context.Context, spec routeProbeSpec) (*http.Reque
 }
 
 func (s *Service) performRouteProbe(ctx context.Context, route Route, spec routeProbeSpec) bool {
+	return s.executeRouteProbe(ctx, route, spec).Success
+}
+
+func (s *Service) executeRouteProbe(ctx context.Context, route Route, spec routeProbeSpec) (result RouteTestResult) {
+	started := time.Now()
+	result.Message = "admin.modelProxy.manualTest.failed"
+	defer func() { result.LatencyMS = time.Since(started).Milliseconds() }()
 	request, body, err := newRouteProbeRequest(ctx, spec)
 	if err != nil {
-		return false
+		return result
 	}
 	response, _, err := s.performAttemptWithResponseHeaderTimeout(request, route,
 		func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil },
 		route.ModelMapping, mappedResponseContext{}, false, smartGroupFirstResponseHeaderTimeout)
 	if response != nil {
 		defer response.Body.Close()
+		result.StatusCode = response.StatusCode
 	}
 	if err != nil || response == nil || response.StatusCode < 200 || response.StatusCode >= 300 {
-		return false
+		return result
 	}
 	// A models list alone is insufficient to restore an inference route. Validate
 	// the actual minimal request and its body, including errors hidden behind 200.
 	encoded, err := io.ReadAll(io.LimitReader(response.Body, (1<<20)+1))
 	if err != nil || len(encoded) > 1<<20 {
-		return false
+		return result
 	}
-	var result map[string]json.RawMessage
-	if err := json.Unmarshal(encoded, &result); err != nil {
-		return false
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		return result
 	}
-	if len(result) == 0 {
-		return false
+	if len(payload) == 0 {
+		return result
 	}
-	if raw, ok := result["error"]; ok && string(raw) != "null" {
-		return false
+	if raw, ok := payload["error"]; ok && string(raw) != "null" {
+		return result
 	}
 	expected := "output"
 	switch {
@@ -237,6 +245,10 @@ func (s *Service) performRouteProbe(ctx context.Context, route Route, spec route
 			expected = "name"
 		}
 	}
-	raw, ok := result[expected]
-	return ok && len(raw) > 0 && string(raw) != "null"
+	raw, ok := payload[expected]
+	result.Success = ok && len(raw) > 0 && string(raw) != "null"
+	if result.Success {
+		result.Message = "admin.modelProxy.manualTest.succeeded"
+	}
+	return result
 }

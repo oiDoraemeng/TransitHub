@@ -9,6 +9,9 @@ import type {
   ProxyCustomKey,
   ProxyRoute,
   ProxyRouteInput,
+  ProxyModel,
+  RouteModelTestResult,
+  RouteTestProtocol,
   ProxySite,
   ProxySmartGroup,
   SmartGroupInput,
@@ -60,6 +63,15 @@ export const deleteProxyRoute = (id: string) => request<{ success: boolean }>(`/
 export const revealProxyRouteKey = (id: string) => request<KeyResponse>(`/proxy-routes/${id}/key`)
 export const rotateProxyRouteKey = (id: string) => request<KeyResponse>(`/proxy-routes/${id}/rotate-key`, { method: 'POST' })
 export const getProxyCleanupStatus = () => request<CleanupStatus>('/proxy-routes/cleanup-status')
+
+export const listRouteTestModels = (id: string, groupId = '', refresh = false, signal?: AbortSignal) => {
+  const query = new URLSearchParams({ groupId, refresh: String(refresh) })
+  return request<ProxyModel[]>(`/proxy-routes/${encodeURIComponent(id)}/test-models?${query}`, { signal })
+}
+export const testRouteModel = (id: string, input: { groupId?: string; modelId: string; protocol: RouteTestProtocol }, signal?: AbortSignal) =>
+  request<RouteModelTestResult>(`/proxy-routes/${encodeURIComponent(id)}/test`, { method: 'POST', body: JSON.stringify(input), signal })
+export const restoreRouteScheduling = (id: string, input: { groupId?: string; token: string }, signal?: AbortSignal) =>
+  request<{ success: boolean }>(`/proxy-routes/${encodeURIComponent(id)}/restore-scheduling`, { method: 'POST', body: JSON.stringify(input), signal })
 
 export const listModelEgressProxies = () => request<ModelEgressProxy[]>('/model-proxies')
 export const createModelEgressProxy = (input: ModelEgressProxyInput & { url: string }) => request<ModelEgressProxy>('/model-proxies', { method: 'POST', body: JSON.stringify(input) })

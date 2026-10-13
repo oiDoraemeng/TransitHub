@@ -105,6 +105,17 @@ export interface ModelEgressProxyTestResult {
   message: string
 }
 
+export type RouteTestProtocol = 'chat' | 'responses' | 'messages' | 'gemini' | 'embeddings'
+
+export interface RouteModelTestResult {
+  success: boolean
+  latencyMs: number
+  statusCode?: number
+  message: string
+  recoveryToken?: string
+  expiresAt?: string
+}
+
 export interface SmartGroupInput {
   name: string
   memberKeys?: string[]

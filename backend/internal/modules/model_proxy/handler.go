@@ -24,6 +24,9 @@ func RegisterRoutes(mux *http.ServeMux, service *Service) {
 	mux.HandleFunc("DELETE /api/proxy-routes/{id}", h.deleteRoute)
 	mux.HandleFunc("GET /api/proxy-routes/{id}/key", h.revealRouteKey)
 	mux.HandleFunc("POST /api/proxy-routes/{id}/rotate-key", h.rotateRouteKey)
+	mux.HandleFunc("GET /api/proxy-routes/{id}/test-models", h.routeTestModels)
+	mux.HandleFunc("POST /api/proxy-routes/{id}/test", h.testRouteModel)
+	mux.HandleFunc("POST /api/proxy-routes/{id}/restore-scheduling", h.restoreRouteScheduling)
 	mux.HandleFunc("GET /api/proxy-routes/sites", h.listSites)
 	mux.HandleFunc("GET /api/proxy-routes/sites/{siteId}/groups", h.listGroups)
 	mux.HandleFunc("GET /api/proxy-routes/cleanup-status", h.cleanupStatus)
@@ -421,4 +424,55 @@ func (h *Handler) writeError(w http.ResponseWriter, err error) {
 	}
 	log.Printf("[model-proxy] admin request failed: %v", err)
 	httpjson.WriteError(w, http.StatusInternalServerError, "model proxy request failed")
+}
+
+func (h *Handler) routeTestModels(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	userID, ok := h.userID(w, r)
+	if !ok {
+		return
+	}
+	models, err := h.service.ListRouteTestModels(r.Context(), userID, r.PathValue("id"), r.URL.Query().Get("groupId"), r.URL.Query().Get("refresh") == "true")
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, models)
+}
+
+func (h *Handler) testRouteModel(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	userID, ok := h.userID(w, r)
+	if !ok {
+		return
+	}
+	var input RouteTestRequest
+	if err := httpjson.Decode(r, &input); err != nil {
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	result, err := h.service.TestRouteModel(r.Context(), userID, r.PathValue("id"), input)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, result)
+}
+
+func (h *Handler) restoreRouteScheduling(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	userID, ok := h.userID(w, r)
+	if !ok {
+		return
+	}
+	var input RouteRecoveryRequest
+	if err := httpjson.Decode(r, &input); err != nil {
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := h.service.RestoreRouteScheduling(r.Context(), userID, r.PathValue("id"), input); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpjson.Write(w, http.StatusOK, map[string]bool{"success": true})
 }

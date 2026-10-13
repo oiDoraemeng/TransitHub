@@ -148,7 +148,7 @@ func scanRouteWithPolicy(row routeScanner) (Route, error) {
 		&route.StreamOnly, &route.MinInputTokens, &route.RequestsPerMinute, &route.Priority,
 		&route.RouteProvidedKey, &route.MemberProvidedKey, &route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext,
 		&route.KeywordMatchMode, &route.ModelMappingEnabled, &mappingJSON,
-		&route.SyncKeyDeleteEnabled, &route.SyncKeyDeleteDelayMS, &route.SchedulingPaused)
+		&route.SyncKeyDeleteEnabled, &route.SyncKeyDeleteDelayMS, &route.SchedulingPaused, &route.MemberPolicyRevision)
 	route.ModelMapping = decodeModelMapping(mappingJSON)
 	return route, err
 }
@@ -521,7 +521,8 @@ func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, 
 			keyword_match_mode=COALESCE($14::text,m.keyword_match_mode),
 			sync_key_delete_enabled=COALESCE($15::boolean,m.sync_key_delete_enabled),
 			sync_key_delete_delay_ms=COALESCE($16::integer,m.sync_key_delete_delay_ms),
-			scheduling_paused=COALESCE($17::boolean,m.scheduling_paused)
+			scheduling_paused=COALESCE($17::boolean,m.scheduling_paused),
+			policy_revision=m.policy_revision+1
 		FROM proxy_smart_groups g, proxy_routes r
 		WHERE m.smart_group_id=g.id AND g.id=$1 AND m.route_id=$2 AND r.id=m.route_id
 			AND g.user_id=$3 AND g.admin_account_id=$4
@@ -595,7 +596,7 @@ func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enable
 				THEN COALESCE(gm.upstream_key_preview,'') ELSE COALESCE(r.upstream_key_preview,'') END,
 			COALESCE(CASE WHEN gm.use_upstream_key THEN NULLIF(gm.upstream_key_ciphertext,'') END,r.upstream_key_ciphertext,''),
 			CASE WHEN gm.keyword_check_enabled THEN gm.keyword_match_mode ELSE 'disabled' END,gm.model_mapping_enabled,
-			COALESCE(gm.model_mapping,'{}'::jsonb),gm.sync_key_delete_enabled,gm.sync_key_delete_delay_ms,gm.scheduling_paused
+			COALESCE(gm.model_mapping,'{}'::jsonb),gm.sync_key_delete_enabled,gm.sync_key_delete_delay_ms,gm.scheduling_paused,gm.policy_revision
 		FROM proxy_smart_group_members gm JOIN proxy_routes r ON r.id=gm.route_id
 		LEFT JOIN upstream_sites s ON s.id=r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id

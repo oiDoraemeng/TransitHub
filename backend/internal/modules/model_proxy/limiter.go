@@ -49,6 +49,9 @@ redis.call('PEXPIRE', KEYS[1], ARGV[1])
 if ARGV[4] ~= '' and redis.call('HGET', KEYS[2], 'probe_token') == ARGV[4] then
   redis.call('ZADD', KEYS[3], now + tonumber(ARGV[5]), ARGV[3])
 end
+if ARGV[6] ~= '' and redis.call('GET', KEYS[4]) == ARGV[6] then
+  redis.call('PEXPIRE', KEYS[4], ARGV[1])
+end
 return 1
 `)
 
@@ -83,13 +86,14 @@ type Limiter struct {
 }
 
 type Lease struct {
-	limiter    *Limiter
-	routeID    string
-	id         string
-	stop       chan struct{}
-	epoch      int64
-	probeToken string
-	once       sync.Once
+	limiter         *Limiter
+	routeID         string
+	id              string
+	stop            chan struct{}
+	epoch           int64
+	probeToken      string
+	manualTestToken string
+	once            sync.Once
 }
 
 func NewLimiter(client *redis.Client) *Limiter { return &Limiter{redis: client} }
@@ -199,8 +203,8 @@ func (l *Lease) renew() {
 			return
 		case <-ticker.C:
 			renewCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			_ = renewLeaseScript.Run(renewCtx, l.limiter.redis, []string{leaseKey(l.routeID), healthKey(l.routeID), probeDueKey()},
-				leaseTTL.Milliseconds(), l.id, l.routeID, l.probeToken, routeProbeClaimTTL.Milliseconds()).Err()
+			_ = renewLeaseScript.Run(renewCtx, l.limiter.redis, []string{leaseKey(l.routeID), healthKey(l.routeID), probeDueKey(), manualTestKey(l.routeID)},
+				leaseTTL.Milliseconds(), l.id, l.routeID, l.probeToken, routeProbeClaimTTL.Milliseconds(), l.manualTestToken).Err()
 			cancel()
 		}
 	}
@@ -214,7 +218,11 @@ func (l *Lease) Release(ctx context.Context) {
 		close(l.stop)
 		releaseCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
-		_ = l.limiter.redis.ZRem(releaseCtx, leaseKey(l.routeID), l.id).Err()
+		if l.manualTestToken != "" {
+			_ = releaseManualTestScript.Run(releaseCtx, l.limiter.redis, []string{leaseKey(l.routeID), manualTestKey(l.routeID)}, l.id, l.manualTestToken).Err()
+		} else {
+			_ = l.limiter.redis.ZRem(releaseCtx, leaseKey(l.routeID), l.id).Err()
+		}
 	})
 }
 

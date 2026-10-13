@@ -1315,7 +1315,12 @@ func (s *Service) refreshRouteModels(ctx context.Context, routeID string) error 
 }
 
 func (s *Service) refreshRouteModelsWithRoute(ctx context.Context, route Route) error {
-	_, err, _ := s.modelRefresh.Do(route.ID, func() (any, error) {
+	return s.refreshRouteModelsInScope(ctx, route, "")
+}
+
+func (s *Service) refreshRouteModelsInScope(ctx context.Context, route Route, scope string) error {
+	refreshBinding := route.ID + ":" + route.GroupID + ":" + route.ProxyID + ":" + hashKey(route.UpstreamKeyCiphertext) + ":" + scope
+	_, err, _ := s.modelRefresh.Do(refreshBinding, func() (any, error) {
 		client, err := s.dataClientForRoute(ctx, route)
 		if err != nil {
 			_ = s.repository.SetModelSyncError(ctx, route.ID, err)

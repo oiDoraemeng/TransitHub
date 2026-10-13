@@ -35,6 +35,7 @@ type Route struct {
 	// smart-group membership. They are intentionally not route-level settings.
 	StreamOnly            bool              `json:"streamOnly,omitempty"`
 	SchedulingPaused      bool              `json:"schedulingPaused,omitempty"`
+	MemberPolicyRevision  int64             `json:"-"`
 	MinInputTokens        int               `json:"minInputTokens,omitempty"`
 	RequestsPerMinute     int               `json:"requestsPerMinute,omitempty"`
 	Priority              int               `json:"priority,omitempty"`
