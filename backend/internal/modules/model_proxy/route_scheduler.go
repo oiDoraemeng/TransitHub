@@ -1,0 +1,105 @@
+package model_proxy
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+
+	"github.com/redis/go-redis/v9"
+)
+
+// Selection, health filtering and capacity reservation are one operation. A
+// snapshot followed by per-route acquisitions can skip soft tiers or priority
+// boundaries when another request releases capacity between the two calls.
+var acquireBestRouteScript = redis.NewScript(routeHealthLua + `
+local now = clockMS()
+local routes = cjson.decode(ARGV[1])
+local best = nil
+local tied = {}
+local paused = 0
+for index, route in ipairs(routes) do
+  local offset = 3 + (index - 1) * 3
+  local untilMS = resumeExpired(KEYS[offset + 2], KEYS[2], route.id, now)
+  if untilMS > now or route.manualPause then
+    paused = paused + 1
+  else
+    redis.call('ZREMRANGEBYSCORE', KEYS[offset], '-inf', now)
+    local active = redis.call('ZCARD', KEYS[offset])
+    local remaining = route.limit - active
+    if remaining > 0 then
+      local tier = 2
+      if not route.provided and active < math.min(route.limit, tonumber(ARGV[4])) then tier = 0 end
+      if route.provided and active < math.min(route.limit, tonumber(ARGV[5])) then tier = 1 end
+      -- Unmeasured routes get an initial sample; measured routes use recent EWMA.
+      local latency = tonumber(redis.call('GET', KEYS[offset + 1]) or '-1')
+      local item = {index=index, offset=offset, priority=route.priority, tier=tier,
+                    active=active, remaining=remaining, latency=latency, id=route.id}
+      local better = best == nil
+      if best ~= nil then
+        if item.priority ~= best.priority then better = item.priority > best.priority
+        elseif item.tier ~= best.tier then better = item.tier < best.tier
+        elseif tier == 2 then better = remaining > best.remaining
+        elseif latency ~= best.latency then better = latency < best.latency
+        elseif active ~= best.active then better = active < best.active
+        else better = item.id < best.id end
+      end
+      if better then best = item; tied = {item}
+      elseif best.priority == item.priority and best.tier == 2 and tier == 2
+             and best.remaining == remaining then table.insert(tied, item) end
+    end
+  end
+end
+if best == nil then return {0, 0, paused} end
+if best.tier == 2 then
+  table.sort(tied, function(a,b) return a.id < b.id end)
+  local cursor = redis.call('INCR', KEYS[1])
+  best = tied[(cursor - 1) % #tied + 1]
+end
+redis.call('ZADD', KEYS[best.offset], now + tonumber(ARGV[3]), ARGV[2])
+redis.call('PEXPIRE', KEYS[best.offset], ARGV[3])
+return {best.index, tonumber(redis.call('HGET', KEYS[best.offset + 2], 'epoch') or '0'), paused}
+`)
+
+type schedulerRoute struct {
+	ID          string `json:"id"`
+	Priority    int    `json:"priority"`
+	Limit       int    `json:"limit"`
+	Provided    bool   `json:"provided"`
+	ManualPause bool   `json:"manualPause"`
+}
+
+func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID string) (*Lease, *Route, error) {
+	if len(routes) == 0 {
+		return nil, nil, nil
+	}
+	keys := []string{roundRobinKey(), probeDueKey()}
+	input := make([]schedulerRoute, 0, len(routes))
+	for _, route := range routes {
+		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID), healthKey(route.ID))
+		input = append(input, schedulerRoute{route.ID, route.Priority, route.ConcurrencyLimit, route.UseProvidedKey, route.SchedulingPaused})
+	}
+	encoded, err := json.Marshal(input)
+	if err != nil {
+		return nil, nil, err
+	}
+	values, err := acquireBestRouteScript.Run(ctx, l.redis, keys, string(encoded), leaseID,
+		leaseTTL.Milliseconds(), temporaryKeySoftConcurrency, providedKeySoftConcurrency).Int64Slice()
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(values) != 3 {
+		return nil, nil, errors.New("invalid route acquisition response")
+	}
+	if values[0] == 0 {
+		if values[2] == int64(len(routes)) {
+			return nil, nil, errRoutePaused
+		}
+		return nil, nil, nil
+	}
+	index := values[0] - 1
+	if index < 0 || index >= int64(len(routes)) {
+		return nil, nil, errors.New("invalid selected route index")
+	}
+	route := routes[index]
+	return l.newLease(route.ID, leaseID, values[1], ""), &route, nil
+}

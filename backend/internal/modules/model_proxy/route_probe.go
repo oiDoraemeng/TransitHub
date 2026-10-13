@@ -1,0 +1,242 @@
+package model_proxy
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"log"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+)
+
+func writeRoutePaused(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", "180")
+	writeOpenAIError(w, http.StatusServiceUnavailable, "route_temporarily_paused", "eligible upstream routes are temporarily paused; recovery probes run every 3 minutes")
+}
+
+// Client cancellation and invalid request parameters say nothing about route
+// health. Other failures (including authentication, quota and transport errors)
+// count per actual attempt, so retries cannot hide a persistently broken route.
+func routeAttemptResult(ctx context.Context, response *http.Response, err error) (success, observe bool) {
+	if ctx.Err() != nil {
+		return false, false
+	}
+	if response != nil && (response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusUnprocessableEntity) {
+		return false, false
+	}
+	return err == nil && response != nil && response.StatusCode >= 200 && response.StatusCode < 300, true
+}
+
+func (s *Service) observeRouteAttempt(ctx context.Context, lease *Lease, spec routeProbeSpec, response *http.Response, attemptErr error) bool {
+	if s.limiter == nil || lease == nil {
+		return false
+	}
+	success, observe := routeAttemptResult(ctx, response, attemptErr)
+	if !observe {
+		return false
+	}
+	stateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+	defer cancel()
+	paused, err := s.limiter.ObserveRouteResult(stateCtx, lease, success, spec)
+	if err != nil {
+		log.Printf("[model-proxy] route health update route_id=%s err=%v", lease.routeID, err)
+	}
+	return paused
+}
+
+func (s *Service) routeProbeLoop(ctx context.Context) {
+	defer s.wg.Done()
+	if s.limiter == nil {
+		return
+	}
+	jobs := make(chan string, routeProbeWorkers)
+	var workers sync.WaitGroup
+	for index := 0; index < routeProbeWorkers; index++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case routeID, ok := <-jobs:
+					if !ok {
+						return
+					}
+					s.probePausedRoute(ctx, routeID)
+				}
+			}
+		}()
+	}
+	defer workers.Wait()
+	defer close(jobs)
+	ticker := time.NewTicker(routeProbeTick)
+	defer ticker.Stop()
+	for {
+		stateCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		due, err := s.limiter.dueRouteProbes(stateCtx)
+		cancel()
+		if err == nil {
+			for _, routeID := range due {
+				select {
+				case jobs <- routeID:
+				case <-ctx.Done():
+					return
+				default: // Leave excess work in Redis for the next scan.
+				}
+			}
+		} else if ctx.Err() == nil {
+			log.Printf("[model-proxy] list recovery probes: %v", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *Service) probePausedRoute(parent context.Context, routeID string) {
+	ctx, cancel := context.WithTimeout(parent, routeProbeTimeout)
+	defer cancel()
+	claim, err := s.limiter.claimRouteProbe(ctx, routeID)
+	if err != nil || claim == nil {
+		return
+	}
+	success := false
+	defer func() {
+		stateCtx, stateCancel := context.WithTimeout(context.WithoutCancel(parent), 2*time.Second)
+		defer stateCancel()
+		if _, err := s.limiter.finishRouteProbe(stateCtx, claim, success); err != nil {
+			log.Printf("[model-proxy] finish recovery probe route_id=%s err=%v", routeID, err)
+		}
+	}()
+	route, err := s.loadProbeRoute(ctx, claim)
+	if err != nil || route == nil || !route.Enabled {
+		return
+	}
+	lease, acquired, err := s.limiter.acquireRouteLease(ctx, *route, claim.token, route.ConcurrencyLimit, claim.token)
+	if err != nil || !acquired {
+		return
+	}
+	defer lease.Release(context.WithoutCancel(parent))
+	success = s.performRouteProbe(ctx, *route, claim.spec)
+}
+
+func (s *Service) loadProbeRoute(ctx context.Context, claim *routeProbeClaim) (*Route, error) {
+	if claim.spec.GroupID == "" {
+		return s.repository.GetRoute(ctx, claim.routeID)
+	}
+	group, err := s.repository.GetSmartGroup(ctx, claim.spec.GroupID)
+	if err != nil || group == nil || !group.Enabled {
+		return nil, err
+	}
+	// Reload the exact membership, including its current prepared key and mapping.
+	routes, err := s.repository.ListGroupRoutes(ctx, claim.spec.GroupID, true, claim.spec.ModelID)
+	if err != nil {
+		return nil, err
+	}
+	for _, route := range routes {
+		if route.ID == claim.routeID {
+			return &route, nil
+		}
+	}
+	return nil, nil
+}
+
+func newRouteProbeRequest(ctx context.Context, spec routeProbeSpec) (*http.Request, []byte, error) {
+	path := spec.Path
+	method := http.MethodPost
+	var payload map[string]any
+	switch {
+	case path == "/v1/models" || path == "/v1beta/models" || (strings.HasPrefix(path, "/v1beta/models/") && !strings.Contains(path, ":")):
+		method = http.MethodGet
+	case path == "/v1/embeddings":
+		payload = map[string]any{"model": spec.ModelID, "input": "ping"}
+	case path == "/v1/chat/completions" || path == "/v1/messages":
+		payload = map[string]any{"model": spec.ModelID, "messages": []map[string]string{{"role": "user", "content": "Reply OK."}}, "max_tokens": 16, "stream": false}
+	case path == "/v1/responses":
+		payload = map[string]any{"model": spec.ModelID, "input": "Reply OK.", "max_output_tokens": 16, "stream": false}
+	case path == "/v1/responses/compact":
+		payload = map[string]any{"model": spec.ModelID, "input": []map[string]string{{"role": "user", "content": "Reply OK."}}}
+	case strings.HasPrefix(path, "/v1beta/models/"):
+		if _, _, ok := nativeGeminiModelAction(path); !ok {
+			return nil, nil, errors.New("unsupported recovery probe endpoint")
+		}
+		path = strings.Replace(path, ":streamGenerateContent", ":generateContent", 1)
+		payload = map[string]any{"contents": []any{map[string]any{"role": "user", "parts": []map[string]string{{"text": "Reply OK."}}}}, "generationConfig": map[string]int{"maxOutputTokens": 16}}
+	default:
+		return nil, nil, errors.New("unsupported recovery probe endpoint")
+	}
+	if method == http.MethodPost && strings.TrimSpace(spec.ModelID) == "" {
+		return nil, nil, errors.New("recovery probe model is required")
+	}
+	var body []byte
+	if payload != nil {
+		var err error
+		body, err = json.Marshal(payload)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	request, err := http.NewRequestWithContext(ctx, method, "http://recovery.local"+path, bytes.NewReader(body))
+	if err == nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	return request, body, err
+}
+
+func (s *Service) performRouteProbe(ctx context.Context, route Route, spec routeProbeSpec) bool {
+	request, body, err := newRouteProbeRequest(ctx, spec)
+	if err != nil {
+		return false
+	}
+	response, _, err := s.performAttemptWithResponseHeaderTimeout(request, route,
+		func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil },
+		route.ModelMapping, mappedResponseContext{}, false, smartGroupFirstResponseHeaderTimeout)
+	if response != nil {
+		defer response.Body.Close()
+	}
+	if err != nil || response == nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+		return false
+	}
+	// A models list alone is insufficient to restore an inference route. Validate
+	// the actual minimal request and its body, including errors hidden behind 200.
+	encoded, err := io.ReadAll(io.LimitReader(response.Body, (1<<20)+1))
+	if err != nil || len(encoded) > 1<<20 {
+		return false
+	}
+	var result map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &result); err != nil {
+		return false
+	}
+	if len(result) == 0 {
+		return false
+	}
+	if raw, ok := result["error"]; ok && string(raw) != "null" {
+		return false
+	}
+	expected := "output"
+	switch {
+	case spec.Path == "/v1/models" || spec.Path == "/v1/embeddings":
+		expected = "data"
+	case spec.Path == "/v1/chat/completions":
+		expected = "choices"
+	case spec.Path == "/v1/messages":
+		expected = "content"
+	case spec.Path == "/v1beta/models":
+		expected = "models"
+	case strings.HasPrefix(spec.Path, "/v1beta/models/"):
+		if strings.Contains(spec.Path, ":") {
+			expected = "candidates"
+		} else {
+			expected = "name"
+		}
+	}
+	raw, ok := result[expected]
+	return ok && len(raw) > 0 && string(raw) != "null"
+}

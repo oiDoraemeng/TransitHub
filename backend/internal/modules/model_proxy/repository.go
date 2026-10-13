@@ -148,7 +148,7 @@ func scanRouteWithPolicy(row routeScanner) (Route, error) {
 		&route.StreamOnly, &route.MinInputTokens, &route.RequestsPerMinute, &route.Priority,
 		&route.RouteProvidedKey, &route.MemberProvidedKey, &route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext,
 		&route.KeywordMatchMode, &route.ModelMappingEnabled, &mappingJSON,
-		&route.SyncKeyDeleteEnabled, &route.SyncKeyDeleteDelayMS)
+		&route.SyncKeyDeleteEnabled, &route.SyncKeyDeleteDelayMS, &route.SchedulingPaused)
 	route.ModelMapping = decodeModelMapping(mappingJSON)
 	return route, err
 }
@@ -338,7 +338,7 @@ func (r *Repository) ListSmartGroups(ctx context.Context, userID, accountID stri
 		}
 		groups[index].Models = models
 		for _, member := range members {
-			if member.Enabled {
+			if member.Enabled && !member.SchedulingPaused {
 				groups[index].TotalConcurrency += member.ConcurrencyLimit
 			}
 		}
@@ -369,7 +369,7 @@ func (r *Repository) GetSmartGroup(ctx context.Context, groupID string) (*SmartG
 	}
 	group.Models, err = r.GroupModels(ctx, groupID)
 	for _, member := range group.Members {
-		if member.Enabled {
+		if member.Enabled && !member.SchedulingPaused {
 			group.TotalConcurrency += member.ConcurrencyLimit
 		}
 	}
@@ -497,7 +497,7 @@ func (r *Repository) AddMember(ctx context.Context, userID, accountID, groupID, 
 	return nil
 }
 
-func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, modelMappingEnabled *bool, modelMappingJSON *string, useProvidedKey *bool, keyCiphertext, keyPreview *string, keywordMatchMode *string, syncKeyDeleteEnabled *bool, syncKeyDeleteDelayMS *int) error {
+func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, modelMappingEnabled *bool, modelMappingJSON *string, useProvidedKey *bool, keyCiphertext, keyPreview *string, keywordMatchMode *string, syncKeyDeleteEnabled *bool, syncKeyDeleteDelayMS *int, schedulingPaused *bool) error {
 	result, err := r.db.Exec(ctx, `
 		UPDATE proxy_smart_group_members m
 		SET stream_only=COALESCE($5::boolean,m.stream_only),
@@ -520,12 +520,13 @@ func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, 
 			keyword_check_enabled=CASE WHEN $14::text IS NULL THEN m.keyword_check_enabled ELSE $14::text <> 'disabled' END,
 			keyword_match_mode=COALESCE($14::text,m.keyword_match_mode),
 			sync_key_delete_enabled=COALESCE($15::boolean,m.sync_key_delete_enabled),
-			sync_key_delete_delay_ms=COALESCE($16::integer,m.sync_key_delete_delay_ms)
+			sync_key_delete_delay_ms=COALESCE($16::integer,m.sync_key_delete_delay_ms),
+			scheduling_paused=COALESCE($17::boolean,m.scheduling_paused)
 		FROM proxy_smart_groups g, proxy_routes r
 		WHERE m.smart_group_id=g.id AND g.id=$1 AND m.route_id=$2 AND r.id=m.route_id
 			AND g.user_id=$3 AND g.admin_account_id=$4
 			AND r.user_id=$3 AND r.admin_account_id=$4
-	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, modelMappingEnabled, modelMappingJSON, useProvidedKey, keyCiphertext, keyPreview, keywordMatchMode, syncKeyDeleteEnabled, syncKeyDeleteDelayMS)
+	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, modelMappingEnabled, modelMappingJSON, useProvidedKey, keyCiphertext, keyPreview, keywordMatchMode, syncKeyDeleteEnabled, syncKeyDeleteDelayMS, schedulingPaused)
 	if err != nil {
 		return err
 	}
@@ -594,7 +595,7 @@ func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enable
 				THEN COALESCE(gm.upstream_key_preview,'') ELSE COALESCE(r.upstream_key_preview,'') END,
 			COALESCE(CASE WHEN gm.use_upstream_key THEN NULLIF(gm.upstream_key_ciphertext,'') END,r.upstream_key_ciphertext,''),
 			CASE WHEN gm.keyword_check_enabled THEN gm.keyword_match_mode ELSE 'disabled' END,gm.model_mapping_enabled,
-			COALESCE(gm.model_mapping,'{}'::jsonb),gm.sync_key_delete_enabled,gm.sync_key_delete_delay_ms
+			COALESCE(gm.model_mapping,'{}'::jsonb),gm.sync_key_delete_enabled,gm.sync_key_delete_delay_ms,gm.scheduling_paused
 		FROM proxy_smart_group_members gm JOIN proxy_routes r ON r.id=gm.route_id
 		LEFT JOIN upstream_sites s ON s.id=r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id
@@ -602,7 +603,7 @@ func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enable
 		WHERE gm.smart_group_id=$1`
 	args := []any{groupID}
 	if enabledOnly {
-		query += ` AND r.enabled=true`
+		query += ` AND r.enabled=true AND gm.scheduling_paused=false`
 	}
 	if strings.TrimSpace(modelID) != "" {
 		query += ` AND (
@@ -679,14 +680,14 @@ func (r *Repository) GroupModels(ctx context.Context, groupID string) ([]Model, 
 			FROM proxy_smart_group_members gm
 			JOIN proxy_routes r ON r.id=gm.route_id AND r.enabled=true
 			JOIN proxy_route_models m ON m.route_id=r.id
-			WHERE gm.smart_group_id=$1
+			WHERE gm.smart_group_id=$1 AND gm.scheduling_paused=false
 			UNION ALL
 			SELECT mapping.key AS model_id, target.model_json::text AS model_json_text, r.concurrency_limit
 			FROM proxy_smart_group_members gm
 			JOIN proxy_routes r ON r.id=gm.route_id AND r.enabled=true
 			CROSS JOIN LATERAL jsonb_each_text(COALESCE(gm.model_mapping,'{}'::jsonb)) mapping
 			JOIN proxy_route_models target ON target.route_id=r.id AND target.model_id=mapping.value
-			WHERE gm.smart_group_id=$1 AND gm.model_mapping_enabled=true
+			WHERE gm.smart_group_id=$1 AND gm.scheduling_paused=false AND gm.model_mapping_enabled=true
 		) models
 		GROUP BY models.model_id ORDER BY models.model_id ASC
 	`, groupID)

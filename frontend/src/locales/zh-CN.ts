@@ -188,6 +188,8 @@ export default {
       form: { name: '名称', site: '上游站点', group: '分组（可选）', proxy: '模型出口代理（可选）', proxyHelp: '仅模型请求使用此代理。代理停用或不可用时请求会失败，不会回退到直连。', concurrency: '并发额度', enabled: '创建后立即启用', selectSite: '选择站点', selectGroup: '选择分组', noGroup: '不选择分组，使用预置上游 Key', preparedKeyBinding: '预置上游 Key', upstreamKey: '预置上游 Key', upstreamKeyKeep: '留空则保留当前 Key', upstreamKeyHelp: 'Key 会加密保存，并作为该路由在所有智能分组中的默认上游凭据。', upstreamKeyRequired: '不选择分组时必须填写预置上游 Key。' },
       actions: { reveal: '查看 Key', rotate: '轮换 Key', edit: '编辑', delete: '删除', test: '测试代理', copy: '复制', addMember: '添加成员', removeMember: '移除成员' },
       cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个待自动重试', processing: '{count} 个正在清理', routePending: '{count} 个待清理' },
+      circuit: { paused: '调度暂停至 {time}', nextProbe: '下次恢复探测 {time}', help: '连续失败 3 次暂停 30 分钟，每 3 分钟探测，成功后恢复。' },
+      memberPause: { pause: '暂停', resume: '恢复', paused: '已手动暂停', help: '只暂停当前智能分组内的这个成员，需手动恢复。', pausedNotice: '已暂停成员「{name}」', resumedNotice: '已恢复成员「{name}」；若仍处于自动暂停，将等待恢复探测成功或暂停到期。', summary: '当前有 {auto} 条路由自动暂停、{manual} 个成员手动暂停。', summaryHelp: '自动暂停每 3 分钟探测恢复；手动暂停需点击成员旁的“恢复”。' },
       key: { newRoute: '新代理路由 Key', newGroup: '新智能分组 Key', storeSafely: '此 Key 可随时在管理页再次查看，请勿发送给不可信客户端。' },
       confirm: { deleteRoute: '删除代理路由“{name}”？', deleteGroup: '删除智能分组“{name}”？', deleteProxy: '删除模型出口代理“{name}”？', removeMember: '从智能分组移除“{name}”？', rotateKey: '轮换后旧 Key 会立即失效，确认继续？' },
       notices: { routeUpdated: '代理路由已更新', groupUpdated: '智能分组已更新', memberPolicyUpdated: '成员策略已更新', proxyCreated: '模型出口代理已创建', proxyUpdated: '模型出口代理已更新', proxyTested: '代理测试成功，出口 IP：{ip}', copied: 'Key 已复制' },

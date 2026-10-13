@@ -108,10 +108,11 @@ func NewService(repository *Repository, accounts AccountResolver, sites Upstream
 func (s *Service) Start(parent context.Context) {
 	ctx, cancel := context.WithCancel(parent)
 	s.cancel = cancel
-	s.wg.Add(3)
+	s.wg.Add(4)
 	go s.cleanupLoop(ctx)
 	go s.modelRefreshLoop(ctx)
 	go s.latencyObservationLoop(ctx)
+	go s.routeProbeLoop(ctx)
 }
 
 func (s *Service) Stop() {
@@ -142,11 +143,7 @@ func (s *Service) latencyObservationLoop(ctx context.Context) {
 		}
 		writeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
-		for routeID, aggregate := range pending {
-			if aggregate.count > 0 {
-				_ = s.limiter.ObserveResponseHeaderLatency(writeCtx, routeID, aggregate.total/time.Duration(aggregate.count))
-			}
-		}
+		_ = s.limiter.observeResponseHeaderLatencies(writeCtx, pending)
 		clear(pending)
 	}
 	for {
@@ -211,10 +208,7 @@ func (s *Service) ListRoutes(ctx context.Context, userID string) ([]Route, error
 	if err != nil {
 		return nil, err
 	}
-	for index := range routes {
-		routes[index].ActiveConcurrency, _ = s.limiter.Active(ctx, routes[index].ID)
-	}
-	return routes, nil
+	return routes, s.limiter.PopulateRouteRuntime(ctx, routes)
 }
 
 func (s *Service) CreateRoute(ctx context.Context, userID string, input CreateRouteRequest) (Route, string, error) {
@@ -387,10 +381,17 @@ func (s *Service) ListSmartGroups(ctx context.Context, userID string) ([]SmartGr
 	if err != nil {
 		return nil, err
 	}
+	members := make([]Route, 0)
+	for _, group := range groups {
+		members = append(members, group.Members...)
+	}
+	if err := s.limiter.PopulateRouteRuntime(ctx, members); err != nil {
+		return nil, err
+	}
+	offset := 0
 	for groupIndex := range groups {
-		for memberIndex := range groups[groupIndex].Members {
-			groups[groupIndex].Members[memberIndex].ActiveConcurrency, _ = s.limiter.Active(ctx, groups[groupIndex].Members[memberIndex].ID)
-		}
+		copy(groups[groupIndex].Members, members[offset:offset+len(groups[groupIndex].Members)])
+		offset += len(groups[groupIndex].Members)
 	}
 	return groups, nil
 }
@@ -651,7 +652,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 		}
 		input.KeywordMatchMode = &mode
 	}
-	if input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordMatchMode == nil && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
+	if input.SchedulingPaused == nil && input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordMatchMode == nil && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
 	var keyCiphertext, keyPreviewValue *string
@@ -691,7 +692,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
 		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
 		input.ModelMappingEnabled, modelMappingJSON, input.UseProvidedKey, keyCiphertext, keyPreviewValue,
-		input.KeywordMatchMode, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS)
+		input.KeywordMatchMode, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS, input.SchedulingPaused)
 }
 
 const (

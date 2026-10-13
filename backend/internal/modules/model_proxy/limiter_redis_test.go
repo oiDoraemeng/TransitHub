@@ -42,6 +42,17 @@ func TestLimiterRedisSchedulingStages(t *testing.T) {
 		if lease == nil || route == nil {
 			t.Fatalf("request %d did not acquire a route", index)
 		}
+		if index < 20 {
+			expected := routes[2].ID
+			if index < 5 {
+				expected = routes[0].ID
+			} else if index < 10 {
+				expected = routes[1].ID
+			}
+			if route.ID != expected {
+				t.Fatalf("request %d selected %s want %s", index, route.ID, expected)
+			}
+		}
 		leases = append(leases, lease)
 		counts[route.ID]++
 	}
@@ -113,7 +124,12 @@ func cleanupRedisTestRoutes(t *testing.T, client *redis.Client, routes []Route) 
 	t.Helper()
 	keys := make([]string, 0, len(routes)*2)
 	for _, route := range routes {
-		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID))
+		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID), healthKey(route.ID))
 	}
-	t.Cleanup(func() { _ = client.Del(context.Background(), keys...).Err() })
+	t.Cleanup(func() {
+		_ = client.Del(context.Background(), keys...).Err()
+		for _, route := range routes {
+			_ = client.ZRem(context.Background(), probeDueKey(), route.ID).Err()
+		}
+	})
 }

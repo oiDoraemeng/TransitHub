@@ -144,6 +144,10 @@ func groupModelsWithMappings(group *SmartGroup) []Model {
 func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, route Route) {
 	leaseID, _ := randomID("req_")
 	lease, ok, err := s.limiter.Acquire(incoming.Context(), route, newLeaseID(leaseID, route.ID))
+	if errors.Is(err, errRoutePaused) {
+		writeRoutePaused(w)
+		return
+	}
 	if err != nil {
 		writeOpenAIError(w, http.StatusServiceUnavailable, "concurrency_backend_unavailable", "concurrency service is unavailable")
 		return
@@ -168,24 +172,41 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 		return
 	}
 	defer replay.Close()
+	modelID, _ := requestModelID(incoming, replay)
+	probeSpec := routeProbeSpec{ModelID: modelID, Path: incoming.URL.Path}
 
 	var lastStatus int
+	attempts := 0
 	for attempt := 0; attempt < directMaxAttempts; attempt++ {
+		if attempt > 0 {
+			allowed, err := s.limiter.routeRetryAllowed(incoming.Context(), lease)
+			if err != nil || !allowed {
+				break
+			}
+		}
+		attempts++
 		response, retryable, attemptErr := s.performAttempt(incoming, route, replay.Open, nil, mappedResponseContext{}, false)
 		if attemptErr == nil && !retryable {
-			s.writeUpstreamResponse(w, response)
+			completed, readErr := s.writeUpstreamResponse(w, response)
+			if completed || readErr != nil || response.StatusCode >= 300 {
+				s.observeRouteAttempt(incoming.Context(), lease, probeSpec, response, readErr)
+			}
 			return
 		}
+		paused := s.observeRouteAttempt(incoming.Context(), lease, probeSpec, response, attemptErr)
 		if response != nil {
 			lastStatus = response.StatusCode
 			response.Body.Close()
+		}
+		if paused {
+			break
 		}
 		if attempt+1 < directMaxAttempts && waitForProxyRetry(incoming.Context(), attempt) {
 			continue
 		}
 		break
 	}
-	message := fmt.Sprintf("upstream remained unavailable after %d automatic attempts", directMaxAttempts)
+	message := fmt.Sprintf("upstream remained unavailable after %d automatic attempts", attempts)
 	if lastStatus != 0 {
 		message += fmt.Sprintf(" (last status %d)", lastStatus)
 	}
@@ -276,6 +297,10 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	rateLimited := false
 	for len(remaining) > 0 {
 		lease, route, acquireErr := s.limiter.AcquireBest(incoming.Context(), remaining, requestID)
+		if errors.Is(acquireErr, errRoutePaused) {
+			writeRoutePaused(w)
+			return
+		}
 		if acquireErr != nil {
 			writeOpenAIError(w, http.StatusServiceUnavailable, "concurrency_backend_unavailable", "concurrency service is unavailable")
 			return
@@ -301,21 +326,40 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			lease.Release(context.Background())
 			continue
 		}
+		attempts := 0
 		response, attemptErr := attemptSmartGroupMember(incoming.Context(), func(responseHeaderTimeout time.Duration) (*http.Response, error) {
+			if attempts > 0 {
+				allowed, err := s.limiter.routeRetryAllowed(incoming.Context(), lease)
+				if err != nil {
+					return nil, err
+				}
+				if !allowed {
+					return nil, errRoutePaused
+				}
+			}
+			attempts++
 			started := time.Now()
 			response, _, err := s.performAttemptWithResponseHeaderTimeout(incoming, *route, replay.Open, route.ModelMapping, responseMapping, !streaming, responseHeaderTimeout)
 			s.observeSmartGroupLatency(incoming.Context(), route.ID, time.Since(started), responseHeaderTimeout, response, err)
+			if err != nil || response == nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+				if s.observeRouteAttempt(incoming.Context(), lease, routeProbeSpec{GroupID: group.ID, ModelID: modelID, Path: incoming.URL.Path}, response, err) {
+					return response, errRoutePaused
+				}
+			}
 			return response, err
 		})
 		if attemptErr != nil {
-			lastErr = fmt.Errorf("member %s failed after %d attempts: %w", route.Name, smartGroupAttempts, attemptErr)
+			lastErr = fmt.Errorf("member %s failed after %d attempts: %w", route.Name, attempts, attemptErr)
 			lease.Release(context.Background())
 			if incoming.Context().Err() != nil {
 				return
 			}
 			continue
 		}
-		s.writeUpstreamResponse(w, response)
+		completed, readErr := s.writeUpstreamResponse(w, response)
+		if completed || readErr != nil {
+			s.observeRouteAttempt(incoming.Context(), lease, routeProbeSpec{GroupID: group.ID, ModelID: modelID, Path: incoming.URL.Path}, response, readErr)
+		}
 		lease.Release(context.Background())
 		return
 	}
@@ -348,6 +392,9 @@ func attemptSmartGroupMember(ctx context.Context, attempt func(time.Duration) (*
 			lastErr = err
 		} else {
 			lastErr = errors.New("upstream returned no response")
+		}
+		if errors.Is(err, errRoutePaused) {
+			return nil, err
 		}
 		if attemptIndex+1 < smartGroupAttempts && !waitForProxyRetry(ctx, attemptIndex) {
 			return nil, ctx.Err()
@@ -671,7 +718,7 @@ func readFirstSSEEvent(source *bufio.Reader) ([]byte, error) {
 	return event, errSSEEventTooLarge
 }
 
-func (s *Service) writeUpstreamResponse(w http.ResponseWriter, response *http.Response) {
+func (s *Service) writeUpstreamResponse(w http.ResponseWriter, response *http.Response) (bool, error) {
 	defer response.Body.Close()
 	copyResponseHeaders(w.Header(), response.Header)
 	w.WriteHeader(response.StatusCode)
@@ -681,14 +728,17 @@ func (s *Service) writeUpstreamResponse(w http.ResponseWriter, response *http.Re
 		n, err := response.Body.Read(buffer)
 		if n > 0 {
 			if _, writeErr := w.Write(buffer[:n]); writeErr != nil {
-				return
+				return false, nil // A downstream disconnect is not an upstream failure.
 			}
 			if canFlush {
 				flusher.Flush()
 			}
 		}
 		if err != nil {
-			return
+			if errors.Is(err, io.EOF) {
+				return true, nil
+			}
+			return false, err
 		}
 	}
 }

@@ -12,25 +12,29 @@ const (
 )
 
 type Route struct {
-	ID                string `json:"id"`
-	UserID            string `json:"-"`
-	AdminAccountID    string `json:"-"`
-	Name              string `json:"name"`
-	SiteID            string `json:"siteId"`
-	SiteName          string `json:"siteName"`
-	GroupID           string `json:"groupId"`
-	GroupName         string `json:"groupName"`
-	ConcurrencyLimit  int    `json:"concurrencyLimit"`
-	ActiveConcurrency int64  `json:"activeConcurrency"`
-	Enabled           bool   `json:"enabled"`
-	ProxyID           string `json:"proxyId"`
-	ProxyName         string `json:"proxyName"`
-	KeyPreview        string `json:"keyPreview"`
-	ModelCount        int    `json:"modelCount"`
-	CleanupPending    int    `json:"cleanupPending"`
+	ID                  string     `json:"id"`
+	UserID              string     `json:"-"`
+	AdminAccountID      string     `json:"-"`
+	Name                string     `json:"name"`
+	SiteID              string     `json:"siteId"`
+	SiteName            string     `json:"siteName"`
+	GroupID             string     `json:"groupId"`
+	GroupName           string     `json:"groupName"`
+	ConcurrencyLimit    int        `json:"concurrencyLimit"`
+	ActiveConcurrency   int64      `json:"activeConcurrency"`
+	Enabled             bool       `json:"enabled"`
+	ProxyID             string     `json:"proxyId"`
+	ProxyName           string     `json:"proxyName"`
+	KeyPreview          string     `json:"keyPreview"`
+	ModelCount          int        `json:"modelCount"`
+	CleanupPending      int        `json:"cleanupPending"`
+	PausedUntil         *time.Time `json:"pausedUntil,omitempty"`
+	NextProbeAt         *time.Time `json:"nextProbeAt,omitempty"`
+	ConsecutiveFailures int64      `json:"consecutiveFailures,omitempty"`
 	// Member policies are populated only when this route is loaded through a
 	// smart-group membership. They are intentionally not route-level settings.
 	StreamOnly            bool              `json:"streamOnly,omitempty"`
+	SchedulingPaused      bool              `json:"schedulingPaused,omitempty"`
 	MinInputTokens        int               `json:"minInputTokens,omitempty"`
 	RequestsPerMinute     int               `json:"requestsPerMinute,omitempty"`
 	Priority              int               `json:"priority,omitempty"`
@@ -187,6 +191,7 @@ type AddMemberRequest struct {
 }
 
 type UpdateMemberPolicyRequest struct {
+	SchedulingPaused     *bool              `json:"schedulingPaused,omitempty"`
 	StreamOnly           *bool              `json:"streamOnly,omitempty"`
 	MinInputTokens       *int               `json:"minInputTokens,omitempty"`
 	RequestsPerMinute    *int               `json:"requestsPerMinute,omitempty"`

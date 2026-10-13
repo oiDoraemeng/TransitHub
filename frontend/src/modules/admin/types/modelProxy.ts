@@ -15,6 +15,10 @@ export interface ProxyRoute {
   keyPreview: string
   modelCount: number
   cleanupPending: number
+  pausedUntil?: string
+  nextProbeAt?: string
+  consecutiveFailures?: number
+  schedulingPaused?: boolean
   streamOnly?: boolean
   minInputTokens?: number
   requestsPerMinute?: number
@@ -110,6 +114,7 @@ export interface SmartGroupInput {
 }
 
 export interface SmartGroupMemberPolicyInput {
+  schedulingPaused?: boolean
   streamOnly: boolean
   minInputTokens: number
   requestsPerMinute: number

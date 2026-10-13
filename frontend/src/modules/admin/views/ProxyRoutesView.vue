@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Activity, Check, ChevronDown, ChevronRight, Clipboard, Layers3,
-  Loader2, Network, Pencil, PlugZap, Plus, RefreshCw, Route, Trash2, Users, X,
+  Loader2, Network, Pause, Pencil, Play, PlugZap, Plus, RefreshCw, Route, Trash2, Users, X,
 } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
 import {
@@ -34,7 +34,13 @@ const groupsLoading = ref(false)
 const errorMessage = ref('')
 const noticeMessage = ref('')
 const expandedGroups = ref(new Set<string>())
+const memberPausePending = ref(new Set<string>())
+const autoPausedRoutes = computed(() => routes.value.filter(route => route.pausedUntil))
+const manuallyPausedMembers = computed(() => smartGroups.value.flatMap(group => group.members.filter(member => member.schedulingPaused)))
 let pollTimer: number | undefined
+let loadInProgress = false
+let viewDisposed = false
+let loadRevision = 0
 
 const routeModalOpen = ref(false)
 const editingRouteId = ref('')
@@ -82,12 +88,16 @@ const flash = (message: string) => {
 }
 
 const loadAll = async (quiet = false) => {
+  if (quiet && (loadInProgress || memberPausePending.value.size > 0 || document.hidden)) return
+  loadInProgress = true
+  const revision = loadRevision
   if (!quiet) loading.value = true
   errorMessage.value = ''
   try {
     const [routeRows, groupRows, proxyRows, siteRows, cleanupStatus] = await Promise.all([
       listProxyRoutes(), listProxySmartGroups(), listModelEgressProxies(), listProxySites(), getProxyCleanupStatus(),
     ])
+    if (viewDisposed || revision !== loadRevision) return
     routes.value = routeRows ?? []
     smartGroups.value = groupRows ?? []
     proxies.value = proxyRows ?? []
@@ -96,6 +106,7 @@ const loadAll = async (quiet = false) => {
   } catch (error) {
     errorMessage.value = friendlyError(error)
   } finally {
+    loadInProgress = false
     loading.value = false
   }
 }
@@ -424,6 +435,27 @@ const removeMember = async (group: ProxySmartGroup, route: ProxyRoute) => {
   } catch (error) { errorMessage.value = friendlyError(error) }
 }
 
+const toggleMemberPause = async (group: ProxySmartGroup, member: ProxyRoute) => {
+  const pendingKey = `${group.id}:${member.id}`
+  if (memberPausePending.value.has(pendingKey)) return
+  memberPausePending.value = new Set([...memberPausePending.value, pendingKey])
+  errorMessage.value = ''
+  const paused = !member.schedulingPaused
+  try {
+    await updateProxySmartGroupMemberPolicy(group.id, member.id, { schedulingPaused: paused })
+    loadRevision++
+    // Keep the row's state current while the rest of the page refreshes.
+    const current = smartGroups.value.find(item => item.id === group.id)?.members.find(item => item.id === member.id)
+    if (current) current.schedulingPaused = paused
+    flash(t(paused ? 'admin.modelProxy.memberPause.pausedNotice' : 'admin.modelProxy.memberPause.resumedNotice', { name: member.name }))
+  } catch (error) {
+    errorMessage.value = friendlyError(error)
+  } finally {
+    memberPausePending.value = new Set([...memberPausePending.value].filter(key => key !== pendingKey))
+  }
+  await loadAll(true)
+}
+
 const copyText = async (value: string) => {
   try {
     await navigator.clipboard.writeText(value)
@@ -459,7 +491,7 @@ onMounted(() => {
   void loadAll()
   pollTimer = window.setInterval(() => void loadAll(true), 10000)
 })
-onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
+onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval(pollTimer) })
 </script>
 
 <template>
@@ -484,6 +516,10 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
         <span>{{ errorMessage }}</span><button title="Close" @click="errorMessage = ''"><X class="h-4 w-4" /></button>
       </div>
       <div v-if="noticeMessage" class="mb-4 flex items-center gap-2 border border-signal/30 bg-signal/10 px-4 py-3 text-sm text-signal"><Check class="h-4 w-4" />{{ noticeMessage }}</div>
+      <div v-if="autoPausedRoutes.length || manuallyPausedMembers.length" role="status" aria-live="polite" class="mb-4 border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+        <div class="flex items-center gap-2 font-medium"><Pause class="h-4 w-4" />{{ t('admin.modelProxy.memberPause.summary', { auto: autoPausedRoutes.length, manual: manuallyPausedMembers.length }) }}</div>
+        <p class="mt-1">{{ t('admin.modelProxy.memberPause.summaryHelp') }}</p>
+      </div>
 
       <div class="mb-3 inline-flex h-9 items-center border border-border bg-surface p-1" role="tablist">
         <button type="button" role="tab" :aria-selected="activeTab === 'routes'" class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'routes' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click.stop="selectTab('routes')"><Route class="h-4 w-4" />{{ t('admin.modelProxy.routes.tab') }}</button>
@@ -507,7 +543,8 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
                 <td class="px-3 py-2"><span class="font-mono">{{ routeItem.activeConcurrency }} / {{ routeItem.concurrencyLimit }}</span><div class="mt-1 h-1 w-20 bg-surface-line"><div class="h-full bg-primary" :style="{ width: `${Math.min(100, routeItem.activeConcurrency / routeItem.concurrencyLimit * 100)}%` }" /></div></td>
                 <td class="px-3 py-2"><span>{{ routeItem.modelCount }}</span><span v-if="routeItem.modelSyncError" class="ml-2 text-xs text-warning" :title="routeItem.modelSyncError">{{ t('admin.modelProxy.stale') }}</span></td>
                 <td class="px-3 py-2 font-mono text-xs text-muted-foreground">{{ routeItem.keyPreview }}</td>
-                <td class="px-3 py-2"><button class="inline-flex items-center gap-1.5" @click="toggleRoute(routeItem)"><span class="h-2 w-2 rounded-full" :class="routeItem.enabled ? 'bg-signal' : 'bg-muted-foreground'" />{{ routeItem.enabled ? t('admin.modelProxy.enabled') : t('admin.modelProxy.disabled') }}</button><div v-if="routeItem.cleanupPending" class="text-xs text-warning">{{ t('admin.modelProxy.cleanup.routePending', { count: routeItem.cleanupPending }) }}</div></td>
+                <!-- Runtime pause is independent of the administrator's enabled flag. -->
+                <td class="px-3 py-2"><button class="inline-flex items-center gap-1.5" @click="toggleRoute(routeItem)"><span class="h-2 w-2 rounded-full" :class="routeItem.enabled ? 'bg-signal' : 'bg-muted-foreground'" />{{ routeItem.enabled ? t('admin.modelProxy.enabled') : t('admin.modelProxy.disabled') }}</button><div v-if="routeItem.pausedUntil" class="text-xs text-warning" :title="t('admin.modelProxy.circuit.help')">{{ t('admin.modelProxy.circuit.paused', { time: formatDate(routeItem.pausedUntil) }) }}<div v-if="routeItem.nextProbeAt">{{ t('admin.modelProxy.circuit.nextProbe', { time: formatDate(routeItem.nextProbeAt) }) }}</div></div><div v-if="routeItem.cleanupPending" class="text-xs text-warning">{{ t('admin.modelProxy.cleanup.routePending', { count: routeItem.cleanupPending }) }}</div></td>
                 <td class="px-3 py-2"><div class="flex justify-end gap-0.5"><button class="icon-button" :title="t('admin.modelProxy.actions.copy')" @click="copyOwnerKey(routeItem, 'route')"><Clipboard /></button><button class="icon-button" :title="t('admin.modelProxy.actions.rotate')" @click="rotateKey(routeItem, 'route')"><RefreshCw /></button><button class="icon-button" :title="t('admin.modelProxy.actions.edit')" @click="openEditRoute(routeItem)"><Pencil /></button><button class="icon-button text-destructive" :title="t('admin.modelProxy.actions.delete')" @click="removeRoute(routeItem)"><Trash2 /></button></div></td>
               </tr>
             </tbody>
@@ -537,9 +574,11 @@ onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
                   <div v-for="member in group.members" :key="member.id" class="flex items-center justify-between gap-2 py-1.5 text-sm">
                     <div class="min-w-0">
                       <div class="flex flex-wrap items-baseline gap-x-2"><span class="font-medium">{{ member.name }}</span><span class="truncate text-xs text-muted-foreground">{{ member.siteName }} / {{ member.groupName || t('admin.modelProxy.form.preparedKeyBinding') }}</span></div>
+                      <div v-if="member.schedulingPaused" class="text-xs text-warning" :title="t('admin.modelProxy.memberPause.help')">{{ t('admin.modelProxy.memberPause.paused') }}</div>
+                      <div v-if="member.pausedUntil" class="text-xs text-warning" :title="t('admin.modelProxy.circuit.help')">{{ t('admin.modelProxy.circuit.paused', { time: formatDate(member.pausedUntil) }) }}<span v-if="member.nextProbeAt"> · {{ t('admin.modelProxy.circuit.nextProbe', { time: formatDate(member.nextProbeAt) }) }}</span></div>
                       <div class="flex flex-wrap gap-x-2 text-xs text-muted-foreground"><span>{{ t('admin.modelProxy.groups.policy.prioritySummary', { count: member.priority ?? 0 }) }}</span><span v-if="member.modelMappingEnabled">{{ t('admin.modelProxy.groups.policy.modelMappingEnabled') }}</span><span v-if="member.streamOnly">{{ t('admin.modelProxy.groups.policy.streamOnly') }}</span><span v-if="member.syncKeyDeleteEnabled && !member.useProvidedKey">{{ t('admin.modelProxy.groups.policy.syncKeyDeleteSummary', { count: member.syncKeyDeleteDelayMs ?? 500 }) }}</span><span v-if="member.minInputTokens">{{ t('admin.modelProxy.groups.policy.minInputSummary', { count: member.minInputTokens }) }}</span><span v-if="member.requestsPerMinute">{{ t('admin.modelProxy.groups.policy.rpmSummary', { count: member.requestsPerMinute }) }}</span><span v-if="member.useProvidedKey">{{ t(member.memberProvidedKey ? 'admin.modelProxy.groups.policy.providedKeySummary' : 'admin.modelProxy.groups.policy.routeProvidedKeySummary', { preview: member.upstreamKeyPreview || '***' }) }}</span><span v-if="member.keywordMatchMode && member.keywordMatchMode !== 'disabled'">{{ t(member.keywordMatchMode === 'require_match' ? 'admin.modelProxy.groups.policy.keywordRequireMatchSummary' : 'admin.modelProxy.groups.policy.keywordSkipOnMatchSummary') }}</span><span v-if="!member.streamOnly && !member.syncKeyDeleteEnabled && !member.minInputTokens && !member.requestsPerMinute && !member.priority && !member.modelMappingEnabled && !member.useProvidedKey && (!member.keywordMatchMode || member.keywordMatchMode === 'disabled')">{{ t('admin.modelProxy.groups.policy.default') }}</span></div>
                     </div>
-                    <div class="flex shrink-0 items-center gap-1"><span class="font-mono text-xs">{{ member.activeConcurrency }}/{{ member.concurrencyLimit }}</span><button class="icon-button" :title="t('admin.modelProxy.groups.policy.edit')" @click="openMemberPolicy(group, member)"><Pencil /></button><button class="icon-button text-destructive" :title="t('admin.modelProxy.actions.removeMember')" @click="removeMember(group, member)"><X /></button></div>
+                    <div class="flex shrink-0 items-center gap-1"><span class="font-mono text-xs">{{ member.activeConcurrency }}/{{ member.concurrencyLimit }}</span><button type="button" class="inline-flex items-center gap-1 border border-border px-2 py-1 text-xs disabled:opacity-50" :class="member.schedulingPaused ? 'text-signal' : 'text-warning'" :disabled="memberPausePending.has(`${group.id}:${member.id}`)" :title="t('admin.modelProxy.memberPause.help')" @click="toggleMemberPause(group, member)"><Loader2 v-if="memberPausePending.has(`${group.id}:${member.id}`)" class="h-3.5 w-3.5 animate-spin" /><Play v-else-if="member.schedulingPaused" class="h-3.5 w-3.5" /><Pause v-else class="h-3.5 w-3.5" />{{ t(member.schedulingPaused ? 'admin.modelProxy.memberPause.resume' : 'admin.modelProxy.memberPause.pause') }}</button><button class="icon-button" :title="t('admin.modelProxy.groups.policy.edit')" @click="openMemberPolicy(group, member)"><Pencil /></button><button class="icon-button text-destructive" :title="t('admin.modelProxy.actions.removeMember')" @click="removeMember(group, member)"><X /></button></div>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,9 @@
 package model_proxy
 
-import "testing"
+import (
+	"sort"
+	"testing"
+)
 
 func TestRankAcquireCandidatesUsesSoftTiersAndLatency(t *testing.T) {
 	routes := []availableRoute{
@@ -79,4 +82,114 @@ func assertCandidate(t *testing.T, candidate acquireCandidate, routeID string, l
 	if candidate.route.ID != routeID || candidate.limit != limit {
 		t.Fatalf("candidate=(%s,%d) want (%s,%d)", candidate.route.ID, candidate.limit, routeID, limit)
 	}
+}
+
+// Pure reference ordering for the scheduler policy. Redis tests exercise the
+// production atomic scheduler under real contention.
+type availableRoute struct {
+	route        Route
+	active       int64
+	available    int64
+	latencyMS    int64
+	latencyKnown bool
+}
+
+type acquireCandidate struct {
+	availableRoute
+	limit int
+}
+
+func sortAvailableRoutes(routes []availableRoute) {
+	sort.SliceStable(routes, func(i, j int) bool {
+		if routes[i].route.Priority == routes[j].route.Priority {
+			if routes[i].available == routes[j].available {
+				return routes[i].route.ID < routes[j].route.ID
+			}
+			return routes[i].available > routes[j].available
+		}
+		return routes[i].route.Priority > routes[j].route.Priority
+	})
+}
+
+func rankAcquireCandidates(routes []availableRoute, cursor int64) []acquireCandidate {
+	priorities := make([]int, 0, len(routes))
+	seen := make(map[int]struct{}, len(routes))
+	for _, route := range routes {
+		if route.available <= 0 {
+			continue
+		}
+		if _, ok := seen[route.route.Priority]; !ok {
+			seen[route.route.Priority] = struct{}{}
+			priorities = append(priorities, route.route.Priority)
+		}
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(priorities)))
+
+	result := make([]acquireCandidate, 0, len(routes)*2)
+	for _, priority := range priorities {
+		priorityRoutes := make([]availableRoute, 0, len(routes))
+		for _, route := range routes {
+			if route.route.Priority == priority && route.available > 0 {
+				priorityRoutes = append(priorityRoutes, route)
+			}
+		}
+		result = appendSoftTier(result, priorityRoutes, false, temporaryKeySoftConcurrency)
+		result = appendSoftTier(result, priorityRoutes, true, providedKeySoftConcurrency)
+		sortAvailableRoutes(priorityRoutes)
+		rotateLeadingCapacityTie(priorityRoutes, cursor)
+		for _, route := range priorityRoutes {
+			result = append(result, acquireCandidate{availableRoute: route, limit: route.route.ConcurrencyLimit})
+		}
+	}
+	return result
+}
+
+func rotateLeadingCapacityTie(routes []availableRoute, cursor int64) {
+	if len(routes) < 2 || routes[0].available <= 0 {
+		return
+	}
+	tied := 1
+	for tied < len(routes) && routes[tied].available == routes[0].available {
+		tied++
+	}
+	if tied > 1 {
+		selected := int((cursor - 1) % int64(tied))
+		if selected < 0 {
+			selected = 0
+		}
+		routes[0], routes[selected] = routes[selected], routes[0]
+	}
+}
+
+func appendSoftTier(result []acquireCandidate, routes []availableRoute, providedKey bool, softLimit int) []acquireCandidate {
+	tier := make([]availableRoute, 0, len(routes))
+	for _, route := range routes {
+		limit := softLimit
+		if route.route.ConcurrencyLimit < limit {
+			limit = route.route.ConcurrencyLimit
+		}
+		if route.route.UseProvidedKey == providedKey && route.active < int64(limit) {
+			tier = append(tier, route)
+		}
+	}
+	sort.SliceStable(tier, func(i, j int) bool {
+		if tier[i].latencyKnown != tier[j].latencyKnown {
+			return !tier[i].latencyKnown
+		}
+		if tier[i].latencyKnown && tier[i].latencyMS != tier[j].latencyMS {
+			return tier[i].latencyMS < tier[j].latencyMS
+		}
+		if tier[i].active != tier[j].active {
+			return tier[i].active < tier[j].active
+		}
+		return tier[i].route.ID < tier[j].route.ID
+	})
+	for _, route := range tier {
+		limit := softLimit
+		if route.route.ConcurrencyLimit < limit {
+			limit = route.route.ConcurrencyLimit
+		}
+		result = append(result, acquireCandidate{availableRoute: route, limit: limit})
+	}
+	return result
 }
