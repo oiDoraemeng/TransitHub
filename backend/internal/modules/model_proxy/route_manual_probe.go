@@ -226,17 +226,22 @@ func (s *Service) ListRouteTestModels(ctx context.Context, userID, routeID, grou
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	models := make([]Model, 0, len(available))
+	// Testing accepts native models as well as member aliases. Do not hide the
+	// route's catalog just because a member maps a smaller set of public names.
+	selectable := make(map[string]bool, len(available)+len(route.ModelMapping))
+	for id := range available {
+		selectable[id] = true
+	}
 	if route.ModelMappingEnabled {
 		for alias, target := range route.ModelMapping {
 			if available[target] {
-				models = append(models, Model{ID: alias, Object: "model"})
+				selectable[alias] = true
 			}
 		}
-	} else {
-		for id := range available {
-			models = append(models, Model{ID: id, Object: "model"})
-		}
+	}
+	models := make([]Model, 0, len(selectable))
+	for id := range selectable {
+		models = append(models, Model{ID: id, Object: "model"})
 	}
 	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
 	return models, nil

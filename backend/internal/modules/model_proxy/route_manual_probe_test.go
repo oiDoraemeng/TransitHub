@@ -140,7 +140,7 @@ func TestManualProbePostgresTestsPausedMemberThenRestoresOnlySelectedScope(t *te
 	})
 	ctx := context.Background()
 	models, err := service.ListRouteTestModels(ctx, "user", route.ID, "a", false)
-	if err != nil || len(models) != 1 || models[0].ID != "alias" {
+	if err != nil || len(models) != 2 || models[0].ID != "alias" || models[1].ID != "model" {
 		t.Fatalf("paused model selector=%+v %v", models, err)
 	}
 	result, err := service.TestRouteModel(ctx, "user", route.ID, RouteTestRequest{GroupID: "a", ModelID: "alias", Protocol: "responses"})
@@ -291,7 +291,7 @@ func TestManualProbeModelRefreshUsesSelectedMemberDuringBackgroundRefresh(t *tes
 	memberDone := make(chan error, 1)
 	go func() {
 		models, err := service.ListRouteTestModels(context.Background(), "user", route.ID, "a", true)
-		if err == nil && (len(models) != 1 || models[0].ID != "alias") {
+		if err == nil && (len(models) != 2 || models[0].ID != "alias" || models[1].ID != "model") {
 			err = fmt.Errorf("member catalog=%+v", models)
 		}
 		memberDone <- err
@@ -307,5 +307,34 @@ func TestManualProbeModelRefreshUsesSelectedMemberDuringBackgroundRefresh(t *tes
 	}
 	if err := <-memberDone; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestManualProbeCatalogIncludesAllNativeModelsAndAvailableAliases(t *testing.T) {
+	service, route, _ := manualProbeFixture(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{"data":[{"id":"model"},{"id":"another-model"},{"id":"third-model"}]}`)
+	})
+	ctx := context.Background()
+	mapping := map[string]string{"alias": "model", "another-model": "another-model", "unavailable-alias": "missing-model"}
+	if err := service.UpdateMemberPolicy(ctx, "user", "a", route.ID, UpdateMemberPolicyRequest{ModelMapping: &mapping}); err != nil {
+		t.Fatal(err)
+	}
+	models, err := service.ListRouteTestModels(ctx, "user", route.ID, "a", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"alias", "another-model", "model", "third-model"}
+	if len(models) != len(want) {
+		t.Fatalf("catalog=%+v want %v", models, want)
+	}
+	for i := range want {
+		if models[i].ID != want[i] {
+			t.Fatalf("catalog=%+v want %v", models, want)
+		}
+	}
+	// The test-only catalog must not broaden the member's scheduling policy.
+	eligible, err := service.repository.ListGroupRoutes(ctx, "a", false, "third-model")
+	if err != nil || len(eligible) != 0 {
+		t.Fatalf("native test model changed scheduling: %+v %v", eligible, err)
 	}
 }

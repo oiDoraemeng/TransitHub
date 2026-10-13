@@ -11,6 +11,8 @@ const emit = defineEmits<{ close: []; restored: [] }>()
 const { t } = useI18n()
 const models = ref<ProxyModel[]>([])
 const modelId = ref('')
+const selectedModel = ref('')
+const customModel = '__custom_model__'
 const protocol = ref<RouteTestProtocol>('chat')
 const loadingModels = ref(false)
 const testing = ref(false)
@@ -19,7 +21,6 @@ const result = ref<RouteModelTestResult | null>(null)
 const errorMessage = ref('')
 const controller = new AbortController()
 const busy = computed(() => loadingModels.value || testing.value || restoring.value)
-const modelListId = computed(() => `route-test-models-${props.route.id}-${props.group?.id ?? 'direct'}`)
 const friendlyError = (error: unknown) => {
   const message = error instanceof Error ? error.message : 'admin.modelProxy.errors.request'
   return message.startsWith('admin.') ? t(message) : message
@@ -31,6 +32,7 @@ watch(modelId, model => {
     : name.includes('embedding') ? 'embeddings' : name.includes('gpt-5') || name.includes('codex') ? 'responses' : 'chat'
 })
 watch([modelId, protocol], () => { result.value = null; errorMessage.value = '' })
+watch(selectedModel, model => { modelId.value = model === customModel ? '' : model })
 
 const loadModels = async (refresh = false) => {
   if (busy.value) return
@@ -39,7 +41,10 @@ const loadModels = async (refresh = false) => {
   if (refresh) result.value = null
   try {
     models.value = await listRouteTestModels(props.route.id, props.group?.id, refresh, controller.signal)
-    if (!modelId.value) modelId.value = models.value[0]?.id ?? ''
+    if (!selectedModel.value) selectedModel.value = models.value[0]?.id ?? customModel
+    else if (selectedModel.value !== customModel && !models.value.some(model => model.id === selectedModel.value)) {
+      selectedModel.value = models.value[0]?.id ?? customModel
+    }
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = friendlyError(error)
   } finally { loadingModels.value = false }
@@ -85,11 +90,16 @@ onBeforeUnmount(() => controller.abort())
         </div>
         <div class="min-h-0 space-y-4 overflow-y-auto p-5">
           <p class="text-sm text-muted-foreground">{{ t(group ? 'admin.modelProxy.manualTest.memberHelp' : 'admin.modelProxy.manualTest.routeHelp') }}</p>
-          <label class="grid gap-2 text-sm font-medium">
+          <div class="grid gap-2 text-sm font-medium">
             <span class="flex items-center justify-between gap-2">{{ t('admin.modelProxy.manualTest.model') }}<button type="button" class="inline-flex items-center gap-1 text-xs text-primary disabled:opacity-50" :disabled="busy" @click="loadModels(true)"><Loader2 v-if="loadingModels" class="h-3.5 w-3.5 animate-spin" /><RefreshCw v-else class="h-3.5 w-3.5" />{{ t('admin.modelProxy.manualTest.refreshModels') }}</button></span>
-            <input v-model="modelId" :list="modelListId" required :disabled="busy" :placeholder="t('admin.modelProxy.manualTest.modelPlaceholder')" autocomplete="off" class="border border-border bg-background px-3 py-2 font-normal outline-none focus:border-primary" />
-            <datalist :id="modelListId"><option v-for="model in models" :key="model.id" :value="model.id" /></datalist>
-          </label>
+            <select v-model="selectedModel" :disabled="busy" :aria-label="t('admin.modelProxy.manualTest.model')" class="border border-border bg-background px-3 py-2 font-normal outline-none focus:border-primary">
+              <option v-if="!selectedModel" value="" disabled>{{ t('admin.modelProxy.manualTest.modelPlaceholder') }}</option>
+              <option v-for="model in models" :key="model.id" :value="model.id">{{ model.id }}</option>
+              <option :value="customModel">{{ t('admin.modelProxy.manualTest.customModel') }}</option>
+            </select>
+            <input v-if="selectedModel === customModel" v-model="modelId" required :disabled="busy" :aria-label="t('admin.modelProxy.manualTest.customModel')" :placeholder="t('admin.modelProxy.manualTest.modelPlaceholder')" autocomplete="off" class="border border-border bg-background px-3 py-2 font-normal outline-none focus:border-primary" />
+            <small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.manualTest.modelCount', { count: models.length }) }}</small>
+          </div>
           <label class="grid gap-2 text-sm font-medium"><span>{{ t('admin.modelProxy.manualTest.protocol') }}</span><select v-model="protocol" :disabled="busy" class="border border-border bg-background px-3 py-2 font-normal outline-none focus:border-primary"><option value="chat">OpenAI Chat Completions</option><option value="responses">OpenAI Responses</option><option value="messages">Anthropic Messages</option><option value="gemini">Gemini</option><option value="embeddings">Embeddings</option></select></label>
           <div v-if="result" role="status" aria-live="polite" class="border px-3 py-3 text-sm" :class="result.success ? 'border-signal/30 bg-signal/10 text-signal' : 'border-destructive/30 bg-destructive/10 text-destructive'">
             <div class="flex items-center gap-2 font-medium"><Check v-if="result.success" class="h-4 w-4" />{{ t(result.message) }}</div>
@@ -100,7 +110,7 @@ onBeforeUnmount(() => controller.abort())
         </div>
         <div class="flex flex-wrap justify-end gap-2 border-t border-border px-5 py-3">
           <Button type="button" variant="ghost" :disabled="busy" @click="close">{{ t('admin.modelProxy.cancel') }}</Button>
-          <Button type="submit" variant="secondary" :disabled="busy || !modelId.trim()"><Loader2 v-if="testing" class="h-4 w-4 animate-spin" /><FlaskConical v-else class="h-4 w-4" />{{ t(testing ? 'admin.modelProxy.manualTest.testing' : 'admin.modelProxy.manualTest.run') }}</Button>
+          <Button type="submit" variant="secondary" :disabled="busy || !modelId.trim()" :title="t(testing ? 'admin.modelProxy.manualTest.testing' : 'admin.modelProxy.manualTest.run')" :aria-label="t(testing ? 'admin.modelProxy.manualTest.testing' : 'admin.modelProxy.manualTest.run')"><Loader2 v-if="testing" class="h-4 w-4 animate-spin" /><FlaskConical v-else class="h-4 w-4" /></Button>
           <Button type="button" :disabled="busy || !result?.success || !result.recoveryToken" @click="restore"><Loader2 v-if="restoring" class="h-4 w-4 animate-spin" /><Play v-else class="h-4 w-4" />{{ t('admin.modelProxy.manualTest.restore') }}</Button>
         </div>
       </form>

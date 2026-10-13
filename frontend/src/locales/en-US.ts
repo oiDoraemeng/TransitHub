@@ -190,6 +190,7 @@ export default {
       cleanup: { pending: '{count} temporary keys pending cleanup', retrying: '{count} scheduled for retry', processing: '{count} being cleaned up', routePending: '{count} pending cleanup' },
       circuit: { paused: 'Scheduling paused until {time}', nextProbe: 'Next recovery probe {time}', help: 'Three consecutive failures pause scheduling for 30 minutes. Probes run every 3 minutes and success restores scheduling.' },
       manualTest: {
+        customModel: 'Enter a model manually', modelCount: '{count} models (including available aliases)',
         action: 'Test model', title: 'Test a model and restore scheduling', model: 'Model', modelPlaceholder: 'Select or enter a model', protocol: 'Request protocol', refreshModels: 'Refresh models',
         routeHelp: 'After a successful test, you can manually clear this route’s automatic failure pause.', memberHelp: 'Tests use this member’s key and model mapping. Restoration clears the route’s automatic failure pause and resumes this member. Other manually paused members need separate restoration.',
         run: 'Test model', testing: 'Testing', restore: 'Restore scheduling', succeeded: 'Model test succeeded. You can restore scheduling.', failed: 'Model test failed. Scheduling is unchanged.',

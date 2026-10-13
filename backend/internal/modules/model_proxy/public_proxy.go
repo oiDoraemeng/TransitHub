@@ -22,7 +22,7 @@ const (
 	memoryReplayLimit                     = 1 << 20
 	directMaxAttempts                     = 3
 	smartGroupAttempts                    = 2
-	smartGroupFirstResponseHeaderTimeout  = 15 * time.Second
+	smartGroupFirstResponseHeaderTimeout  = 30 * time.Second
 	smartGroupSecondResponseHeaderTimeout = 10 * time.Second
 	firstSSEEventLimit                    = 1 << 20
 )

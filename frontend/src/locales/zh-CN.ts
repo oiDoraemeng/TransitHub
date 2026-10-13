@@ -190,6 +190,7 @@ export default {
       cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个待自动重试', processing: '{count} 个正在清理', routePending: '{count} 个待清理' },
       circuit: { paused: '调度暂停至 {time}', nextProbe: '下次恢复探测 {time}', help: '连续失败 3 次暂停 30 分钟，每 3 分钟探测，成功后恢复。' },
       manualTest: {
+        customModel: '手动输入模型', modelCount: '共 {count} 个模型（含可用映射别名）',
         action: '模型测试', title: '测试模型并恢复调度', model: '测试模型', modelPlaceholder: '选择或输入模型名称', protocol: '请求协议', refreshModels: '刷新模型',
         routeHelp: '测试成功后，可手动解除这条路由的自动故障暂停。', memberHelp: '使用当前成员的 Key 和模型映射测试。恢复会解除整条路由的自动故障暂停，并恢复当前成员；其他成员的手动暂停需分别恢复。',
         run: '测试模型', testing: '正在测试', restore: '恢复调度', succeeded: '模型测试成功，可手动恢复调度。', failed: '模型测试失败，调度状态保持不变。',
