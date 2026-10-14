@@ -96,7 +96,7 @@ redis.call('ZREM', KEYS[2], ARGV[1])
 if ARGV[4] ~= '' then
   redis.call('HINCRBY', KEYS[6], 'epoch', 1)
   redis.call('HSET', KEYS[6], 'failures', 0, 'probe_attempts', 0)
-  redis.call('HDEL', KEYS[6], 'isolated', 'probe_token', 'probe_spec')
+  redis.call('HDEL', KEYS[6], 'isolated', 'isolated_at', 'probe_token', 'probe_spec')
   redis.call('ZREM', KEYS[7], ARGV[4])
 end
 return 1

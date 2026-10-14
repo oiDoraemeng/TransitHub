@@ -69,7 +69,7 @@ redis.call('HSET', KEYS[1], 'route_id', ARGV[7], 'model_id', ARGV[8], 'protocol'
 redis.call('SADD', KEYS[4], ARGV[1])
 if ARGV[5] == '1' or failures >= tonumber(ARGV[6]) then
   redis.call('HINCRBY', KEYS[1], 'epoch', 1)
-  redis.call('HSET', KEYS[1], 'isolated', 1, 'probe_attempts', 0, 'probe_spec', ARGV[10])
+  redis.call('HSET', KEYS[1], 'isolated', 1, 'isolated_at', now, 'probe_attempts', 0, 'probe_spec', ARGV[10])
   redis.call('ZADD', KEYS[2], now + 60000, ARGV[1])
   return 1
 end
@@ -115,7 +115,7 @@ redis.call('HDEL', KEYS[1], 'probe_token')
 if ARGV[4] == '1' then
   redis.call('HINCRBY', KEYS[1], 'epoch', 1)
   redis.call('HSET', KEYS[1], 'failures', 0, 'probe_attempts', 0)
-  redis.call('HDEL', KEYS[1], 'isolated', 'probe_spec')
+  redis.call('HDEL', KEYS[1], 'isolated', 'isolated_at', 'probe_spec')
   redis.call('ZREM', KEYS[2], ARGV[1])
   return 1
 end
@@ -126,8 +126,17 @@ if ARGV[5] == '0' then
 end
 local attempts = redis.call('HINCRBY', KEYS[1], 'probe_attempts', 1)
 local interval = 600000
-if attempts == 1 then interval = 180000 elseif attempts == 2 then interval = 300000 end
-redis.call('ZADD', KEYS[2], now + interval, ARGV[1])
+local offset = (attempts - 2) * 600000
+if attempts == 1 then interval = 120000; offset = 180000
+elseif attempts == 2 then interval = 120000; offset = 300000
+elseif attempts == 3 then interval = 300000; offset = 600000 end
+-- Anchor the first probes at minutes 1, 3, 5 and 10 of this isolation,
+-- followed by minutes 20, 30, ... . Probe duration must not shift the plan.
+local isolatedAt = tonumber(redis.call('HGET', KEYS[1], 'isolated_at') or '0')
+local nextDue = isolatedAt + offset
+-- Legacy states have no anchor. Delayed work must not trigger catch-up bursts.
+if isolatedAt == 0 or nextDue <= now then nextDue = now + interval end
+redis.call('ZADD', KEYS[2], nextDue, ARGV[1])
 return 0
 `)
 

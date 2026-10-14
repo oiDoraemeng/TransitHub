@@ -20,7 +20,7 @@ func writeRoutePaused(w http.ResponseWriter) {
 
 func writeModelPaused(w http.ResponseWriter) {
 	w.Header().Set("Retry-After", "60")
-	writeOpenAIError(w, http.StatusServiceUnavailable, "model_temporarily_paused", "eligible upstream routes for this model are isolated; streaming recovery probes use 1, 3, 5, then 10 minute intervals; other models remain available")
+	writeOpenAIError(w, http.StatusServiceUnavailable, "model_temporarily_paused", "eligible upstream routes for this model are isolated; recovery probes are scheduled at minutes 1, 3, 5 and 10 after isolation, then every 10 minutes; other models remain available")
 }
 
 // Client cancellation and invalid request parameters say nothing about route

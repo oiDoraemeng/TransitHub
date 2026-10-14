@@ -48,18 +48,22 @@ func TestModelHealthRedisBackoffIsolationAndFencing(t *testing.T) {
 	spec := routeProbeSpec{ModelID: "bad", Path: "/v1/responses"}
 	old := failTestModel(t, limiter, route, spec)
 	id := modelHealthID(route, spec)
-	checkDelay := func(want time.Duration) {
+	checkDueOffset := func(want time.Duration) {
 		t.Helper()
 		due, err := client.ZScore(ctx, modelProbeDueKey(), id).Result()
 		if err != nil {
 			t.Fatal(err)
 		}
-		delay := time.Until(time.UnixMilli(int64(due)))
-		if delay < want-time.Second || delay > want+time.Second {
-			t.Fatalf("probe delay=%s want %s", delay, want)
+		anchor, err := client.HGet(ctx, modelHealthKey(id), "isolated_at").Int64()
+		if err != nil {
+			t.Fatal(err)
+		}
+		offset := time.Duration(int64(due)-anchor) * time.Millisecond
+		if offset != want {
+			t.Fatalf("probe offset=%s want %s", offset, want)
 		}
 	}
-	checkDelay(time.Minute)
+	checkDueOffset(time.Minute)
 	if _, _, err := limiter.AcquireForModel(ctx, route, "bad-traffic", spec); !errors.Is(err, errModelPaused) {
 		t.Fatalf("isolated model allowed: %v", err)
 	}
@@ -68,7 +72,7 @@ func TestModelHealthRedisBackoffIsolationAndFencing(t *testing.T) {
 		t.Fatalf("other model blocked: %v %v", ok, err)
 	}
 	good.Release(ctx)
-	for _, interval := range []time.Duration{3 * time.Minute, 5 * time.Minute, 10 * time.Minute, 10 * time.Minute, 10 * time.Minute} {
+	for _, offset := range []time.Duration{3 * time.Minute, 5 * time.Minute, 10 * time.Minute, 20 * time.Minute, 30 * time.Minute} {
 		forceModelProbeDue(t, client, id)
 		claim, err := limiter.claimModelProbe(ctx, id)
 		if err != nil || claim == nil {
@@ -77,7 +81,7 @@ func TestModelHealthRedisBackoffIsolationAndFencing(t *testing.T) {
 		if _, err := limiter.finishModelProbe(ctx, claim, false, true); err != nil {
 			t.Fatal(err)
 		}
-		checkDelay(interval)
+		checkDueOffset(offset)
 	}
 	if _, err := limiter.ObserveModelResult(ctx, old, true, false, route, spec); err != nil {
 		t.Fatal(err)
@@ -126,7 +130,68 @@ func TestModelHealthRedisBackoffIsolationAndFencing(t *testing.T) {
 	if newLease.modelEpoch == old.modelEpoch {
 		t.Fatal("model recovery didn't fence old requests")
 	}
-	checkDelay(time.Minute)
+	checkDueOffset(time.Minute)
+}
+
+func TestModelProbeMilestonesAndDelayedWork(t *testing.T) {
+	limiter, client := redisTestLimiter(t)
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name     string
+		attempts int
+		elapsed  time.Duration
+		next     time.Duration
+		fallback time.Duration
+		legacy   bool
+	}{
+		{name: "first probe takes 30 seconds", elapsed: 90 * time.Second, next: 3 * time.Minute},
+		{name: "second probe takes 30 seconds", attempts: 1, elapsed: 210 * time.Second, next: 5 * time.Minute},
+		{name: "third probe takes 30 seconds", attempts: 2, elapsed: 330 * time.Second, next: 10 * time.Minute},
+		{name: "fourth probe takes 30 seconds", attempts: 3, elapsed: 630 * time.Second, next: 20 * time.Minute},
+		{name: "missed milestone avoids immediate catch-up", elapsed: 4 * time.Minute, fallback: 2 * time.Minute},
+		{name: "legacy isolation uses corrected interval", legacy: true, fallback: 2 * time.Minute},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			route := healthTestRoute(t, client)
+			spec := routeProbeSpec{ModelID: "bad", Path: "/v1/responses"}
+			failTestModel(t, limiter, route, spec)
+			id := modelHealthID(route, spec)
+			now, err := client.Time(ctx).Result()
+			if err != nil {
+				t.Fatal(err)
+			}
+			anchor := now.Add(-tc.elapsed).UnixMilli()
+			if err := client.HSet(ctx, modelHealthKey(id), "isolated_at", anchor, "probe_attempts", tc.attempts).Err(); err != nil {
+				t.Fatal(err)
+			}
+			if tc.legacy {
+				if err := client.HDel(ctx, modelHealthKey(id), "isolated_at").Err(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			forceModelProbeDue(t, client, id)
+			claim, err := limiter.claimModelProbe(ctx, id)
+			if err != nil || claim == nil {
+				t.Fatalf("claim=%+v err=%v", claim, err)
+			}
+			if _, err := limiter.finishModelProbe(ctx, claim, false, true); err != nil {
+				t.Fatal(err)
+			}
+			due, err := client.ZScore(ctx, modelProbeDueKey(), id).Result()
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := anchor + tc.next.Milliseconds()
+			if tc.fallback != 0 {
+				want = now.Add(tc.fallback).UnixMilli()
+				if delta := int64(due) - want; delta < 0 || delta > 1000 {
+					t.Fatalf("fallback due=%v want near %d", due, want)
+				}
+			} else if int64(due) != want {
+				t.Fatalf("milestone due=%v want %d", due, want)
+			}
+		})
+	}
 }
 
 func TestProxyModel503KeepsNineOtherModelsAvailable(t *testing.T) {
