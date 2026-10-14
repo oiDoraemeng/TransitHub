@@ -142,22 +142,6 @@ func groupModelsWithMappings(group *SmartGroup) []Model {
 }
 
 func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, route Route) {
-	leaseID, _ := randomID("req_")
-	lease, ok, err := s.limiter.Acquire(incoming.Context(), route, newLeaseID(leaseID, route.ID))
-	if errors.Is(err, errRoutePaused) {
-		writeRoutePaused(w)
-		return
-	}
-	if err != nil {
-		writeOpenAIError(w, http.StatusServiceUnavailable, "concurrency_backend_unavailable", "concurrency service is unavailable")
-		return
-	}
-	if !ok {
-		w.Header().Set("Retry-After", "1")
-		writeOpenAIError(w, http.StatusTooManyRequests, "route_concurrency_exceeded", "proxy route concurrency is full")
-		return
-	}
-	defer lease.Release(context.Background())
 	source := incoming.Body
 	if source == nil {
 		source = http.NoBody
@@ -174,6 +158,26 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 	defer replay.Close()
 	modelID, _ := requestModelID(incoming, replay)
 	probeSpec := routeProbeSpec{ModelID: modelID, Path: incoming.URL.Path}
+	leaseID, _ := randomID("req_")
+	lease, ok, err := s.limiter.AcquireForModel(incoming.Context(), route, newLeaseID(leaseID, route.ID), probeSpec)
+	if errors.Is(err, errModelPaused) {
+		writeModelPaused(w)
+		return
+	}
+	if errors.Is(err, errRoutePaused) {
+		writeRoutePaused(w)
+		return
+	}
+	if err != nil {
+		writeOpenAIError(w, http.StatusServiceUnavailable, "concurrency_backend_unavailable", "concurrency service is unavailable")
+		return
+	}
+	if !ok {
+		w.Header().Set("Retry-After", "1")
+		writeOpenAIError(w, http.StatusTooManyRequests, "route_concurrency_exceeded", "proxy route concurrency is full")
+		return
+	}
+	defer lease.Release(context.Background())
 
 	var lastStatus int
 	var lastResponse *http.Response
@@ -192,20 +196,23 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 		if attemptErr == nil && !retryable {
 			completed, readErr := s.writeUpstreamResponse(w, response)
 			if completed || readErr != nil || response.StatusCode >= 300 {
-				s.observeRouteRequest(incoming.Context(), lease, probeSpec, response, readErr)
+				s.observeRouteRequest(incoming.Context(), lease, probeSpec, response, readErr, route)
 			}
 			return
 		}
 		if response != nil {
 			lastStatus = response.StatusCode
 			response.Body.Close()
+			if responseHealth(response).modelMissing {
+				break
+			}
 		}
 		if attempt+1 < directMaxAttempts && waitForProxyRetry(incoming.Context(), attempt) {
 			continue
 		}
 		break
 	}
-	s.observeRouteRequest(incoming.Context(), lease, probeSpec, lastResponse, lastAttemptErr)
+	s.observeRouteRequest(incoming.Context(), lease, probeSpec, lastResponse, lastAttemptErr, route)
 	message := fmt.Sprintf("upstream remained unavailable after %d automatic attempts", attempts)
 	if lastStatus != 0 {
 		message += fmt.Sprintf(" (last status %d)", lastStatus)
@@ -293,10 +300,15 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	}
 	requestID, _ := randomID("req_")
 	remaining := append([]Route(nil), eligible...)
+	requestSpec := routeProbeSpec{GroupID: group.ID, ModelID: modelID, Path: incoming.URL.Path}
 	var lastErr error
 	rateLimited := false
 	for len(remaining) > 0 {
-		lease, route, acquireErr := s.limiter.AcquireBest(incoming.Context(), remaining, requestID)
+		lease, route, acquireErr := s.limiter.AcquireBest(incoming.Context(), remaining, requestID, requestSpec)
+		if errors.Is(acquireErr, errModelPaused) {
+			writeModelPaused(w)
+			return
+		}
 		if errors.Is(acquireErr, errRoutePaused) {
 			writeRoutePaused(w)
 			return
@@ -329,7 +341,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		attempts := 0
 		var lastResponse *http.Response
 		var lastAttemptErr error
-		probeSpec := routeProbeSpec{GroupID: group.ID, ModelID: modelID, Path: incoming.URL.Path}
+		probeSpec := requestSpec
 		response, attemptErr := attemptSmartGroupMember(incoming.Context(), func(responseHeaderTimeout time.Duration) (*http.Response, error) {
 			if attempts > 0 {
 				allowed, err := s.limiter.routeRetryAllowed(incoming.Context(), lease)
@@ -350,7 +362,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		if attemptErr != nil {
 			// A member's first attempt and retry are one request outcome. Record
 			// it once before falling back to another member, which has its own health.
-			s.observeRouteRequest(incoming.Context(), lease, probeSpec, lastResponse, lastAttemptErr)
+			s.observeRouteRequest(incoming.Context(), lease, probeSpec, lastResponse, lastAttemptErr, *route)
 			lastErr = fmt.Errorf("member %s failed after %d attempts: %w", route.Name, attempts, attemptErr)
 			lease.Release(context.Background())
 			if incoming.Context().Err() != nil {
@@ -360,13 +372,13 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		}
 		completed, readErr := s.writeUpstreamResponse(w, response)
 		if completed || readErr != nil {
-			s.observeRouteRequest(incoming.Context(), lease, probeSpec, response, readErr)
+			s.observeRouteRequest(incoming.Context(), lease, probeSpec, response, readErr, *route)
 		}
 		lease.Release(context.Background())
 		return
 	}
 	if lastErr != nil {
-		writeOpenAIError(w, http.StatusBadGateway, "all_upstreams_failed", lastErr.Error())
+		writeOpenAIError(w, http.StatusBadGateway, "model_upstreams_failed", "upstream routes for the requested model failed: "+lastErr.Error())
 		return
 	}
 	w.Header().Set("Retry-After", "1")
@@ -390,6 +402,9 @@ func attemptSmartGroupMember(ctx context.Context, attempt func(time.Duration) (*
 		if response != nil {
 			lastErr = fmt.Errorf("upstream returned %d", response.StatusCode)
 			response.Body.Close()
+			if responseHealth(response).modelMissing {
+				return nil, lastErr
+			}
 		} else if err != nil {
 			lastErr = err
 		} else {
@@ -612,6 +627,7 @@ func (s *Service) performAttemptWithResponseHeaderTimeout(incoming *http.Request
 	} else if deadlineCleanup == nil {
 		cleanup()
 	}
+	trackResponseHealth(response)
 	return response, retryable, nil
 }
 

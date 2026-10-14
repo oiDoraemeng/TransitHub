@@ -25,11 +25,13 @@ var errRoutePaused = errors.New("proxy route is temporarily paused")
 var routeRetryAllowedScript = redis.NewScript(routeHealthLua + `
 local untilMS = resumeExpired(KEYS[1], KEYS[2], ARGV[1], clockMS())
 if untilMS > 0 or tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0') ~= tonumber(ARGV[2]) then return 0 end
+if ARGV[3] ~= '' and (redis.call('HGET', KEYS[3], 'isolated') == '1'
+   or tonumber(redis.call('HGET', KEYS[3], 'epoch') or '0') ~= tonumber(ARGV[4])) then return 0 end
 return 1
 `)
 
 func (l *Limiter) routeRetryAllowed(ctx context.Context, lease *Lease) (bool, error) {
-	result, err := routeRetryAllowedScript.Run(ctx, l.redis, []string{healthKey(lease.routeID), probeDueKey()}, lease.routeID, lease.epoch).Int64()
+	result, err := routeRetryAllowedScript.Run(ctx, l.redis, []string{healthKey(lease.routeID), probeDueKey(), modelHealthKey(lease.modelHealthID)}, lease.routeID, lease.epoch, lease.modelHealthID, lease.modelEpoch).Int64()
 	return result == 1, err
 }
 
@@ -39,8 +41,10 @@ type routeProbeSpec struct {
 	Path    string `json:"path"`
 }
 
-func healthKey(routeID string) string { return "proxy:health:{routes}:" + routeID }
-func probeDueKey() string             { return "proxy:probe-due:{routes}" }
+// Version the old route-wide counters: legacy 5xx pauses contain no failure
+// classification and must not disable healthy models after this upgrade.
+func healthKey(routeID string) string { return "proxy:health-v2:{routes}:" + routeID }
+func probeDueKey() string             { return "proxy:probe-due-v2:{routes}" }
 
 // Epochs fence results from requests started before a pause or recovery. A late
 // success must never reopen a circuit, and a late failure must never close it.
@@ -171,7 +175,7 @@ func (l *Limiter) PopulateRouteRuntime(ctx context.Context, routes []Route) erro
 			}
 		}
 	}
-	return nil
+	return l.populateModelRuntime(ctx, routes)
 }
 
 func (l *Limiter) ObserveRouteResult(ctx context.Context, lease *Lease, success bool, spec routeProbeSpec) (bool, error) {

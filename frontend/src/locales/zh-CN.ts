@@ -188,11 +188,11 @@ export default {
       form: { name: '名称', site: '上游站点', group: '分组（可选）', proxy: '模型出口代理（可选）', proxyHelp: '仅模型请求使用此代理。代理停用或不可用时请求会失败，不会回退到直连。', concurrency: '并发额度', enabled: '创建后立即启用', selectSite: '选择站点', selectGroup: '选择分组', noGroup: '不选择分组，使用预置上游 Key', preparedKeyBinding: '预置上游 Key', upstreamKey: '预置上游 Key', upstreamKeyKeep: '留空则保留当前 Key', upstreamKeyHelp: 'Key 会加密保存，并作为该路由在所有智能分组中的默认上游凭据。', upstreamKeyRequired: '不选择分组时必须填写预置上游 Key。' },
       actions: { reveal: '查看 Key', rotate: '轮换 Key', edit: '编辑', delete: '删除', test: '测试代理', copy: '复制', addMember: '添加成员', removeMember: '移除成员' },
       cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个待自动重试', processing: '{count} 个正在清理', routePending: '{count} 个待清理' },
-      circuit: { paused: '调度暂停至 {time}', nextProbe: '下次恢复探测 {time}', help: '连续 3 个请求（含重试）最终失败后暂停 30 分钟，每 3 分钟流式探测，成功后恢复。' },
+      circuit: { unavailable: '不可用', modelSchedule: '仅隔离以上模型。流式探测间隔：1 → 3 → 5 → 10 分钟，之后每 10 分钟。', paused: '整条路由暂停至 {time}', nextProbe: '下次恢复探测 {time}', help: '整条路由的连接或凭据连续 3 个请求最终失败后暂停 30 分钟，每 3 分钟流式探测。', modelPaused: '模型 {model} 已隔离', modelSummary: '当前隔离 {count} 个路由模型，其他模型仍可调度。', modelHelp: '同一模型连续 3 个请求（含重试）最终失败才隔离；明确的模型不存在立即隔离。按 1、3、5、10 分钟间隔流式探测，后续每 10 分钟一次，成功恢复。' },
       manualTest: {
         customModel: '手动输入模型', modelCount: '共 {count} 个模型（含可用映射别名）',
         action: '模型测试', title: '测试模型并恢复调度', model: '测试模型', modelPlaceholder: '选择或输入模型名称', protocol: '请求协议', refreshModels: '刷新模型',
-        routeHelp: '测试成功后，可手动解除这条路由的自动故障暂停。', memberHelp: '使用当前成员的 Key 和模型映射测试。恢复会解除整条路由的自动故障暂停，并恢复当前成员；其他成员的手动暂停需分别恢复。',
+        routeHelp: '测试成功后，可手动恢复所选模型，并解除连接或凭据故障造成的整条路由暂停；其他模型的隔离状态保持。', memberHelp: '使用当前成员的 Key 和模型映射测试。恢复所选模型、整条路由的连接或凭据故障暂停及当前成员的手动暂停；其他模型或成员需分别恢复。',
         run: '测试模型', testing: '正在测试', restore: '恢复调度', succeeded: '模型测试成功，可手动恢复调度。', failed: '模型测试失败，调度状态保持不变。',
         latency: '耗时 {ms} ms', validFor: '测试结果有效期为 5 分钟，点击“恢复调度”后生效。', restored: '已恢复「{name}」的调度。',
         busy: '路由正在测试或硬并发容量已满，请稍后重试。', disabled: '请先启用路由及所在智能分组。', modelsFailed: '获取模型失败，可输入模型名称后测试。',

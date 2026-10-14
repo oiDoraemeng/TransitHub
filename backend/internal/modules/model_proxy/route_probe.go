@@ -18,6 +18,11 @@ func writeRoutePaused(w http.ResponseWriter) {
 	writeOpenAIError(w, http.StatusServiceUnavailable, "route_temporarily_paused", "eligible upstream routes are temporarily paused; recovery probes run every 3 minutes")
 }
 
+func writeModelPaused(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", "60")
+	writeOpenAIError(w, http.StatusServiceUnavailable, "model_temporarily_paused", "eligible upstream routes for this model are isolated; streaming recovery probes use 1, 3, 5, then 10 minute intervals; other models remain available")
+}
+
 // Client cancellation and invalid request parameters say nothing about route
 // health. Other failures (including authentication, quota and transport errors)
 // count once per completed route request, after all its retries have finished.
@@ -25,13 +30,13 @@ func routeRequestResult(ctx context.Context, response *http.Response, err error)
 	if ctx.Err() != nil {
 		return false, false
 	}
-	if response != nil && (response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusUnprocessableEntity) {
+	if response != nil && (response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusUnprocessableEntity) && !responseHealth(response).modelMissing {
 		return false, false
 	}
-	return err == nil && response != nil && response.StatusCode >= 200 && response.StatusCode < 300, true
+	return err == nil && response != nil && response.StatusCode >= 200 && response.StatusCode < 300 && !responseHealth(response).failed, true
 }
 
-func (s *Service) observeRouteRequest(ctx context.Context, lease *Lease, spec routeProbeSpec, response *http.Response, requestErr error) bool {
+func (s *Service) observeRouteRequest(ctx context.Context, lease *Lease, spec routeProbeSpec, response *http.Response, requestErr error, route Route) bool {
 	if s.limiter == nil || lease == nil {
 		return false
 	}
@@ -41,7 +46,20 @@ func (s *Service) observeRouteRequest(ctx context.Context, lease *Lease, spec ro
 	}
 	stateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
-	paused, err := s.limiter.ObserveRouteResult(stateCtx, lease, success, spec)
+	var paused bool
+	var err error
+	health := responseHealth(response)
+	// An HTTP response proves the route is reachable. 5xx/429/403 can be
+	// specific to the requested model; only credential-wide failures promote
+	// them to a route circuit. Transport errors retain the route circuit.
+	modelScoped := lease.modelHealthID != "" && response != nil &&
+		(health.modelMissing || response.StatusCode != http.StatusUnauthorized && !health.credentialError)
+	if modelScoped {
+		paused, err = s.limiter.ObserveModelResult(stateCtx, lease, success, health.modelMissing, route, spec)
+	}
+	if !modelScoped {
+		paused, err = s.limiter.ObserveRouteResult(stateCtx, lease, success, spec)
+	}
 	if err != nil {
 		log.Printf("[model-proxy] route health update route_id=%s err=%v", lease.routeID, err)
 	}
@@ -53,7 +71,11 @@ func (s *Service) routeProbeLoop(ctx context.Context) {
 	if s.limiter == nil {
 		return
 	}
-	jobs := make(chan string, routeProbeWorkers)
+	type probeJob struct {
+		id    string
+		model bool
+	}
+	jobs := make(chan probeJob, routeProbeWorkers)
 	var workers sync.WaitGroup
 	for index := 0; index < routeProbeWorkers; index++ {
 		workers.Add(1)
@@ -63,11 +85,15 @@ func (s *Service) routeProbeLoop(ctx context.Context) {
 				select {
 				case <-ctx.Done():
 					return
-				case routeID, ok := <-jobs:
+				case job, ok := <-jobs:
 					if !ok {
 						return
 					}
-					s.probePausedRoute(ctx, routeID)
+					if job.model {
+						s.probeIsolatedModel(ctx, job.id)
+					} else {
+						s.probePausedRoute(ctx, job.id)
+					}
 				}
 			}
 		}()
@@ -79,18 +105,32 @@ func (s *Service) routeProbeLoop(ctx context.Context) {
 	for {
 		stateCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		due, err := s.limiter.dueRouteProbes(stateCtx)
+		modelDue, modelErr := s.limiter.dueModelProbes(stateCtx)
 		cancel()
-		if err == nil {
-			for _, routeID := range due {
+		if err != nil && ctx.Err() == nil {
+			log.Printf("[model-proxy] list recovery probes: %v", err)
+		}
+		if modelErr != nil && ctx.Err() == nil {
+			log.Printf("[model-proxy] list model recovery probes: %v", modelErr)
+		}
+		// Interleave both queues so a backlog of route failures does not starve
+		// isolated models waiting for their first recovery probe.
+		for i := 0; i < len(due) || i < len(modelDue); i++ {
+			batch := make([]probeJob, 0, 2)
+			if i < len(modelDue) {
+				batch = append(batch, probeJob{id: modelDue[i], model: true})
+			}
+			if i < len(due) {
+				batch = append(batch, probeJob{id: due[i]})
+			}
+			for _, job := range batch {
 				select {
-				case jobs <- routeID:
+				case jobs <- job:
 				case <-ctx.Done():
 					return
-				default: // Leave excess work in Redis for the next scan.
+				default:
 				}
 			}
-		} else if ctx.Err() == nil {
-			log.Printf("[model-proxy] list recovery probes: %v", err)
 		}
 		select {
 		case <-ctx.Done():

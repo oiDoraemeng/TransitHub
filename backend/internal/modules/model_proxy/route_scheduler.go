@@ -17,11 +17,16 @@ local routes = cjson.decode(ARGV[1])
 local best = nil
 local tied = {}
 local paused = 0
+local modelPaused = 0
 for index, route in ipairs(routes) do
-  local offset = 3 + (index - 1) * 3
+  local offset = 3 + (index - 1) * 4
   local untilMS = resumeExpired(KEYS[offset + 2], KEYS[2], route.id, now)
+  local isolated = route.modelHealthID ~= '' and redis.call('HGET', KEYS[offset + 3], 'isolated') == '1'
   if untilMS > now or route.manualPause then
     paused = paused + 1
+  elseif isolated then
+    paused = paused + 1
+    modelPaused = modelPaused + 1
   else
     redis.call('ZREMRANGEBYSCORE', KEYS[offset], '-inf', now)
     local active = redis.call('ZCARD', KEYS[offset])
@@ -49,7 +54,7 @@ for index, route in ipairs(routes) do
     end
   end
 end
-if best == nil then return {0, 0, paused} end
+if best == nil then return {0, 0, paused, 0, modelPaused} end
 if best.tier == 2 then
   table.sort(tied, function(a,b) return a.id < b.id end)
   local cursor = redis.call('INCR', KEYS[1])
@@ -57,26 +62,32 @@ if best.tier == 2 then
 end
 redis.call('ZADD', KEYS[best.offset], now + tonumber(ARGV[3]), ARGV[2])
 redis.call('PEXPIRE', KEYS[best.offset], ARGV[3])
-return {best.index, tonumber(redis.call('HGET', KEYS[best.offset + 2], 'epoch') or '0'), paused}
+return {best.index, tonumber(redis.call('HGET', KEYS[best.offset + 2], 'epoch') or '0'), paused,
+        tonumber(redis.call('HGET', KEYS[best.offset + 3], 'epoch') or '0'), modelPaused}
 `)
 
 type schedulerRoute struct {
-	ID          string `json:"id"`
-	Priority    int    `json:"priority"`
-	Limit       int    `json:"limit"`
-	Provided    bool   `json:"provided"`
-	ManualPause bool   `json:"manualPause"`
+	ID            string `json:"id"`
+	Priority      int    `json:"priority"`
+	Limit         int    `json:"limit"`
+	Provided      bool   `json:"provided"`
+	ManualPause   bool   `json:"manualPause"`
+	ModelHealthID string `json:"modelHealthID"`
 }
 
-func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID string) (*Lease, *Route, error) {
+func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID string, specs ...routeProbeSpec) (*Lease, *Route, error) {
 	if len(routes) == 0 {
 		return nil, nil, nil
 	}
 	keys := []string{roundRobinKey(), probeDueKey()}
 	input := make([]schedulerRoute, 0, len(routes))
 	for _, route := range routes {
-		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID), healthKey(route.ID))
-		input = append(input, schedulerRoute{route.ID, route.Priority, route.ConcurrencyLimit, route.UseProvidedKey, route.SchedulingPaused})
+		modelID := ""
+		if len(specs) > 0 {
+			modelID = modelHealthID(route, specs[0])
+		}
+		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID), healthKey(route.ID), modelHealthKey(modelID))
+		input = append(input, schedulerRoute{route.ID, route.Priority, route.ConcurrencyLimit, route.UseProvidedKey, route.SchedulingPaused, modelID})
 	}
 	encoded, err := json.Marshal(input)
 	if err != nil {
@@ -87,11 +98,14 @@ func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(values) != 3 {
+	if len(values) != 5 {
 		return nil, nil, errors.New("invalid route acquisition response")
 	}
 	if values[0] == 0 {
 		if values[2] == int64(len(routes)) {
+			if values[4] > 0 {
+				return nil, nil, errModelPaused
+			}
 			return nil, nil, errRoutePaused
 		}
 		return nil, nil, nil
@@ -101,5 +115,5 @@ func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID
 		return nil, nil, errors.New("invalid selected route index")
 	}
 	route := routes[index]
-	return l.newLease(route.ID, leaseID, values[1], ""), &route, nil
+	return l.newLease(route.ID, leaseID, values[1], "", modelLeaseState{input[index].ModelHealthID, values[3], ""}), &route, nil
 }

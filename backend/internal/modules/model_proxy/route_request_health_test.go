@@ -35,7 +35,7 @@ func TestSmartGroupRedisCountsRequestsAfterOneRetry(t *testing.T) {
 		if calls.Load() != int64(index*smartGroupAttempts) {
 			t.Fatalf("request %d upstream calls=%d", index, calls.Load())
 		}
-		if failures, err := client.HGet(context.Background(), healthKey(route.ID), "failures").Int(); err != nil || failures != index {
+		if failures, err := client.HGet(context.Background(), modelHealthKey(modelHealthID(route, routeProbeSpec{ModelID: "model", Path: "/v1/responses"})), "failures").Int(); err != nil || failures != index {
 			t.Fatalf("request %d failures=%d err=%v", index, failures, err)
 		}
 	}

@@ -7,6 +7,7 @@ import {
 } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
 import RouteModelTestDialog from '../components/RouteModelTestDialog.vue'
+import RouteModelHealthStatus from '../components/RouteModelHealthStatus.vue'
 import {
   addProxySmartGroupMember, createModelEgressProxy, createProxyRoute, createProxySmartGroup,
   deleteModelEgressProxy, deleteProxyRoute, deleteProxySmartGroup, getProxyCleanupStatus,
@@ -18,7 +19,7 @@ import {
 } from '../api/modelProxy'
 import type {
   CleanupStatus, ModelEgressProxy, ModelEgressProxyInput, ProxyGroup, ProxyRoute,
-  ProxyRouteInput, ProxySite, ProxySmartGroup,
+  ProxyModelHealth, ProxyRouteInput, ProxySite, ProxySmartGroup, RouteTestProtocol,
 } from '../types/modelProxy'
 
 const { t } = useI18n()
@@ -36,8 +37,9 @@ const errorMessage = ref('')
 const noticeMessage = ref('')
 const expandedGroups = ref(new Set<string>())
 const memberPausePending = ref(new Set<string>())
-const routeTestTarget = ref<{ route: ProxyRoute; group?: ProxySmartGroup } | null>(null)
+const routeTestTarget = ref<{ route: ProxyRoute; group?: ProxySmartGroup; model?: string; protocol?: RouteTestProtocol } | null>(null)
 const autoPausedRoutes = computed(() => routes.value.filter(route => route.pausedUntil))
+const isolatedModelCount = computed(() => routes.value.reduce((count, route) => count + (route.modelHealth?.length ?? 0), 0))
 const manuallyPausedMembers = computed(() => smartGroups.value.flatMap(group => group.members.filter(member => member.schedulingPaused)))
 let pollTimer: number | undefined
 let loadInProgress = false
@@ -441,6 +443,14 @@ const openRouteTest = (route: ProxyRoute, group?: ProxySmartGroup) => {
   routeTestTarget.value = { route, group }
 }
 
+const openIsolatedModelTest = (route: ProxyRoute, health: ProxyModelHealth, group?: ProxySmartGroup) => {
+  const alias = route.modelMappingEnabled
+    ? Object.entries(route.modelMapping ?? {}).find(([, target]) => target === health.modelId)?.[0]
+    : undefined
+  const protocol = ({ '/v1/chat/completions': 'chat', '/v1/responses': 'responses', '/v1/messages': 'messages', '/v1/embeddings': 'embeddings', gemini: 'gemini' } as Record<string, RouteTestProtocol>)[health.protocol]
+  routeTestTarget.value = { route, group, model: alias ?? health.modelId, protocol }
+}
+
 const onSchedulingRestored = async () => {
   const target = routeTestTarget.value
   if (!target) return
@@ -540,15 +550,16 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
         <span>{{ errorMessage }}</span><button title="Close" @click="errorMessage = ''"><X class="h-4 w-4" /></button>
       </div>
       <div v-if="noticeMessage" class="mb-4 flex items-center gap-2 border border-signal/30 bg-signal/10 px-4 py-3 text-sm text-signal"><Check class="h-4 w-4" />{{ noticeMessage }}</div>
-      <div v-if="autoPausedRoutes.length || manuallyPausedMembers.length" role="status" aria-live="polite" class="mb-4 border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
-        <div class="flex items-center gap-2 font-medium"><Pause class="h-4 w-4" />{{ t('admin.modelProxy.memberPause.summary', { auto: autoPausedRoutes.length, manual: manuallyPausedMembers.length }) }}</div>
-        <p class="mt-1">{{ t('admin.modelProxy.memberPause.summaryHelp') }}</p>
+      <div v-if="autoPausedRoutes.length || isolatedModelCount || manuallyPausedMembers.length" role="status" aria-live="polite" class="mb-4 space-y-1 rounded-xl border border-warning/25 bg-warning/5 px-4 py-2.5 text-sm text-warning">
+        <div v-if="autoPausedRoutes.length || manuallyPausedMembers.length" class="flex items-center gap-2 font-medium"><Pause class="h-4 w-4" />{{ t('admin.modelProxy.memberPause.summary', { auto: autoPausedRoutes.length, manual: manuallyPausedMembers.length }) }}</div>
+        <p v-if="autoPausedRoutes.length || manuallyPausedMembers.length" class="text-xs text-muted-foreground">{{ t('admin.modelProxy.memberPause.summaryHelp') }}</p>
+        <p v-if="isolatedModelCount" class="font-medium" :title="t('admin.modelProxy.circuit.modelHelp')">{{ t('admin.modelProxy.circuit.modelSummary', { count: isolatedModelCount }) }}</p>
       </div>
 
-      <div class="mb-3 inline-flex h-9 items-center border border-border bg-surface p-1" role="tablist">
-        <button type="button" role="tab" :aria-selected="activeTab === 'routes'" class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'routes' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click.stop="selectTab('routes')"><Route class="h-4 w-4" />{{ t('admin.modelProxy.routes.tab') }}</button>
-        <button type="button" role="tab" :aria-selected="activeTab === 'groups'" class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'groups' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click.stop="selectTab('groups')"><Layers3 class="h-4 w-4" />{{ t('admin.modelProxy.groups.tab') }}</button>
-        <button type="button" role="tab" :aria-selected="activeTab === 'proxies'" class="flex h-8 items-center gap-2 px-4 text-sm font-medium" :class="activeTab === 'proxies' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click.stop="selectTab('proxies')"><Network class="h-4 w-4" />{{ t('admin.modelProxy.proxies.tab') }}</button>
+      <div class="mb-3 inline-flex h-10 items-center rounded-xl border border-border bg-surface p-1" role="tablist">
+        <button type="button" role="tab" :aria-selected="activeTab === 'routes'" class="flex h-8 items-center gap-2 rounded-lg px-4 text-sm font-medium" :class="activeTab === 'routes' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click.stop="selectTab('routes')"><Route class="h-4 w-4" />{{ t('admin.modelProxy.routes.tab') }}</button>
+        <button type="button" role="tab" :aria-selected="activeTab === 'groups'" class="flex h-8 items-center gap-2 rounded-lg px-4 text-sm font-medium" :class="activeTab === 'groups' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click.stop="selectTab('groups')"><Layers3 class="h-4 w-4" />{{ t('admin.modelProxy.groups.tab') }}</button>
+        <button type="button" role="tab" :aria-selected="activeTab === 'proxies'" class="flex h-8 items-center gap-2 rounded-lg px-4 text-sm font-medium" :class="activeTab === 'proxies' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'" @click.stop="selectTab('proxies')"><Network class="h-4 w-4" />{{ t('admin.modelProxy.proxies.tab') }}</button>
       </div>
 
       <div v-if="loading" class="flex min-h-64 items-center justify-center text-muted-foreground"><Loader2 class="mr-2 h-5 w-5 animate-spin" />{{ t('admin.modelProxy.loading') }}</div>
@@ -568,7 +579,7 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
                 <td class="px-3 py-2"><span>{{ routeItem.modelCount }}</span><span v-if="routeItem.modelSyncError" class="ml-2 text-xs text-warning" :title="routeItem.modelSyncError">{{ t('admin.modelProxy.stale') }}</span></td>
                 <td class="px-3 py-2 font-mono text-xs text-muted-foreground">{{ routeItem.keyPreview }}</td>
                 <!-- Runtime pause is independent of the administrator's enabled flag. -->
-                <td class="px-3 py-2"><button class="inline-flex items-center gap-1.5" @click="toggleRoute(routeItem)"><span class="h-2 w-2 rounded-full" :class="routeItem.enabled ? 'bg-signal' : 'bg-muted-foreground'" />{{ routeItem.enabled ? t('admin.modelProxy.enabled') : t('admin.modelProxy.disabled') }}</button><div v-if="routeItem.pausedUntil" class="text-xs text-warning" :title="t('admin.modelProxy.circuit.help')">{{ t('admin.modelProxy.circuit.paused', { time: formatDate(routeItem.pausedUntil) }) }}<div v-if="routeItem.nextProbeAt">{{ t('admin.modelProxy.circuit.nextProbe', { time: formatDate(routeItem.nextProbeAt) }) }}</div></div><div v-if="routeItem.cleanupPending" class="text-xs text-warning">{{ t('admin.modelProxy.cleanup.routePending', { count: routeItem.cleanupPending }) }}</div></td>
+                <td class="px-3 py-2"><button class="inline-flex items-center gap-1.5" @click="toggleRoute(routeItem)"><span class="h-2 w-2 rounded-full" :class="routeItem.enabled ? 'bg-signal' : 'bg-muted-foreground'" />{{ routeItem.enabled ? t('admin.modelProxy.enabled') : t('admin.modelProxy.disabled') }}</button><div v-if="routeItem.pausedUntil" class="text-xs text-warning" :title="t('admin.modelProxy.circuit.help')">{{ t('admin.modelProxy.circuit.paused', { time: formatDate(routeItem.pausedUntil) }) }}<div v-if="routeItem.nextProbeAt">{{ t('admin.modelProxy.circuit.nextProbe', { time: formatDate(routeItem.nextProbeAt) }) }}</div></div><RouteModelHealthStatus :health="routeItem.modelHealth" :disabled="!routeItem.enabled" @test="openIsolatedModelTest(routeItem, $event)" /><div v-if="routeItem.cleanupPending" class="text-xs text-warning">{{ t('admin.modelProxy.cleanup.routePending', { count: routeItem.cleanupPending }) }}</div></td>
                 <td class="px-3 py-2"><div class="flex justify-end gap-0.5"><button type="button" class="icon-button disabled:opacity-50" :disabled="!routeItem.enabled" :title="t('admin.modelProxy.manualTest.action')" :aria-label="t('admin.modelProxy.manualTest.action')" @click="openRouteTest(routeItem)"><FlaskConical /></button><button class="icon-button" :title="t('admin.modelProxy.actions.copy')" @click="copyOwnerKey(routeItem, 'route')"><Clipboard /></button><button class="icon-button" :title="t('admin.modelProxy.actions.rotate')" @click="rotateKey(routeItem, 'route')"><RefreshCw /></button><button class="icon-button" :title="t('admin.modelProxy.actions.edit')" @click="openEditRoute(routeItem)"><Pencil /></button><button class="icon-button text-destructive" :title="t('admin.modelProxy.actions.delete')" @click="removeRoute(routeItem)"><Trash2 /></button></div></td>
               </tr>
             </tbody>
@@ -595,11 +606,12 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
               <div>
                 <h4 class="mb-1.5 text-sm font-medium">{{ t('admin.modelProxy.groups.members') }}</h4>
                 <div class="divide-y divide-border/50">
-                  <div v-for="member in group.members" :key="member.id" class="flex items-center justify-between gap-2 py-1.5 text-sm">
+                  <div v-for="member in group.members" :key="member.id" class="flex flex-wrap items-start justify-between gap-2 py-2.5 text-sm">
                     <div class="min-w-0">
                       <div class="flex flex-wrap items-baseline gap-x-2"><span class="font-medium">{{ member.name }}</span><span class="truncate text-xs text-muted-foreground">{{ member.siteName }} / {{ member.groupName || t('admin.modelProxy.form.preparedKeyBinding') }}</span></div>
                       <div v-if="member.schedulingPaused" class="text-xs text-warning" :title="t('admin.modelProxy.memberPause.help')">{{ t('admin.modelProxy.memberPause.paused') }}</div>
                       <div v-if="member.pausedUntil" class="text-xs text-warning" :title="t('admin.modelProxy.circuit.help')">{{ t('admin.modelProxy.circuit.paused', { time: formatDate(member.pausedUntil) }) }}<span v-if="member.nextProbeAt"> · {{ t('admin.modelProxy.circuit.nextProbe', { time: formatDate(member.nextProbeAt) }) }}</span></div>
+                      <RouteModelHealthStatus :health="member.modelHealth" :disabled="!member.enabled || !group.enabled" @test="openIsolatedModelTest(member, $event, group)" />
                       <div class="flex flex-wrap gap-x-2 text-xs text-muted-foreground"><span>{{ t('admin.modelProxy.groups.policy.prioritySummary', { count: member.priority ?? 0 }) }}</span><span v-if="member.modelMappingEnabled">{{ t('admin.modelProxy.groups.policy.modelMappingEnabled') }}</span><span v-if="member.streamOnly">{{ t('admin.modelProxy.groups.policy.streamOnly') }}</span><span v-if="member.syncKeyDeleteEnabled && !member.useProvidedKey">{{ t('admin.modelProxy.groups.policy.syncKeyDeleteSummary', { count: member.syncKeyDeleteDelayMs ?? 500 }) }}</span><span v-if="member.minInputTokens">{{ t('admin.modelProxy.groups.policy.minInputSummary', { count: member.minInputTokens }) }}</span><span v-if="member.requestsPerMinute">{{ t('admin.modelProxy.groups.policy.rpmSummary', { count: member.requestsPerMinute }) }}</span><span v-if="member.useProvidedKey">{{ t(member.memberProvidedKey ? 'admin.modelProxy.groups.policy.providedKeySummary' : 'admin.modelProxy.groups.policy.routeProvidedKeySummary', { preview: member.upstreamKeyPreview || '***' }) }}</span><span v-if="member.keywordMatchMode && member.keywordMatchMode !== 'disabled'">{{ t(member.keywordMatchMode === 'require_match' ? 'admin.modelProxy.groups.policy.keywordRequireMatchSummary' : 'admin.modelProxy.groups.policy.keywordSkipOnMatchSummary') }}</span><span v-if="!member.streamOnly && !member.syncKeyDeleteEnabled && !member.minInputTokens && !member.requestsPerMinute && !member.priority && !member.modelMappingEnabled && !member.useProvidedKey && (!member.keywordMatchMode || member.keywordMatchMode === 'disabled')">{{ t('admin.modelProxy.groups.policy.default') }}</span></div>
                     </div>
                     <div class="flex shrink-0 items-center gap-1"><span class="font-mono text-xs">{{ member.activeConcurrency }}/{{ member.concurrencyLimit }}</span><button type="button" class="icon-button disabled:opacity-50" :disabled="!member.enabled || !group.enabled || memberPausePending.has(`${group.id}:${member.id}`)" :title="t('admin.modelProxy.manualTest.action')" :aria-label="t('admin.modelProxy.manualTest.action')" @click="openRouteTest(member, group)"><FlaskConical /></button><button type="button" class="inline-flex items-center gap-1 border border-border px-2 py-1 text-xs disabled:opacity-50" :class="member.schedulingPaused ? 'text-signal' : 'text-warning'" :disabled="memberPausePending.has(`${group.id}:${member.id}`)" :title="t('admin.modelProxy.memberPause.help')" @click="toggleMemberPause(group, member)"><Loader2 v-if="memberPausePending.has(`${group.id}:${member.id}`)" class="h-3.5 w-3.5 animate-spin" /><Play v-else-if="member.schedulingPaused" class="h-3.5 w-3.5" /><Pause v-else class="h-3.5 w-3.5" />{{ t(member.schedulingPaused ? 'admin.modelProxy.memberPause.resume' : 'admin.modelProxy.memberPause.pause') }}</button><button class="icon-button" :title="t('admin.modelProxy.groups.policy.edit')" @click="openMemberPolicy(group, member)"><Pencil /></button><button class="icon-button text-destructive" :title="t('admin.modelProxy.actions.removeMember')" @click="removeMember(group, member)"><X /></button></div>
@@ -636,7 +648,7 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
       </section>
     </main>
 
-    <RouteModelTestDialog v-if="routeTestTarget" :key="`${routeTestTarget.route.id}:${routeTestTarget.group?.id ?? ''}`" :route="routeTestTarget.route" :group="routeTestTarget.group" @close="routeTestTarget = null" @restored="onSchedulingRestored" />
+    <RouteModelTestDialog v-if="routeTestTarget" :key="`${routeTestTarget.route.id}:${routeTestTarget.group?.id ?? ''}`" :route="routeTestTarget.route" :group="routeTestTarget.group" :initial-model="routeTestTarget.model" :initial-protocol="routeTestTarget.protocol" @close="routeTestTarget = null" @restored="onSchedulingRestored" />
 
     <Teleport to="body">
       <div v-if="routeModalOpen" class="modal-backdrop" @click.self="routeModalOpen = false">

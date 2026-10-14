@@ -18,6 +18,7 @@ export interface ProxyRoute {
   pausedUntil?: string
   nextProbeAt?: string
   consecutiveFailures?: number
+  modelHealth?: ProxyModelHealth[]
   schedulingPaused?: boolean
   streamOnly?: boolean
   minInputTokens?: number
@@ -36,6 +37,15 @@ export interface ProxyRoute {
   modelSyncError: string
   createdAt: string
   updatedAt: string
+}
+
+export interface ProxyModelHealth {
+  modelId: string
+  protocol: string
+  isolated: boolean
+  consecutiveFailures: number
+  nextProbeAt?: string
+  probeAttempts: number
 }
 
 export interface ProxyModel {

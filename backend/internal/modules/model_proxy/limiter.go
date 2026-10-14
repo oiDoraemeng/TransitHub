@@ -25,6 +25,13 @@ local untilMS = resumeExpired(KEYS[2], KEYS[3], ARGV[4], now)
 local probe = ARGV[5] ~= '' and redis.call('HGET', KEYS[2], 'probe_token') == ARGV[5]
 if untilMS > now and not probe then return {-1, 0} end
 if ARGV[5] ~= '' and not probe then return {-1, 0} end
+local modelEpoch = 0
+if ARGV[6] ~= '' then
+  modelEpoch = tonumber(redis.call('HGET', KEYS[4], 'epoch') or '0')
+  local modelProbe = ARGV[7] ~= '' and redis.call('HGET', KEYS[4], 'probe_token') == ARGV[7]
+  if redis.call('HGET', KEYS[4], 'isolated') == '1' and not modelProbe then return {-2, 0} end
+  if ARGV[7] ~= '' and not modelProbe then return {-2, 0} end
+end
 redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now)
 local count = redis.call('ZCARD', KEYS[1])
 if count >= tonumber(ARGV[1]) then
@@ -32,7 +39,7 @@ if count >= tonumber(ARGV[1]) then
 end
 redis.call('ZADD', KEYS[1], now + tonumber(ARGV[3]), ARGV[2])
 redis.call('PEXPIRE', KEYS[1], ARGV[3])
-return {1, tonumber(redis.call('HGET', KEYS[2], 'epoch') or '0')}
+return {1, tonumber(redis.call('HGET', KEYS[2], 'epoch') or '0'), modelEpoch}
 `)
 
 var activeLeaseScript = redis.NewScript(routeHealthLua + `
@@ -51,6 +58,9 @@ if ARGV[4] ~= '' and redis.call('HGET', KEYS[2], 'probe_token') == ARGV[4] then
 end
 if ARGV[6] ~= '' and redis.call('GET', KEYS[4]) == ARGV[6] then
   redis.call('PEXPIRE', KEYS[4], ARGV[1])
+end
+if ARGV[8] ~= '' and redis.call('HGET', KEYS[5], 'probe_token') == ARGV[8] then
+  redis.call('ZADD', KEYS[6], now + tonumber(ARGV[5]), ARGV[7])
 end
 return 1
 `)
@@ -93,6 +103,9 @@ type Lease struct {
 	epoch           int64
 	probeToken      string
 	manualTestToken string
+	modelHealthID   string
+	modelEpoch      int64
+	modelProbeToken string
 	once            sync.Once
 }
 
@@ -129,39 +142,62 @@ func (l *Limiter) Acquire(ctx context.Context, route Route, leaseID string) (*Le
 	return l.acquireWithLimit(ctx, route, leaseID, route.ConcurrencyLimit)
 }
 
+func (l *Limiter) AcquireForModel(ctx context.Context, route Route, leaseID string, spec routeProbeSpec) (*Lease, bool, error) {
+	return l.acquireHealthLease(ctx, route, leaseID, route.ConcurrencyLimit, "", modelHealthID(route, spec), "")
+}
+
 func (l *Limiter) acquireWithLimit(ctx context.Context, route Route, leaseID string, limit int) (*Lease, bool, error) {
 	return l.acquireRouteLease(ctx, route, leaseID, limit, "")
 }
 
 func (l *Limiter) acquireRouteLease(ctx context.Context, route Route, leaseID string, limit int, probeToken string) (*Lease, bool, error) {
+	return l.acquireHealthLease(ctx, route, leaseID, limit, probeToken, "", "")
+}
+
+func (l *Limiter) acquireHealthLease(ctx context.Context, route Route, leaseID string, limit int, probeToken, modelID, modelProbeToken string) (*Lease, bool, error) {
 	if limit <= 0 || limit > route.ConcurrencyLimit {
 		limit = route.ConcurrencyLimit
 	}
-	result, err := acquireLeaseScript.Run(ctx, l.redis, []string{leaseKey(route.ID), healthKey(route.ID), probeDueKey()},
-		limit, leaseID, leaseTTL.Milliseconds(), route.ID, probeToken).Int64Slice()
+	result, err := acquireLeaseScript.Run(ctx, l.redis, []string{leaseKey(route.ID), healthKey(route.ID), probeDueKey(), modelHealthKey(modelID)},
+		limit, leaseID, leaseTTL.Milliseconds(), route.ID, probeToken, modelID, modelProbeToken).Int64Slice()
 	if err != nil {
 		return nil, false, err
 	}
-	if len(result) != 2 {
+	if len(result) < 2 {
 		return nil, false, errors.New("invalid lease response")
 	}
 	if result[0] == -1 {
 		return nil, false, errRoutePaused
 	}
+	if result[0] == -2 {
+		return nil, false, errModelPaused
+	}
 	if result[0] != 1 {
 		return nil, false, nil
 	}
-	return l.newLease(route.ID, leaseID, result[1], probeToken), true, nil
+	if len(result) != 3 {
+		return nil, false, errors.New("invalid health lease response")
+	}
+	return l.newLease(route.ID, leaseID, result[1], probeToken, modelLeaseState{modelID, result[2], modelProbeToken}), true, nil
 }
 
-func (l *Limiter) newLease(routeID, leaseID string, epoch int64, probeToken string) *Lease {
+type modelLeaseState struct {
+	id         string
+	epoch      int64
+	probeToken string
+}
+
+func (l *Limiter) newLease(routeID, leaseID string, epoch int64, probeToken string, model ...modelLeaseState) *Lease {
 	lease := &Lease{limiter: l, routeID: routeID, id: leaseID, epoch: epoch, probeToken: probeToken, stop: make(chan struct{})}
+	if len(model) > 0 {
+		lease.modelHealthID, lease.modelEpoch, lease.modelProbeToken = model[0].id, model[0].epoch, model[0].probeToken
+	}
 	go lease.renew()
 	return lease
 }
 
-func (l *Limiter) AcquireBest(ctx context.Context, routes []Route, leaseID string) (*Lease, *Route, error) {
-	return l.acquireBestAtomic(ctx, routes, leaseID)
+func (l *Limiter) AcquireBest(ctx context.Context, routes []Route, leaseID string, spec ...routeProbeSpec) (*Lease, *Route, error) {
+	return l.acquireBestAtomic(ctx, routes, leaseID, spec...)
 }
 
 func (l *Limiter) ObserveResponseHeaderLatency(ctx context.Context, routeID string, latency time.Duration) error {
@@ -203,8 +239,8 @@ func (l *Lease) renew() {
 			return
 		case <-ticker.C:
 			renewCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			_ = renewLeaseScript.Run(renewCtx, l.limiter.redis, []string{leaseKey(l.routeID), healthKey(l.routeID), probeDueKey(), manualTestKey(l.routeID)},
-				leaseTTL.Milliseconds(), l.id, l.routeID, l.probeToken, routeProbeClaimTTL.Milliseconds(), l.manualTestToken).Err()
+			_ = renewLeaseScript.Run(renewCtx, l.limiter.redis, []string{leaseKey(l.routeID), healthKey(l.routeID), probeDueKey(), manualTestKey(l.routeID), modelHealthKey(l.modelHealthID), modelProbeDueKey()},
+				leaseTTL.Milliseconds(), l.id, l.routeID, l.probeToken, routeProbeClaimTTL.Milliseconds(), l.manualTestToken, l.modelHealthID, l.modelProbeToken).Err()
 			cancel()
 		}
 	}

@@ -130,6 +130,12 @@ func cleanupRedisTestRoutes(t *testing.T, client *redis.Client, routes []Route) 
 		_ = client.Del(context.Background(), keys...).Err()
 		for _, route := range routes {
 			_ = client.ZRem(context.Background(), probeDueKey(), route.ID).Err()
+			ids, _ := client.SMembers(context.Background(), routeModelIndexKey(route.ID)).Result()
+			for _, id := range ids {
+				_ = client.Del(context.Background(), modelHealthKey(id)).Err()
+				_ = client.ZRem(context.Background(), modelProbeDueKey(), id).Err()
+			}
+			_ = client.Del(context.Background(), routeModelIndexKey(route.ID)).Err()
 		}
 	})
 }

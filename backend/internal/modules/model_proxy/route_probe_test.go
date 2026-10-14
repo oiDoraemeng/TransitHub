@@ -149,17 +149,17 @@ func TestProxyDirectRedisStopsRequestsDuringPause(t *testing.T) {
 		if calls.Load() != int64(index*directMaxAttempts) {
 			t.Fatalf("request %d upstream calls=%d", index, calls.Load())
 		}
-		if failures, err := client.HGet(context.Background(), healthKey(route.ID), "failures").Int(); err != nil || failures != index {
+		if failures, err := client.HGet(context.Background(), modelHealthKey(modelHealthID(route, routeProbeSpec{ModelID: "model", Path: "/v1/responses"})), "failures").Int(); err != nil || failures != index {
 			t.Fatalf("request %d failures=%d err=%v", index, failures, err)
 		}
 	}
-	if w := request(); w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") != "180" {
+	if w := request(); w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") != "60" || !strings.Contains(w.Body.String(), "model_temporarily_paused") {
 		t.Fatalf("paused status=%d headers=%v", w.Code, w.Header())
 	}
 	if calls.Load() != routeFailureThreshold*directMaxAttempts {
 		t.Fatal("paused route received real traffic")
 	}
-	state, err := client.HGetAll(context.Background(), healthKey(route.ID)).Result()
+	state, err := client.HGetAll(context.Background(), modelHealthKey(modelHealthID(route, routeProbeSpec{ModelID: "model", Path: "/v1/responses"}))).Result()
 	if err != nil {
 		t.Fatal(err)
 	}

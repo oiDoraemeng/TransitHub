@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, FlaskConical, Loader2, Play, RefreshCw, X } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
 import { listRouteTestModels, restoreRouteScheduling, testRouteModel } from '../api/modelProxy'
 import type { ProxyModel, ProxyRoute, ProxySmartGroup, RouteModelTestResult, RouteTestProtocol } from '../types/modelProxy'
 
-const props = defineProps<{ route: ProxyRoute; group?: ProxySmartGroup }>()
+const props = defineProps<{ route: ProxyRoute; group?: ProxySmartGroup; initialModel?: string; initialProtocol?: RouteTestProtocol }>()
 const emit = defineEmits<{ close: []; restored: [] }>()
 const { t } = useI18n()
 const models = ref<ProxyModel[]>([])
@@ -76,14 +76,24 @@ const restore = async () => {
 }
 
 const close = () => { if (!busy.value) emit('close') }
-onMounted(() => { void loadModels() })
+onMounted(async () => {
+  await loadModels()
+  if (props.initialModel) {
+    if (!models.value.some(model => model.id === props.initialModel)) {
+      models.value.push({ id: props.initialModel, effectiveConcurrency: 0 })
+    }
+    selectedModel.value = props.initialModel
+    await nextTick()
+    if (props.initialProtocol) protocol.value = props.initialProtocol
+  }
+})
 onBeforeUnmount(() => controller.abort())
 </script>
 
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-[80] flex items-center justify-center bg-background/75 p-4 backdrop-blur-sm" @click.self="close" @keydown.esc="close">
-      <form role="dialog" aria-modal="true" aria-labelledby="route-model-test-title" class="flex max-h-[90vh] w-full max-w-xl flex-col border border-border bg-surface-elevated shadow-2xl" @submit.prevent="runTest">
+      <form role="dialog" aria-modal="true" aria-labelledby="route-model-test-title" class="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-border bg-surface-elevated shadow-2xl" @submit.prevent="runTest">
         <div class="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
           <div><h3 id="route-model-test-title" class="font-semibold">{{ t('admin.modelProxy.manualTest.title') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ route.name }}<span v-if="group"> · {{ group.name }}</span></p></div>
           <button type="button" :disabled="busy" :aria-label="t('admin.modelProxy.cancel')" class="disabled:opacity-50" @click="close"><X class="h-5 w-5" /></button>
