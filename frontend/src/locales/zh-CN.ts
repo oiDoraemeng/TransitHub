@@ -188,7 +188,7 @@ export default {
       form: { name: '名称', site: '上游站点', group: '分组（可选）', proxy: '模型出口代理（可选）', proxyHelp: '仅模型请求使用此代理。代理停用或不可用时请求会失败，不会回退到直连。', concurrency: '并发额度', enabled: '创建后立即启用', selectSite: '选择站点', selectGroup: '选择分组', noGroup: '不选择分组，使用预置上游 Key', preparedKeyBinding: '预置上游 Key', upstreamKey: '预置上游 Key', upstreamKeyKeep: '留空则保留当前 Key', upstreamKeyHelp: 'Key 会加密保存，并作为该路由在所有智能分组中的默认上游凭据。', upstreamKeyRequired: '不选择分组时必须填写预置上游 Key。' },
       actions: { reveal: '查看 Key', rotate: '轮换 Key', edit: '编辑', delete: '删除', test: '测试代理', copy: '复制', addMember: '添加成员', removeMember: '移除成员' },
       cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个待自动重试', processing: '{count} 个正在清理', routePending: '{count} 个待清理' },
-      circuit: { unavailable: '不可用', modelSchedule: '仅隔离以上模型。从隔离开始，第 1、3、5、10 分钟恢复探测，之后每隔 10 分钟。', paused: '整条路由暂停至 {time}', nextProbe: '下次恢复探测 {time}', help: '整条路由的连接或凭据连续 3 个请求最终失败后暂停 30 分钟，每 3 分钟流式探测。', modelPaused: '模型 {model} 已隔离', modelSummary: '当前隔离 {count} 个路由模型，其他模型仍可调度。', modelHelp: '同一模型连续 3 个请求（含重试）最终失败才隔离；明确的模型不存在立即隔离。从隔离开始第 1、3、5、10 分钟探测（间隔 1、2、2、5 分钟），之后每隔 10 分钟，成功恢复。' },
+      circuit: { removeModel: '移除模型并停止探测', removedModel: '已移除 · 不调度、不探测；测试成功后可恢复', removeConfirm: '移除 {model}（{protocol}）？此操作会停止自动探测，并继续禁止该模型在此接口调度。其他模型不受影响，测试成功后可手动恢复。', modelChanged: '模型状态已变化，请刷新后重试。', unavailable: '不可用', modelSchedule: '仅隔离以上模型。从隔离开始，第 1、3、5、10 分钟恢复探测，之后每隔 10 分钟。', paused: '整条路由暂停至 {time}', nextProbe: '下次恢复探测 {time}', help: '整条路由的连接或凭据连续 3 个请求最终失败后暂停 30 分钟，每 3 分钟流式探测。', modelPaused: '模型 {model} 已隔离', modelSummary: '当前隔离 {count} 个路由模型，其他模型仍可调度。', modelHelp: '同一模型连续 3 个请求（含重试）最终失败才隔离；明确的模型不存在立即隔离。从隔离开始第 1、3、5、10 分钟探测（间隔 1、2、2、5 分钟），之后每隔 10 分钟，成功恢复。' },
       manualTest: {
         customModel: '手动输入模型', modelCount: '共 {count} 个模型（含可用映射别名）',
         action: '模型测试', title: '测试模型并恢复调度', model: '测试模型', modelPlaceholder: '选择或输入模型名称', protocol: '请求协议', refreshModels: '刷新模型',
@@ -2209,6 +2209,7 @@ export default {
       saving: '保存中...',
       saveSuccess: '已保存',
       strategyDescription: '配置数据刷新频率、预警阈值和自动化策略。',
+      recoveryProbe: { title: '路由恢复探测', help: '仅影响自动恢复探测，覆盖等待响应和读取完整流式输出的总时限。按当前管理账号保存，范围 1–300 秒；保存后对新探测生效。', first: '首次探测超时（秒）', subsequent: '第二次及后续探测超时（秒）' },
       requiresRefresh: '建议先开启数据刷新频率，以便系统自动检测变化并触发预警。',
       balanceWarningAmount: '触发金额（CNY）',
       notifyBots: '发送通知到机器人',

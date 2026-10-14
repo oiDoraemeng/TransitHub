@@ -191,6 +191,7 @@ func New(cfg config.Config, db *pgxpool.Pool, redisClient *redis.Client) *Server
 		cfg.ProxyModelRefresh,
 	)
 	model_proxy.RegisterRoutes(server.mux, proxyService)
+	proxyService.SetRecoveryProbeSettings(settingsService)
 	upstreamService.SetSiteDeleteGuard(proxyRepository)
 	server.modelProxyService = proxyService
 	server.modelProxyHandler = proxyService.PublicHandler()

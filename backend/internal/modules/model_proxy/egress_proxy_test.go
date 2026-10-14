@@ -128,6 +128,33 @@ func TestResponseHeaderTimeoutStopsWaitingForHeaders(t *testing.T) {
 	}
 }
 
+func TestConfiguredProbeTimeoutCanExceedSharedTransportCap(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(60 * time.Millisecond)
+		_, _ = io.WriteString(w, "OK")
+	}))
+	defer server.Close()
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = 15 * time.Millisecond
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport}
+	request, err := http.NewRequest(http.MethodGet, server.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := doWithResponseHeaderTimeout(client, request, time.Second)
+	if err != nil {
+		t.Fatalf("shared cap overrode configured timeout: %v", err)
+	}
+	defer response.Body.Close()
+	if body, err := io.ReadAll(response.Body); err != nil || string(body) != "OK" {
+		t.Fatalf("response=%q %v", body, err)
+	}
+	if transport.ResponseHeaderTimeout != 15*time.Millisecond {
+		t.Fatal("mutated shared transport")
+	}
+}
+
 func TestResponseHeaderTimeoutDoesNotLimitBody(t *testing.T) {
 	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return &http.Response{

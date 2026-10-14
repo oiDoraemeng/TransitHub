@@ -21,6 +21,7 @@ const (
 
 var acquireLeaseScript = redis.NewScript(routeHealthLua + `
 local now = clockMS()
+if redis.call('HGET', KEYS[2], 'deleted') == '1' then return {-1, 0} end
 local untilMS = resumeExpired(KEYS[2], KEYS[3], ARGV[4], now)
 local probe = ARGV[5] ~= '' and redis.call('HGET', KEYS[2], 'probe_token') == ARGV[5]
 if untilMS > now and not probe then return {-1, 0} end
@@ -155,6 +156,9 @@ func (l *Limiter) acquireRouteLease(ctx context.Context, route Route, leaseID st
 }
 
 func (l *Limiter) acquireHealthLease(ctx context.Context, route Route, leaseID string, limit int, probeToken, modelID, modelProbeToken string) (*Lease, bool, error) {
+	if _, removed := route.RemovedModels[modelID]; removed {
+		return nil, false, errModelPaused
+	}
 	if limit <= 0 || limit > route.ConcurrencyLimit {
 		limit = route.ConcurrencyLimit
 	}

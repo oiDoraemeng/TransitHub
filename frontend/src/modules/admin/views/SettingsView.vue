@@ -38,6 +38,8 @@ const errorChannels = ref('')
 const enableRefreshInterval = ref(false)
 const refreshInterval = ref('60')
 const minimumRefreshInterval = 60
+const recoveryProbeFirstTimeout = ref('60')
+const recoveryProbeSubsequentTimeout = ref('15')
 
 const enableBalanceWarning = ref(false)
 const defaultBalanceThreshold = ref('10.00')
@@ -173,6 +175,8 @@ const saveStrategy = async () => {
 }
 
 const applyStrategySettings = (settings: StrategySettings) => {
+  recoveryProbeFirstTimeout.value = String(settings.recoveryProbeFirstTimeoutSeconds || 60)
+  recoveryProbeSubsequentTimeout.value = String(settings.recoveryProbeSubsequentTimeoutSeconds || 15)
   enableRefreshInterval.value = settings.enableRefreshInterval
   refreshInterval.value = String(Math.max(settings.refreshInterval, minimumRefreshInterval))
   enableBalanceWarning.value = settings.enableBalanceWarning
@@ -189,6 +193,8 @@ const applyStrategySettings = (settings: StrategySettings) => {
 }
 
 const currentStrategySettings = (): StrategySettings => ({
+  recoveryProbeFirstTimeoutSeconds: Math.min(300, Math.max(1, Number.parseInt(recoveryProbeFirstTimeout.value, 10) || 60)),
+  recoveryProbeSubsequentTimeoutSeconds: Math.min(300, Math.max(1, Number.parseInt(recoveryProbeSubsequentTimeout.value, 10) || 15)),
   enableRefreshInterval: enableRefreshInterval.value,
   refreshInterval: Math.max(Number.parseInt(refreshInterval.value, 10) || minimumRefreshInterval, minimumRefreshInterval),
   enableBalanceWarning: enableBalanceWarning.value,
@@ -635,6 +641,17 @@ onMounted(async () => {
           <p v-if="errorStrategy" class="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {{ t(errorStrategy) }}
           </p>
+
+          <div class="overflow-hidden rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
+            <div class="flex items-start gap-3">
+              <div class="mt-0.5 shrink-0 rounded-xl bg-primary/10 p-2 text-primary"><Timer class="h-5 w-5" /></div>
+              <div><h4 class="text-sm font-semibold text-foreground">{{ t('admin.settings.recoveryProbe.title') }}</h4><p class="mt-0.5 text-xs text-muted-foreground">{{ t('admin.settings.recoveryProbe.help') }}</p></div>
+            </div>
+            <div class="mt-4 grid gap-4 sm:grid-cols-2 sm:pl-12">
+              <label class="grid gap-1.5 text-xs font-medium text-muted-foreground"><span>{{ t('admin.settings.recoveryProbe.first') }}</span><Input v-model="recoveryProbeFirstTimeout" type="number" min="1" max="300" step="1" /></label>
+              <label class="grid gap-1.5 text-xs font-medium text-muted-foreground"><span>{{ t('admin.settings.recoveryProbe.subsequent') }}</span><Input v-model="recoveryProbeSubsequentTimeout" type="number" min="1" max="300" step="1" /></label>
+            </div>
+          </div>
 
           <!-- Card 1: Data Refresh -->
           <div class="rounded-2xl border border-border/50 bg-card shadow-sm overflow-hidden">

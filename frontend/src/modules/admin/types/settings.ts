@@ -28,6 +28,8 @@ export type NotificationChannelSettings = {
 }
 
 export type StrategySettings = {
+  recoveryProbeFirstTimeoutSeconds: number
+  recoveryProbeSubsequentTimeoutSeconds: number
   enableRefreshInterval: boolean
   refreshInterval: number
   enableBalanceWarning: boolean

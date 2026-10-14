@@ -54,6 +54,7 @@ func manualRecoveryKey(userID, accountID, routeID, groupID string) string {
 // Its own lock never takes over or reschedules an automatic recovery probe.
 var acquireManualTestScript = redis.NewScript(routeHealthLua + `
 local now = clockMS()
+if redis.call('HGET', KEYS[2], 'deleted') == '1' then return {-2, 0} end
 resumeExpired(KEYS[2], KEYS[3], ARGV[1], now)
 if redis.call('EXISTS', KEYS[4]) == 1 then return {-2, 0} end
 redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now)
@@ -96,7 +97,7 @@ redis.call('ZREM', KEYS[2], ARGV[1])
 if ARGV[4] ~= '' then
   redis.call('HINCRBY', KEYS[6], 'epoch', 1)
   redis.call('HSET', KEYS[6], 'failures', 0, 'probe_attempts', 0)
-  redis.call('HDEL', KEYS[6], 'isolated', 'isolated_at', 'probe_token', 'probe_spec')
+  redis.call('HDEL', KEYS[6], 'isolated', 'isolated_at', 'probe_token', 'probe_spec', 'probe_disabled')
   redis.call('ZREM', KEYS[7], ARGV[4])
 end
 return 1
@@ -275,6 +276,8 @@ func manualProbeSpec(input RouteTestRequest) (routeProbeSpec, error) {
 		spec.Path = "/v1/chat/completions"
 	case "responses":
 		spec.Path = "/v1/responses"
+	case "compact":
+		spec.Path = "/v1/responses/compact"
 	case "messages":
 		spec.Path = "/v1/messages"
 	case "embeddings":
@@ -385,6 +388,11 @@ func (s *Service) RestoreRouteScheduling(ctx context.Context, userID, routeID st
 	var proof manualRecoveryProof
 	if err := json.Unmarshal([]byte(encoded), &proof); err != nil || proof.TokenHash != hashKey(input.Token) || proof.Fingerprint != fingerprint {
 		return &requestError{Status: 409, Message: "admin.modelProxy.manualTest.retest"}
+	}
+	if proof.ModelHealthID != "" {
+		if _, err := tx.Exec(ctx, `UPDATE proxy_routes SET removed_models=removed_models-$2 WHERE id=$1`, routeID, proof.ModelHealthID); err != nil {
+			return err
+		}
 	}
 	if input.GroupID != "" {
 		if _, err := tx.Exec(ctx, `UPDATE proxy_smart_group_members SET scheduling_paused=false,policy_revision=policy_revision+1 WHERE smart_group_id=$1 AND route_id=$2`, input.GroupID, routeID); err != nil {

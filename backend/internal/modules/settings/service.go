@@ -99,9 +99,11 @@ func DefaultNotificationChannelSettings() NotificationChannelSettings {
 
 func DefaultStrategySettings() StrategySettings {
 	return StrategySettings{
-		RefreshInterval:          minRefreshIntervalSeconds,
-		BalanceTemplateFormat:    NotificationTemplateFormatText,
-		MultiplierTemplateFormat: NotificationTemplateFormatText,
+		RecoveryProbeFirstTimeoutSeconds:      60,
+		RecoveryProbeSubsequentTimeoutSeconds: 15,
+		RefreshInterval:                       minRefreshIntervalSeconds,
+		BalanceTemplateFormat:                 NotificationTemplateFormatText,
+		MultiplierTemplateFormat:              NotificationTemplateFormatText,
 	}
 }
 
@@ -136,6 +138,14 @@ func (s *Service) GetStrategy(ctx context.Context, userID string) (StrategySetti
 		return StrategySettings{}, err
 	}
 	return s.repository.GetStrategy(ctx, userID, adminAccountID)
+}
+
+// Background probes use the route's workspace, never the user's currently
+// selected workspace or the first saved settings row.
+func (s *Service) GetRecoveryProbeTimeouts(ctx context.Context, userID, accountID string) (int, int, error) {
+	settings, err := s.repository.GetStrategy(ctx, userID, accountID)
+	settings = normalizeStrategySettings(settings)
+	return settings.RecoveryProbeFirstTimeoutSeconds, settings.RecoveryProbeSubsequentTimeoutSeconds, err
 }
 
 func (s *Service) SaveStrategy(ctx context.Context, userID string, settings StrategySettings) (StrategySettings, error) {
@@ -303,6 +313,14 @@ func normalizeNotificationChannelSettings(settings NotificationChannelSettings) 
 }
 
 func normalizeStrategySettings(settings StrategySettings) StrategySettings {
+	if settings.RecoveryProbeFirstTimeoutSeconds < 1 {
+		settings.RecoveryProbeFirstTimeoutSeconds = 60
+	}
+	if settings.RecoveryProbeSubsequentTimeoutSeconds < 1 {
+		settings.RecoveryProbeSubsequentTimeoutSeconds = 15
+	}
+	settings.RecoveryProbeFirstTimeoutSeconds = min(settings.RecoveryProbeFirstTimeoutSeconds, 300)
+	settings.RecoveryProbeSubsequentTimeoutSeconds = min(settings.RecoveryProbeSubsequentTimeoutSeconds, 300)
 	if settings.RefreshInterval < minRefreshIntervalSeconds {
 		settings.RefreshInterval = minRefreshIntervalSeconds
 	}

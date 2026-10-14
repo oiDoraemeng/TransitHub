@@ -27,6 +27,7 @@ func RegisterRoutes(mux *http.ServeMux, service *Service) {
 	mux.HandleFunc("GET /api/proxy-routes/{id}/test-models", h.routeTestModels)
 	mux.HandleFunc("POST /api/proxy-routes/{id}/test", h.testRouteModel)
 	mux.HandleFunc("POST /api/proxy-routes/{id}/restore-scheduling", h.restoreRouteScheduling)
+	mux.HandleFunc("POST /api/proxy-routes/{id}/remove-model", h.removeRouteModel)
 	mux.HandleFunc("GET /api/proxy-routes/sites", h.listSites)
 	mux.HandleFunc("GET /api/proxy-routes/sites/{siteId}/groups", h.listGroups)
 	mux.HandleFunc("GET /api/proxy-routes/cleanup-status", h.cleanupStatus)

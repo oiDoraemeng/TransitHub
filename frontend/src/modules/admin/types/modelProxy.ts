@@ -40,6 +40,7 @@ export interface ProxyRoute {
 }
 
 export interface ProxyModelHealth {
+	probeDisabled?: boolean
   modelId: string
   protocol: string
   isolated: boolean
@@ -115,7 +116,7 @@ export interface ModelEgressProxyTestResult {
   message: string
 }
 
-export type RouteTestProtocol = 'chat' | 'responses' | 'messages' | 'gemini' | 'embeddings'
+export type RouteTestProtocol = 'chat' | 'responses' | 'compact' | 'messages' | 'gemini' | 'embeddings'
 
 export interface RouteModelTestResult {
   success: boolean

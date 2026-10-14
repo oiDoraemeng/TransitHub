@@ -49,12 +49,14 @@ type ModelHealth struct {
 	ConsecutiveFailures int64      `json:"consecutiveFailures"`
 	NextProbeAt         *time.Time `json:"nextProbeAt,omitempty"`
 	ProbeAttempts       int64      `json:"probeAttempts"`
+	ProbeDisabled       bool       `json:"probeDisabled,omitempty"`
 }
 
 // The model circuit stays isolated until a validated probe or manual test
 // succeeds. A timer never sends a known-broken model back into user traffic.
 var observeModelResultScript = redis.NewScript(routeHealthLua + `
 local now = clockMS()
+if redis.call('HGET', KEYS[3], 'deleted') == '1' then return 0 end
 if tonumber(redis.call('HGET', KEYS[3], 'epoch') or '0') ~= tonumber(ARGV[3]) then return 0 end
 local epoch = tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0')
 if epoch ~= tonumber(ARGV[2]) then return 0 end
@@ -94,7 +96,7 @@ func (l *Limiter) ObserveModelResult(ctx context.Context, lease *Lease, success,
 
 var claimModelProbeScript = redis.NewScript(routeHealthLua + `
 local now = clockMS()
-if redis.call('HGET', KEYS[1], 'isolated') ~= '1' then
+if redis.call('HGET', KEYS[1], 'isolated') ~= '1' or redis.call('HGET', KEYS[1], 'probe_disabled') == '1' then
   redis.call('ZREM', KEYS[2], ARGV[1])
   return {}
 end
@@ -103,12 +105,13 @@ if due == 0 or due > now then return {} end
 redis.call('HSET', KEYS[1], 'probe_token', ARGV[2])
 redis.call('ZADD', KEYS[2], now + tonumber(ARGV[3]), ARGV[1])
 return {tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0'),
-        redis.call('HGET', KEYS[1], 'probe_spec') or '{}', redis.call('HGET', KEYS[1], 'route_id') or ''}
+        redis.call('HGET', KEYS[1], 'probe_spec') or '{}', redis.call('HGET', KEYS[1], 'route_id') or '',
+        tonumber(redis.call('HGET', KEYS[1], 'probe_attempts') or '0')}
 `)
 
 var finishModelProbeScript = redis.NewScript(routeHealthLua + `
 local now = clockMS()
-if redis.call('HGET', KEYS[1], 'isolated') ~= '1'
+if redis.call('HGET', KEYS[1], 'isolated') ~= '1' or redis.call('HGET', KEYS[1], 'probe_disabled') == '1'
    or tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0') ~= tonumber(ARGV[2])
    or redis.call('HGET', KEYS[1], 'probe_token') ~= ARGV[3] then return 0 end
 redis.call('HDEL', KEYS[1], 'probe_token')
@@ -154,7 +157,7 @@ func (l *Limiter) claimModelProbe(ctx context.Context, id string) (*modelProbeCl
 	if err != nil || len(values) == 0 {
 		return nil, err
 	}
-	if len(values) != 3 {
+	if len(values) != 4 {
 		return nil, errors.New("invalid model probe claim")
 	}
 	epoch, epochOK := values[0].(int64)
@@ -164,6 +167,7 @@ func (l *Limiter) claimModelProbe(ctx context.Context, id string) (*modelProbeCl
 		return nil, errors.New("invalid model probe claim")
 	}
 	claim := &modelProbeClaim{id: id, routeProbeClaim: routeProbeClaim{routeID: routeID, token: token, epoch: epoch}}
+	claim.attempts, _ = values[3].(int64)
 	if err := json.Unmarshal([]byte(encoded), &claim.spec); err != nil {
 		return nil, err
 	}
@@ -187,7 +191,7 @@ func (l *Limiter) dueModelProbes(ctx context.Context) ([]string, error) {
 }
 
 func (s *Service) probeIsolatedModel(parent context.Context, id string) {
-	ctx, cancel := context.WithTimeout(parent, routeProbeTimeout)
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()
 	claim, err := s.limiter.claimModelProbe(ctx, id)
 	if err != nil || claim == nil {
@@ -201,13 +205,26 @@ func (s *Service) probeIsolatedModel(parent context.Context, id string) {
 	}()
 	route, err := s.loadProbeRoute(ctx, &claim.routeProbeClaim)
 	if err != nil || route == nil || !route.Enabled {
+		if err == nil && route == nil {
+			s.cleanMissingProbeRoute(ctx, claim.routeID)
+		}
 		return
 	}
 	// A changed mapping must not restore the previously failed target model.
+	if _, removed := route.RemovedModels[claim.id]; removed {
+		_, _ = s.limiter.removeRouteModel(ctx, route.ID, claim.id)
+		return
+	}
 	if modelHealthID(*route, claim.spec) != claim.id {
 		return
 	}
-	lease, acquired, err := s.limiter.acquireHealthLease(ctx, *route, claim.token, route.ConcurrencyLimit, "", claim.id, claim.token)
+	timeout, err := s.recoveryProbeTimeout(ctx, *route, claim.attempts)
+	if err != nil {
+		return
+	}
+	probeCtx, probeCancel := context.WithTimeout(parent, timeout)
+	defer probeCancel()
+	lease, acquired, err := s.limiter.acquireHealthLease(probeCtx, *route, claim.token, route.ConcurrencyLimit, "", claim.id, claim.token)
 	if err != nil || !acquired || lease.modelEpoch != claim.epoch {
 		if lease != nil {
 			lease.Release(context.WithoutCancel(parent))
@@ -216,7 +233,7 @@ func (s *Service) probeIsolatedModel(parent context.Context, id string) {
 	}
 	defer lease.Release(context.WithoutCancel(parent))
 	attempted = true
-	success = s.performRouteProbe(ctx, *route, claim.spec)
+	success = s.performRouteProbe(probeCtx, *route, claim.spec, timeout)
 }
 
 var modelRuntimeScript = redis.NewScript(`
@@ -229,6 +246,7 @@ for index=2,#KEYS do
   table.insert(result, redis.call('HGET', key, 'failures') or '0')
   table.insert(result, redis.call('ZSCORE', KEYS[1], ARGV[index - 1]) or '0')
   table.insert(result, redis.call('HGET', key, 'probe_attempts') or '0')
+  table.insert(result, redis.call('HGET', key, 'probe_disabled') or '0')
 end
 return result
 `)
@@ -245,6 +263,9 @@ func (l *Limiter) populateModelRuntime(ctx context.Context, routes []Route) erro
 	for i, index := range indexes {
 		ids := index.Val()
 		routes[i].ModelHealth = nil
+		for _, removed := range routes[i].RemovedModels {
+			routes[i].ModelHealth = append(routes[i].ModelHealth, ModelHealth{ModelID: removed.ModelID, Protocol: removed.Protocol, Isolated: true, ProbeDisabled: true})
+		}
 		if len(ids) == 0 {
 			continue
 		}
@@ -258,15 +279,18 @@ func (l *Limiter) populateModelRuntime(ctx context.Context, routes []Route) erro
 		if err != nil {
 			return err
 		}
-		if len(values) != len(ids)*6 {
+		if len(values) != len(ids)*7 {
 			return errors.New("invalid model runtime response")
 		}
 		for j := range ids {
-			offset := j * 6
+			if _, removed := routes[i].RemovedModels[ids[j]]; removed {
+				continue
+			}
+			offset := j * 7
 			if values[offset+2] != "1" {
 				continue
 			}
-			state := ModelHealth{ModelID: values[offset], Protocol: values[offset+1], Isolated: true}
+			state := ModelHealth{ModelID: values[offset], Protocol: values[offset+1], Isolated: true, ProbeDisabled: values[offset+6] == "1"}
 			_, _ = fmt.Sscan(values[offset+3], &state.ConsecutiveFailures)
 			_, _ = fmt.Sscan(values[offset+5], &state.ProbeAttempts)
 			var due int64

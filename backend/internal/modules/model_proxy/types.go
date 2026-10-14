@@ -12,26 +12,27 @@ const (
 )
 
 type Route struct {
-	ID                  string        `json:"id"`
-	UserID              string        `json:"-"`
-	AdminAccountID      string        `json:"-"`
-	Name                string        `json:"name"`
-	SiteID              string        `json:"siteId"`
-	SiteName            string        `json:"siteName"`
-	GroupID             string        `json:"groupId"`
-	GroupName           string        `json:"groupName"`
-	ConcurrencyLimit    int           `json:"concurrencyLimit"`
-	ActiveConcurrency   int64         `json:"activeConcurrency"`
-	Enabled             bool          `json:"enabled"`
-	ProxyID             string        `json:"proxyId"`
-	ProxyName           string        `json:"proxyName"`
-	KeyPreview          string        `json:"keyPreview"`
-	ModelCount          int           `json:"modelCount"`
-	CleanupPending      int           `json:"cleanupPending"`
-	PausedUntil         *time.Time    `json:"pausedUntil,omitempty"`
-	NextProbeAt         *time.Time    `json:"nextProbeAt,omitempty"`
-	ConsecutiveFailures int64         `json:"consecutiveFailures,omitempty"`
-	ModelHealth         []ModelHealth `json:"modelHealth,omitempty"`
+	ID                  string                       `json:"id"`
+	UserID              string                       `json:"-"`
+	AdminAccountID      string                       `json:"-"`
+	Name                string                       `json:"name"`
+	SiteID              string                       `json:"siteId"`
+	SiteName            string                       `json:"siteName"`
+	GroupID             string                       `json:"groupId"`
+	GroupName           string                       `json:"groupName"`
+	ConcurrencyLimit    int                          `json:"concurrencyLimit"`
+	ActiveConcurrency   int64                        `json:"activeConcurrency"`
+	Enabled             bool                         `json:"enabled"`
+	ProxyID             string                       `json:"proxyId"`
+	ProxyName           string                       `json:"proxyName"`
+	KeyPreview          string                       `json:"keyPreview"`
+	ModelCount          int                          `json:"modelCount"`
+	CleanupPending      int                          `json:"cleanupPending"`
+	PausedUntil         *time.Time                   `json:"pausedUntil,omitempty"`
+	NextProbeAt         *time.Time                   `json:"nextProbeAt,omitempty"`
+	ConsecutiveFailures int64                        `json:"consecutiveFailures,omitempty"`
+	ModelHealth         []ModelHealth                `json:"modelHealth,omitempty"`
+	RemovedModels       map[string]RemovedRouteModel `json:"-"`
 	// Member policies are populated only when this route is loaded through a
 	// smart-group membership. They are intentionally not route-level settings.
 	StreamOnly            bool              `json:"streamOnly,omitempty"`

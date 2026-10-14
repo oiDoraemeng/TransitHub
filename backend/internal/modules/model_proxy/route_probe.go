@@ -141,30 +141,54 @@ func (s *Service) routeProbeLoop(ctx context.Context) {
 }
 
 func (s *Service) probePausedRoute(parent context.Context, routeID string) {
-	ctx, cancel := context.WithTimeout(parent, routeProbeTimeout)
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()
 	claim, err := s.limiter.claimRouteProbe(ctx, routeID)
 	if err != nil || claim == nil {
 		return
 	}
-	success := false
+	success, attempted := false, false
 	defer func() {
 		stateCtx, stateCancel := context.WithTimeout(context.WithoutCancel(parent), 2*time.Second)
 		defer stateCancel()
-		if _, err := s.limiter.finishRouteProbe(stateCtx, claim, success); err != nil {
+		if _, err := s.limiter.finishRouteProbe(stateCtx, claim, success, attempted); err != nil {
 			log.Printf("[model-proxy] finish recovery probe route_id=%s err=%v", routeID, err)
 		}
 	}()
 	route, err := s.loadProbeRoute(ctx, claim)
 	if err != nil || route == nil || !route.Enabled {
+		if err == nil && route == nil {
+			s.cleanMissingProbeRoute(ctx, routeID)
+		}
 		return
 	}
-	lease, acquired, err := s.limiter.acquireRouteLease(ctx, *route, claim.token, route.ConcurrencyLimit, claim.token)
+	if _, removed := route.RemovedModels[modelHealthID(*route, claim.spec)]; removed {
+		return
+	}
+	timeout, err := s.recoveryProbeTimeout(ctx, *route, claim.attempts)
+	if err != nil {
+		return
+	}
+	probeCtx, probeCancel := context.WithTimeout(parent, timeout)
+	defer probeCancel()
+	lease, acquired, err := s.limiter.acquireRouteLease(probeCtx, *route, claim.token, route.ConcurrencyLimit, claim.token)
 	if err != nil || !acquired {
 		return
 	}
 	defer lease.Release(context.WithoutCancel(parent))
-	success = s.performRouteProbe(ctx, *route, claim.spec)
+	attempted = true
+	success = s.performRouteProbe(probeCtx, *route, claim.spec, timeout)
+}
+
+// Also remove orphaned jobs left by older versions or a failed Redis cleanup.
+// An unavailable/removed group membership does not mean the route was deleted.
+func (s *Service) cleanMissingProbeRoute(ctx context.Context, routeID string) {
+	route, err := s.repository.GetRoute(ctx, routeID)
+	if err == nil && route == nil {
+		if err := s.limiter.removeRouteRuntime(ctx, routeID); err != nil {
+			log.Printf("[model-proxy] remove orphan recovery probes route_id=%s err=%v", routeID, err)
+		}
+	}
 }
 
 func (s *Service) loadProbeRoute(ctx context.Context, claim *routeProbeClaim) (*Route, error) {
@@ -230,18 +254,22 @@ func newRouteProbeRequest(ctx context.Context, spec routeProbeSpec) (*http.Reque
 	return request, body, err
 }
 
-func (s *Service) performRouteProbe(ctx context.Context, route Route, spec routeProbeSpec) bool {
+func (s *Service) performRouteProbe(ctx context.Context, route Route, spec routeProbeSpec, timeouts ...time.Duration) bool {
+	headerTimeout := smartGroupFirstResponseHeaderTimeout
+	if len(timeouts) > 0 {
+		headerTimeout = timeouts[0]
+	}
 	request, body, streaming, err := newStreamingRouteProbeRequest(ctx, spec)
 	if err != nil {
 		return false
 	}
 	// Catalog, embedding and compact endpoints have no streaming protocol.
 	if !streaming {
-		return s.executeRouteProbe(ctx, route, spec).Success
+		return s.executeRouteProbe(ctx, route, spec, headerTimeout).Success
 	}
 	response, _, err := s.performAttemptWithResponseHeaderTimeout(request, route,
 		func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil },
-		route.ModelMapping, mappedResponseContext{}, false, smartGroupFirstResponseHeaderTimeout)
+		route.ModelMapping, mappedResponseContext{}, false, headerTimeout)
 	if response != nil {
 		defer response.Body.Close()
 	}
@@ -251,7 +279,11 @@ func (s *Service) performRouteProbe(ctx context.Context, route Route, spec route
 	return validateRouteProbeStream(response.Body, spec.Path)
 }
 
-func (s *Service) executeRouteProbe(ctx context.Context, route Route, spec routeProbeSpec) (result RouteTestResult) {
+func (s *Service) executeRouteProbe(ctx context.Context, route Route, spec routeProbeSpec, timeouts ...time.Duration) (result RouteTestResult) {
+	headerTimeout := smartGroupFirstResponseHeaderTimeout
+	if len(timeouts) > 0 {
+		headerTimeout = timeouts[0]
+	}
 	started := time.Now()
 	result.Message = "admin.modelProxy.manualTest.failed"
 	defer func() { result.LatencyMS = time.Since(started).Milliseconds() }()
@@ -261,7 +293,7 @@ func (s *Service) executeRouteProbe(ctx context.Context, route Route, spec route
 	}
 	response, _, err := s.performAttemptWithResponseHeaderTimeout(request, route,
 		func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil },
-		route.ModelMapping, mappedResponseContext{}, false, smartGroupFirstResponseHeaderTimeout)
+		route.ModelMapping, mappedResponseContext{}, false, headerTimeout)
 	if response != nil {
 		defer response.Body.Close()
 		result.StatusCode = response.StatusCode

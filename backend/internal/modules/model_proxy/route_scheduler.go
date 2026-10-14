@@ -21,8 +21,8 @@ local modelPaused = 0
 for index, route in ipairs(routes) do
   local offset = 3 + (index - 1) * 4
   local untilMS = resumeExpired(KEYS[offset + 2], KEYS[2], route.id, now)
-  local isolated = route.modelHealthID ~= '' and redis.call('HGET', KEYS[offset + 3], 'isolated') == '1'
-  if untilMS > now or route.manualPause then
+  local isolated = route.modelRemoved or (route.modelHealthID ~= '' and redis.call('HGET', KEYS[offset + 3], 'isolated') == '1')
+  if untilMS > now or route.manualPause or redis.call('HGET', KEYS[offset + 2], 'deleted') == '1' then
     paused = paused + 1
   elseif isolated then
     paused = paused + 1
@@ -73,6 +73,7 @@ type schedulerRoute struct {
 	Provided      bool   `json:"provided"`
 	ManualPause   bool   `json:"manualPause"`
 	ModelHealthID string `json:"modelHealthID"`
+	ModelRemoved  bool   `json:"modelRemoved"`
 }
 
 func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID string, specs ...routeProbeSpec) (*Lease, *Route, error) {
@@ -87,7 +88,8 @@ func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID
 			modelID = modelHealthID(route, specs[0])
 		}
 		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID), healthKey(route.ID), modelHealthKey(modelID))
-		input = append(input, schedulerRoute{route.ID, route.Priority, route.ConcurrencyLimit, route.UseProvidedKey, route.SchedulingPaused, modelID})
+		_, removed := route.RemovedModels[modelID]
+		input = append(input, schedulerRoute{route.ID, route.Priority, route.ConcurrencyLimit, route.UseProvidedKey, route.SchedulingPaused, modelID, removed})
 	}
 	encoded, err := json.Marshal(input)
 	if err != nil {

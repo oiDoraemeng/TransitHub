@@ -83,6 +83,7 @@ type Service struct {
 	forceRefreshMu    sync.Mutex
 	forceRefreshUntil map[string]time.Time
 	latencySamples    chan routeLatencyObservation
+	probeSettings     RecoveryProbeSettings
 }
 
 func NewService(repository *Repository, accounts AccountResolver, sites UpstreamSites, platform *upstream.PlatformService, cipher *KeyCipher, limiter *Limiter, maxRequestBytes int64, refreshInterval time.Duration) *Service {
@@ -369,7 +370,12 @@ func (s *Service) DeleteRoute(ctx context.Context, userID, routeID string) error
 	if err != nil {
 		return err
 	}
-	return s.repository.DeleteRoute(ctx, userID, accountID, routeID)
+	if err := s.repository.DeleteRoute(ctx, userID, accountID, routeID); err != nil {
+		return err
+	}
+	stateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupStateTimeout)
+	defer cancel()
+	return s.limiter.removeRouteRuntime(stateCtx, routeID)
 }
 
 func (s *Service) ListSmartGroups(ctx context.Context, userID string) ([]SmartGroup, error) {

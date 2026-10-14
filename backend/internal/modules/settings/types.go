@@ -39,18 +39,20 @@ type NotificationChannelSettings struct {
 }
 
 type StrategySettings struct {
-	EnableRefreshInterval      bool                       `json:"enableRefreshInterval"`
-	RefreshInterval            int                        `json:"refreshInterval"`
-	EnableBalanceWarning       bool                       `json:"enableBalanceWarning"`
-	DefaultBalanceThreshold    float64                    `json:"defaultBalanceThreshold"`
-	BalanceNotifyBotIDs        []string                   `json:"balanceNotifyBotIds"`
-	BalanceTemplate            string                     `json:"balanceTemplate"`
-	BalanceTemplateFormat      NotificationTemplateFormat `json:"balanceTemplateFormat,omitempty"`
-	EnableMultiplierAlert      bool                       `json:"enableMultiplierAlert"`
-	MultiplierNotifyBotIDs     []string                   `json:"multiplierNotifyBotIds"`
-	MultiplierTemplate         string                     `json:"multiplierTemplate"`
-	MultiplierTemplateFormat   NotificationTemplateFormat `json:"multiplierTemplateFormat,omitempty"`
-	EnableAutoChangeMultiplier bool                       `json:"enableAutoChangeMultiplier"`
+	RecoveryProbeFirstTimeoutSeconds      int                        `json:"recoveryProbeFirstTimeoutSeconds"`
+	RecoveryProbeSubsequentTimeoutSeconds int                        `json:"recoveryProbeSubsequentTimeoutSeconds"`
+	EnableRefreshInterval                 bool                       `json:"enableRefreshInterval"`
+	RefreshInterval                       int                        `json:"refreshInterval"`
+	EnableBalanceWarning                  bool                       `json:"enableBalanceWarning"`
+	DefaultBalanceThreshold               float64                    `json:"defaultBalanceThreshold"`
+	BalanceNotifyBotIDs                   []string                   `json:"balanceNotifyBotIds"`
+	BalanceTemplate                       string                     `json:"balanceTemplate"`
+	BalanceTemplateFormat                 NotificationTemplateFormat `json:"balanceTemplateFormat,omitempty"`
+	EnableMultiplierAlert                 bool                       `json:"enableMultiplierAlert"`
+	MultiplierNotifyBotIDs                []string                   `json:"multiplierNotifyBotIds"`
+	MultiplierTemplate                    string                     `json:"multiplierTemplate"`
+	MultiplierTemplateFormat              NotificationTemplateFormat `json:"multiplierTemplateFormat,omitempty"`
+	EnableAutoChangeMultiplier            bool                       `json:"enableAutoChangeMultiplier"`
 }
 
 // NotificationTemplateFormat 描述预警模板的源格式。空值和未知值都会在保存及发送前

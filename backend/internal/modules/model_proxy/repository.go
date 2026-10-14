@@ -28,7 +28,7 @@ func (r *Repository) ListRoutes(ctx context.Context, userID, accountID string) (
 			(SELECT count(*) FROM proxy_cleanup_jobs j WHERE j.route_id = r.id AND j.status <> 'done'),
 			r.model_synced_at, r.model_sync_error, r.created_at, r.updated_at,
 			(NULLIF(r.upstream_key_ciphertext, '') IS NOT NULL),
-			COALESCE(r.upstream_key_preview, ''),COALESCE(r.upstream_key_ciphertext, '')
+			COALESCE(r.upstream_key_preview, ''),COALESCE(r.upstream_key_ciphertext, ''),r.removed_models
 		FROM proxy_routes r
 		LEFT JOIN upstream_sites s ON s.id = r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id = r.egress_proxy_id
@@ -61,7 +61,7 @@ func (r *Repository) GetRoute(ctx context.Context, routeID string) (*Route, erro
 			(SELECT count(*) FROM proxy_cleanup_jobs j WHERE j.route_id = r.id AND j.status <> 'done'),
 			r.model_synced_at, r.model_sync_error, r.created_at, r.updated_at,
 			(NULLIF(r.upstream_key_ciphertext, '') IS NOT NULL),
-			COALESCE(r.upstream_key_preview, ''),COALESCE(r.upstream_key_ciphertext, '')
+			COALESCE(r.upstream_key_preview, ''),COALESCE(r.upstream_key_ciphertext, ''),r.removed_models
 		FROM proxy_routes r
 		LEFT JOIN upstream_sites s ON s.id = r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id = r.egress_proxy_id
@@ -86,7 +86,7 @@ func (r *Repository) GetRouteForModelRefresh(ctx context.Context, routeID string
 			r.model_synced_at, r.model_sync_error, r.created_at, r.updated_at,
 			(COALESCE(NULLIF(r.upstream_key_ciphertext, ''), prepared.upstream_key_ciphertext) IS NOT NULL),
 			COALESCE(NULLIF(r.upstream_key_preview, ''), prepared.upstream_key_preview, ''),
-			COALESCE(NULLIF(r.upstream_key_ciphertext, ''), prepared.upstream_key_ciphertext, '')
+			COALESCE(NULLIF(r.upstream_key_ciphertext, ''), prepared.upstream_key_ciphertext, ''),r.removed_models
 		FROM proxy_routes r
 		LEFT JOIN upstream_sites s ON s.id = r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id = r.egress_proxy_id
@@ -122,12 +122,16 @@ func scanRoute(row routeScanner) (Route, error) {
 
 func scanRouteWithRefreshKey(row routeScanner) (Route, error) {
 	var route Route
+	var removedJSON []byte
 	err := row.Scan(&route.ID, &route.UserID, &route.AdminAccountID, &route.Name, &route.SiteID,
 		&route.SiteName, &route.GroupID, &route.GroupName, &route.ConcurrencyLimit, &route.Enabled,
 		&route.ProxyID, &route.ProxyName,
 		&route.KeyPreview, &route.ModelCount, &route.CleanupPending, &route.ModelSyncedAt,
 		&route.ModelSyncError, &route.CreatedAt, &route.UpdatedAt,
-		&route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext)
+		&route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext, &removedJSON)
+	if err == nil {
+		err = json.Unmarshal(removedJSON, &route.RemovedModels)
+	}
 	route.RouteProvidedKey = route.UseProvidedKey
 	return route, err
 }
@@ -140,6 +144,7 @@ func scanGroupRoute(row routeScanner) (Route, error) {
 func scanRouteWithPolicy(row routeScanner) (Route, error) {
 	var route Route
 	var mappingJSON []byte
+	var removedJSON []byte
 	err := row.Scan(&route.ID, &route.UserID, &route.AdminAccountID, &route.Name, &route.SiteID,
 		&route.SiteName, &route.GroupID, &route.GroupName, &route.ConcurrencyLimit, &route.Enabled,
 		&route.ProxyID, &route.ProxyName,
@@ -148,7 +153,10 @@ func scanRouteWithPolicy(row routeScanner) (Route, error) {
 		&route.StreamOnly, &route.MinInputTokens, &route.RequestsPerMinute, &route.Priority,
 		&route.RouteProvidedKey, &route.MemberProvidedKey, &route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext,
 		&route.KeywordMatchMode, &route.ModelMappingEnabled, &mappingJSON,
-		&route.SyncKeyDeleteEnabled, &route.SyncKeyDeleteDelayMS, &route.SchedulingPaused, &route.MemberPolicyRevision)
+		&route.SyncKeyDeleteEnabled, &route.SyncKeyDeleteDelayMS, &route.SchedulingPaused, &route.MemberPolicyRevision, &removedJSON)
+	if err == nil {
+		err = json.Unmarshal(removedJSON, &route.RemovedModels)
+	}
 	route.ModelMapping = decodeModelMapping(mappingJSON)
 	return route, err
 }
@@ -596,7 +604,7 @@ func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enable
 				THEN COALESCE(gm.upstream_key_preview,'') ELSE COALESCE(r.upstream_key_preview,'') END,
 			COALESCE(CASE WHEN gm.use_upstream_key THEN NULLIF(gm.upstream_key_ciphertext,'') END,r.upstream_key_ciphertext,''),
 			CASE WHEN gm.keyword_check_enabled THEN gm.keyword_match_mode ELSE 'disabled' END,gm.model_mapping_enabled,
-			COALESCE(gm.model_mapping,'{}'::jsonb),gm.sync_key_delete_enabled,gm.sync_key_delete_delay_ms,gm.scheduling_paused,gm.policy_revision
+			COALESCE(gm.model_mapping,'{}'::jsonb),gm.sync_key_delete_enabled,gm.sync_key_delete_delay_ms,gm.scheduling_paused,gm.policy_revision,r.removed_models
 		FROM proxy_smart_group_members gm JOIN proxy_routes r ON r.id=gm.route_id
 		LEFT JOIN upstream_sites s ON s.id=r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id
@@ -720,7 +728,7 @@ func (r *Repository) RoutesNeedingRefresh(ctx context.Context, staleBefore time.
 			r.model_synced_at,r.model_sync_error,r.created_at,r.updated_at,
 			(COALESCE(NULLIF(r.upstream_key_ciphertext,''),prepared.upstream_key_ciphertext) IS NOT NULL),
 			COALESCE(NULLIF(r.upstream_key_preview,''),prepared.upstream_key_preview,''),
-			COALESCE(NULLIF(r.upstream_key_ciphertext,''),prepared.upstream_key_ciphertext,'')
+			COALESCE(NULLIF(r.upstream_key_ciphertext,''),prepared.upstream_key_ciphertext,''),r.removed_models
 		FROM proxy_routes r
 		LEFT JOIN upstream_sites s ON s.id=r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id

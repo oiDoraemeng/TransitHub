@@ -72,6 +72,8 @@ export const testRouteModel = (id: string, input: { groupId?: string; modelId: s
   request<RouteModelTestResult>(`/proxy-routes/${encodeURIComponent(id)}/test`, { method: 'POST', body: JSON.stringify(input), signal })
 export const restoreRouteScheduling = (id: string, input: { groupId?: string; token: string }, signal?: AbortSignal) =>
   request<{ success: boolean }>(`/proxy-routes/${encodeURIComponent(id)}/restore-scheduling`, { method: 'POST', body: JSON.stringify(input), signal })
+export const removeRouteModel = (id: string, input: { modelId: string; protocol: string }) =>
+  request<{ success: boolean }>(`/proxy-routes/${encodeURIComponent(id)}/remove-model`, { method: 'POST', body: JSON.stringify(input) })
 
 export const listModelEgressProxies = () => request<ModelEgressProxy[]>('/model-proxies')
 export const createModelEgressProxy = (input: ModelEgressProxyInput & { url: string }) => request<ModelEgressProxy>('/model-proxies', { method: 'POST', body: JSON.stringify(input) })

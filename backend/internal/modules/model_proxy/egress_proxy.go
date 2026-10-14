@@ -88,6 +88,21 @@ func doWithResponseHeaderTimeout(client *http.Client, request *http.Request, tim
 		return client.Do(request)
 	}
 	requestContext, cancel := context.WithCancel(request.Context())
+	// The shared transport's 90-second header cap must not silently override a
+	// longer configured recovery timeout. Only these exceptional requests need
+	// a separate pool, closed together with their response body.
+	if transport, ok := client.Transport.(*http.Transport); ok && transport.ResponseHeaderTimeout > 0 && timeout > transport.ResponseHeaderTimeout {
+		probeTransport := transport.Clone()
+		probeTransport.ResponseHeaderTimeout = timeout
+		probeClient := *client
+		probeClient.Transport = probeTransport
+		client = &probeClient
+		cancelRequest := cancel
+		cancel = func() {
+			cancelRequest()
+			probeTransport.CloseIdleConnections()
+		}
+	}
 	timer := time.AfterFunc(timeout, cancel)
 	response, err := client.Do(request.WithContext(requestContext))
 	if !timer.Stop() && request.Context().Err() == nil {

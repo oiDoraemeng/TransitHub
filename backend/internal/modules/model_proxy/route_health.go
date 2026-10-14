@@ -15,7 +15,7 @@ const (
 	routePauseDuration    = 30 * time.Minute
 	routeProbeInterval    = 3 * time.Minute
 	routeProbeTimeout     = 45 * time.Second
-	routeProbeClaimTTL    = routeProbeTimeout + 5*time.Second
+	routeProbeClaimTTL    = 65 * time.Second
 	routeProbeWorkers     = 8
 	routeProbeTick        = 5 * time.Second
 )
@@ -24,6 +24,7 @@ var errRoutePaused = errors.New("proxy route is temporarily paused")
 
 var routeRetryAllowedScript = redis.NewScript(routeHealthLua + `
 local untilMS = resumeExpired(KEYS[1], KEYS[2], ARGV[1], clockMS())
+if redis.call('HGET', KEYS[1], 'deleted') == '1' then return 0 end
 if untilMS > 0 or tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0') ~= tonumber(ARGV[2]) then return 0 end
 if ARGV[3] ~= '' and (redis.call('HGET', KEYS[3], 'isolated') == '1'
    or tonumber(redis.call('HGET', KEYS[3], 'epoch') or '0') ~= tonumber(ARGV[4])) then return 0 end
@@ -70,6 +71,7 @@ end
 var observeRouteResultScript = redis.NewScript(routeHealthLua + `
 local now = clockMS()
 local untilMS = resumeExpired(KEYS[1], KEYS[2], ARGV[1], now)
+if redis.call('HGET', KEYS[1], 'deleted') == '1' then return 0 end
 local epoch = tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0')
 if epoch ~= tonumber(ARGV[2]) then return untilMS end
 if untilMS > now then return untilMS end
@@ -81,7 +83,7 @@ local failures = redis.call('HINCRBY', KEYS[1], 'failures', 1)
 if failures >= tonumber(ARGV[4]) then
   untilMS = now + tonumber(ARGV[5])
   redis.call('HINCRBY', KEYS[1], 'epoch', 1)
-  redis.call('HSET', KEYS[1], 'paused_until', untilMS, 'probe_spec', ARGV[7])
+  redis.call('HSET', KEYS[1], 'paused_until', untilMS, 'probe_spec', ARGV[7], 'probe_attempts', 0)
   redis.call('ZADD', KEYS[2], now + tonumber(ARGV[6]), ARGV[1])
 end
 return untilMS
@@ -90,7 +92,7 @@ return untilMS
 var claimRouteProbeScript = redis.NewScript(routeHealthLua + `
 local now = clockMS()
 local untilMS = resumeExpired(KEYS[1], KEYS[2], ARGV[1], now)
-if untilMS == 0 then
+if untilMS == 0 or redis.call('HGET', KEYS[1], 'deleted') == '1' then
   redis.call('ZREM', KEYS[2], ARGV[1])
   return {}
 end
@@ -99,7 +101,8 @@ if due == 0 or due > now then return {} end
 redis.call('HSET', KEYS[1], 'probe_token', ARGV[2])
 redis.call('ZADD', KEYS[2], now + tonumber(ARGV[3]), ARGV[1])
 return {tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0'),
-        redis.call('HGET', KEYS[1], 'probe_spec') or '{}'}
+        redis.call('HGET', KEYS[1], 'probe_spec') or '{}',
+        tonumber(redis.call('HGET', KEYS[1], 'probe_attempts') or '0')}
 `)
 
 var finishRouteProbeScript = redis.NewScript(routeHealthLua + `
@@ -118,15 +121,17 @@ if ARGV[4] == '1' then
   return 1
 end
 -- Failed probes do not extend the original thirty-minute pause.
+if ARGV[6] == '1' then redis.call('HINCRBY', KEYS[1], 'probe_attempts', 1) end
 redis.call('ZADD', KEYS[2], math.min(untilMS, now + tonumber(ARGV[5])), ARGV[1])
 return 0
 `)
 
 type routeProbeClaim struct {
-	routeID string
-	token   string
-	epoch   int64
-	spec    routeProbeSpec
+	routeID  string
+	token    string
+	epoch    int64
+	spec     routeProbeSpec
+	attempts int64
 }
 
 var routeRuntimeScript = redis.NewScript(routeHealthLua + `
@@ -206,7 +211,7 @@ func (l *Limiter) claimRouteProbe(ctx context.Context, routeID string) (*routePr
 	if err != nil || len(values) == 0 {
 		return nil, err
 	}
-	if len(values) != 2 {
+	if len(values) != 3 {
 		return nil, errors.New("invalid route probe claim")
 	}
 	epoch, ok := values[0].(int64)
@@ -215,16 +220,18 @@ func (l *Limiter) claimRouteProbe(ctx context.Context, routeID string) (*routePr
 		return nil, errors.New("invalid route probe claim")
 	}
 	claim := &routeProbeClaim{routeID: routeID, token: token, epoch: epoch}
+	claim.attempts, _ = values[2].(int64)
 	if err := json.Unmarshal([]byte(encoded), &claim.spec); err != nil {
 		return nil, err
 	}
 	return claim, nil
 }
 
-func (l *Limiter) finishRouteProbe(ctx context.Context, claim *routeProbeClaim, success bool) (bool, error) {
+func (l *Limiter) finishRouteProbe(ctx context.Context, claim *routeProbeClaim, success bool, attempted ...bool) (bool, error) {
+	didAttempt := len(attempted) == 0 || attempted[0]
 	result, err := finishRouteProbeScript.Run(ctx, l.redis,
 		[]string{healthKey(claim.routeID), probeDueKey(), latencyKey(claim.routeID)},
-		claim.routeID, claim.epoch, claim.token, boolInt(success), routeProbeInterval.Milliseconds()).Int64()
+		claim.routeID, claim.epoch, claim.token, boolInt(success), routeProbeInterval.Milliseconds(), boolInt(didAttempt)).Int64()
 	return result == 1, err
 }
 
