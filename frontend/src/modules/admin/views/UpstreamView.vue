@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Search, Plus, CheckCircle2, XCircle, X, Loader2, AlertCircle, Trash2, Edit2, LayoutGrid, List, RefreshCw, Settings2, Layers3, ChevronRight } from 'lucide-vue-next'
+import { Search, Plus, CheckCircle2, XCircle, X, Loader2, AlertCircle, Trash2, Edit2, LayoutGrid, List, RefreshCw, Settings2, Layers3 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -329,12 +329,12 @@ onBeforeUnmount(() => {
       <div
         v-for="site in filteredSites"
         :key="site.id"
-        class="group relative flex min-w-0 flex-col rounded-xl border border-border/60 bg-card p-3 shadow-sm transition-[border-color,box-shadow] hover:border-primary/40 hover:shadow-md"
+        class="upstream-card group relative flex aspect-square min-w-0 flex-col overflow-hidden rounded-lg border border-border/60 bg-card p-2.5 shadow-sm transition-[border-color,box-shadow] hover:border-primary/40 hover:shadow-md 2xl:p-3"
       >
         <!-- Sync Progress Overlay -->
         <div
           v-if="siteSyncStates.get(site.id)?.phase && siteSyncStates.get(site.id)?.phase !== 'idle'"
-          class="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl backdrop-blur-sm transition-all"
+          class="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-lg backdrop-blur-sm transition-all"
           :class="{
             'bg-background/60': siteSyncStates.get(site.id)?.phase === 'syncing',
             'bg-signal/10 dark:bg-signal/5': siteSyncStates.get(site.id)?.phase === 'done',
@@ -355,124 +355,121 @@ onBeforeUnmount(() => {
           </template>
         </div>
 
-        <!-- Card Header -->
-        <div class="mb-3 space-y-2.5">
-          <div class="flex min-w-0 items-center gap-2">
-            <div :class="['flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base font-bold', site.logoBg]">
-              {{ site.logo }}
-            </div>
-            <div class="min-w-0"><a :href="site.baseUrl" target="_blank" rel="noopener noreferrer" class="block truncate text-sm font-semibold text-foreground transition-colors hover:text-primary" :title="site.name">{{ site.name }}</a><div class="mt-0.5 truncate text-[10px] text-muted-foreground" :title="site.baseUrl">{{ siteHost(site.baseUrl) }}</div></div>
+        <div class="flex min-w-0 items-start gap-2">
+          <div :class="['flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-bold', site.logoBg]">
+            {{ site.logo }}
           </div>
+          <div class="min-w-0 flex-1">
+            <a :href="site.baseUrl" target="_blank" rel="noopener noreferrer" class="block truncate text-xs font-semibold text-foreground transition-colors hover:text-primary 2xl:text-sm" :title="site.name">
+              {{ site.name }}
+            </a>
+            <div class="mt-0.5 flex min-w-0 items-center gap-1 text-[9px] text-muted-foreground 2xl:text-[10px]">
+              <span class="shrink-0">{{ t(`admin.upstream.modal.form.platforms.${site.platform}`) }}</span>
+              <span class="upstream-card__host" aria-hidden="true">·</span>
+              <span class="upstream-card__host truncate" :title="site.baseUrl">{{ siteHost(site.baseUrl) }}</span>
+            </div>
+          </div>
+          <div class="flex shrink-0 items-center gap-1">
+            <Tooltip v-if="site.errorKey" :text="t(site.errorKey)" wide>
+              <span class="inline-flex h-5 w-5 items-center justify-center rounded text-warning" :aria-label="t(site.errorKey)">
+                <AlertCircle class="h-3.5 w-3.5" />
+              </span>
+            </Tooltip>
+            <Tooltip :text="statusLabel(site.status)">
+              <span class="inline-flex h-5 w-5 items-center justify-center rounded border" :class="statusClasses[site.status]" :aria-label="statusLabel(site.status)">
+                <Loader2 v-if="site.status === 'connecting' || site.status === 'syncing'" class="h-3.5 w-3.5 animate-spin" />
+                <CheckCircle2 v-else-if="site.status === 'connected'" class="h-3.5 w-3.5" />
+                <XCircle v-else class="h-3.5 w-3.5" />
+              </span>
+            </Tooltip>
+          </div>
+        </div>
 
-          <div class="flex flex-wrap items-center justify-between gap-1.5">
-            <span class="w-fit rounded bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-              {{ t(`admin.upstream.modal.form.platforms.${site.platform}`) }}
-            </span>
-            <div
-              class="flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium"
-              :class="statusClasses[site.status]"
+        <div class="mt-2 rounded-md border border-primary/10 bg-primary/5 px-2 py-1.5 2xl:px-2.5 2xl:py-2">
+          <div class="text-[9px] font-medium text-muted-foreground 2xl:text-[10px]">{{ t('admin.upstream.fields.balance') }}</div>
+          <div class="mt-0.5 truncate text-base font-semibold leading-5 text-primary tabular-nums 2xl:text-lg" :title="cnyMetricDisplay(site, site.metrics.balance) || usdMetricDisplay(site.metrics.balance)">
+            {{ cnyMetricDisplay(site, site.metrics.balance) || usdMetricDisplay(site.metrics.balance) }}
+          </div>
+          <div v-if="cnyMetricDisplay(site, site.metrics.balance)" class="upstream-card__secondary-value truncate text-[9px] text-muted-foreground tabular-nums" :title="usdMetricDisplay(site.metrics.balance)">
+            {{ usdMetricDisplay(site.metrics.balance) }}
+          </div>
+        </div>
+
+        <dl class="upstream-card__metrics mt-1.5 grid grid-cols-2 divide-x divide-border/50">
+          <div class="min-w-0 pr-1.5">
+            <dt class="truncate text-[9px] text-muted-foreground 2xl:text-[10px]">{{ t('admin.upstream.fields.todayConsume') }}</dt>
+            <dd :class="['truncate text-[11px] font-semibold tabular-nums 2xl:text-xs', site.metrics.todayConsume.value && site.metrics.todayConsume.value > 0 ? 'text-orange-500' : 'text-foreground']" :title="cnyMetricDisplay(site, site.metrics.todayConsume) || usdMetricDisplay(site.metrics.todayConsume)">
+              {{ cnyMetricDisplay(site, site.metrics.todayConsume) || usdMetricDisplay(site.metrics.todayConsume) }}
+            </dd>
+            <dd v-if="cnyMetricDisplay(site, site.metrics.todayConsume)" class="upstream-card__secondary-value truncate text-[9px] text-muted-foreground tabular-nums" :title="usdMetricDisplay(site.metrics.todayConsume)">
+              {{ usdMetricDisplay(site.metrics.todayConsume) }}
+            </dd>
+          </div>
+          <div class="min-w-0 pl-1.5">
+            <dt class="truncate text-[9px] text-muted-foreground 2xl:text-[10px]">{{ t('admin.upstream.fields.historyRecharge') }}</dt>
+            <dd class="truncate text-[11px] font-semibold text-foreground tabular-nums 2xl:text-xs" :title="cnyMetricDisplay(site, site.metrics.historyRecharge) || usdMetricDisplay(site.metrics.historyRecharge)">
+              {{ cnyMetricDisplay(site, site.metrics.historyRecharge) || usdMetricDisplay(site.metrics.historyRecharge) }}
+            </dd>
+            <dd v-if="cnyMetricDisplay(site, site.metrics.historyRecharge)" class="upstream-card__secondary-value truncate text-[9px] text-muted-foreground tabular-nums" :title="usdMetricDisplay(site.metrics.historyRecharge)">
+              {{ usdMetricDisplay(site.metrics.historyRecharge) }}
+            </dd>
+          </div>
+        </dl>
+
+        <div class="mt-auto flex items-center justify-end border-t border-border/40 pt-1.5">
+          <Tooltip v-if="site.metrics.groups.length > 0" :text="t('admin.upstream.fields.viewAvailableGroups')">
+            <button
+              type="button"
+              class="mr-auto inline-flex h-6 items-center justify-center gap-0.5 rounded-md px-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary 2xl:h-7 2xl:px-1.5"
+              :aria-label="`${t('admin.upstream.fields.viewAvailableGroups')} (${site.metrics.groups.length})`"
+              @click="openGroupsModal(site)"
             >
-              <Loader2 v-if="site.status === 'connecting' || site.status === 'syncing'" class="w-3 h-3 animate-spin" />
-              <CheckCircle2 v-else-if="site.status === 'connected'" class="w-3 h-3" />
-              <XCircle v-else class="w-3 h-3" />
-              {{ statusLabel(site.status) }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Card Body (Stats) -->
-        <div class="flex flex-1 flex-col gap-3">
-          <div class="space-y-2">
-            <div class="mb-3 rounded-lg border border-primary/10 bg-primary/5 px-2.5 py-2.5">
-              <div class="text-[10px] font-medium text-muted-foreground">{{ t('admin.upstream.fields.balance') }}</div>
-              <div class="mt-1 break-words text-xl font-semibold leading-6 tracking-tight text-primary tabular-nums">{{ cnyMetricDisplay(site, site.metrics.balance) || usdMetricDisplay(site.metrics.balance) }}</div>
-              <div v-if="cnyMetricDisplay(site, site.metrics.balance)" class="mt-0.5 text-[10px] text-muted-foreground tabular-nums">{{ usdMetricDisplay(site.metrics.balance) }}</div>
-            </div>
-            <div class="flex items-baseline justify-between gap-2">
-              <span class="text-[11px] text-muted-foreground">{{ t('admin.upstream.fields.todayConsume') }}</span>
-              <div class="min-w-0 text-right [overflow-wrap:anywhere]">
-                <div v-if="cnyMetricDisplay(site, site.metrics.todayConsume)" :class="['text-xs font-semibold', site.metrics.todayConsume.value && site.metrics.todayConsume.value > 0 ? 'text-orange-500' : 'text-foreground']">
-                  {{ cnyMetricDisplay(site, site.metrics.todayConsume) }}
-                </div>
-                <div :class="[cnyMetricDisplay(site, site.metrics.todayConsume) ? 'text-[10px]' : 'text-xs font-semibold', site.metrics.todayConsume.value && site.metrics.todayConsume.value > 0 ? (cnyMetricDisplay(site, site.metrics.todayConsume) ? 'text-orange-500/70' : 'text-orange-500') : (cnyMetricDisplay(site, site.metrics.todayConsume) ? 'text-muted-foreground' : 'text-foreground')]">
-                  {{ usdMetricDisplay(site.metrics.todayConsume) }}
-                </div>
-              </div>
-            </div>
-            <div class="flex items-baseline justify-between gap-2">
-              <span class="text-[11px] text-muted-foreground">{{ t('admin.upstream.fields.historyRecharge') }}</span>
-              <div class="min-w-0 text-right [overflow-wrap:anywhere]">
-                <div v-if="cnyMetricDisplay(site, site.metrics.historyRecharge)" class="text-xs font-semibold text-foreground">
-                  {{ cnyMetricDisplay(site, site.metrics.historyRecharge) }}
-                </div>
-                <div :class="cnyMetricDisplay(site, site.metrics.historyRecharge) ? 'text-[10px] text-muted-foreground' : 'text-xs font-semibold text-foreground'">
-                  {{ usdMetricDisplay(site.metrics.historyRecharge) }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <Button
-            v-if="site.metrics.groups.length > 0"
-            variant="secondary"
-            class="h-8 w-full justify-start gap-1.5 rounded-lg border border-border/40 bg-surface/50 px-2 text-[11px] font-medium hover:bg-primary/5"
-            @click="openGroupsModal(site)"
-          >
-            <Layers3 class="h-3.5 w-3.5 text-muted-foreground" />{{ t('admin.upstream.fields.viewAvailableGroups') }}<span class="ml-auto rounded bg-surface px-1.5 text-[10px] tabular-nums">{{ site.metrics.groups.length }}</span><ChevronRight class="h-3 w-3 text-muted-foreground" />
-          </Button>
-
-          <!-- Card Actions (Edit/Delete) -->
-          <div class="mt-auto space-y-2 border-t border-border/40 pt-2">
-            <div class="flex min-w-0 items-center justify-between gap-1 text-[10px] leading-4 text-muted-foreground">
-              <span class="shrink-0">{{ t('admin.upstream.fields.lastUpdated') }}</span>
-              <span class="truncate text-foreground/80" :title="lastUpdatedDisplay(site)">{{ lastUpdatedDisplay(site) }}</span>
-            </div>
-            <div class="flex items-center justify-end gap-1">
-              <Tooltip :text="syncingSiteIds.has(site.id) ? t('admin.upstream.action.syncing') : t('admin.upstream.action.sync')">
-                <button
-                  type="button"
-                  class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  :disabled="syncingSiteIds.has(site.id)"
-                  :aria-label="t('admin.upstream.action.sync')" @click="refreshSingleSite(site.id)"
-                >
-                  <Loader2 v-if="syncingSiteIds.has(site.id)" class="h-4 w-4 animate-spin" />
-                  <RefreshCw v-else class="h-4 w-4" />
-                </button>
-              </Tooltip>
-              <Tooltip :text="t('admin.upstream.action.settings')">
-                <button
-                  type="button"
-                  class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  :aria-label="t('admin.upstream.action.settings')" @click="openSiteSettings(site)"
-                >
-                  <Settings2 class="h-4 w-4" />
-                </button>
-              </Tooltip>
-              <Tooltip :text="t('admin.upstream.action.edit')">
-                <button
-                  type="button"
-                  class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  :aria-label="t('admin.upstream.action.edit')" @click="handleEditSite(site)"
-                >
-                  <Edit2 class="h-4 w-4" />
-                </button>
-              </Tooltip>
-              <Tooltip :text="t('admin.upstream.delete.action')">
-                <button
-                  type="button"
-                  class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  :aria-label="t('admin.upstream.delete.action')" @click="requestDeleteSite(site.id)"
-                >
-                  <Trash2 class="h-4 w-4" />
-                </button>
-              </Tooltip>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="site.errorKey" class="mt-2 flex items-start gap-1.5 rounded-md border border-warning/20 bg-warning/10 px-2 py-1.5 text-[11px] text-warning">
-          <AlertCircle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>{{ t(site.errorKey) }}</span>
+              <Layers3 class="h-3.5 w-3.5" />
+              <span class="text-[9px] font-semibold tabular-nums">{{ site.metrics.groups.length }}</span>
+            </button>
+          </Tooltip>
+          <Tooltip :text="`${syncingSiteIds.has(site.id) ? t('admin.upstream.action.syncing') : t('admin.upstream.action.sync')} · ${t('admin.upstream.fields.lastUpdated')}: ${lastUpdatedDisplay(site)}`" wide>
+            <button
+              type="button"
+              class="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary 2xl:h-7 2xl:w-7"
+              :disabled="syncingSiteIds.has(site.id)"
+              :aria-label="t('admin.upstream.action.sync')"
+              @click="refreshSingleSite(site.id)"
+            >
+              <Loader2 v-if="syncingSiteIds.has(site.id)" class="h-3.5 w-3.5 animate-spin 2xl:h-4 2xl:w-4" />
+              <RefreshCw v-else class="h-3.5 w-3.5 2xl:h-4 2xl:w-4" />
+            </button>
+          </Tooltip>
+          <Tooltip :text="t('admin.upstream.siteSettings.title')">
+            <button
+              type="button"
+              class="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary 2xl:h-7 2xl:w-7"
+              :aria-label="t('admin.upstream.action.settings')"
+              @click="openSiteSettings(site)"
+            >
+              <Settings2 class="h-3.5 w-3.5 2xl:h-4 2xl:w-4" />
+            </button>
+          </Tooltip>
+          <Tooltip :text="t('admin.upstream.action.edit')">
+            <button
+              type="button"
+              class="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary 2xl:h-7 2xl:w-7"
+              :aria-label="t('admin.upstream.action.edit')"
+              @click="handleEditSite(site)"
+            >
+              <Edit2 class="h-3.5 w-3.5 2xl:h-4 2xl:w-4" />
+            </button>
+          </Tooltip>
+          <Tooltip :text="t('admin.upstream.delete.action')">
+            <button
+              type="button"
+              class="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary 2xl:h-7 2xl:w-7"
+              :aria-label="t('admin.upstream.delete.action')"
+              @click="requestDeleteSite(site.id)"
+            >
+              <Trash2 class="h-3.5 w-3.5 2xl:h-4 2xl:w-4" />
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>
@@ -1028,3 +1025,22 @@ onBeforeUnmount(() => {
     />
   </div>
 </template>
+
+<style scoped>
+.upstream-card {
+  container-type: inline-size;
+}
+
+@container (max-width: 219px) {
+  .upstream-card__secondary-value,
+  .upstream-card__host {
+    display: none;
+  }
+}
+
+@container (max-width: 179px) {
+  .upstream-card__metrics {
+    display: none;
+  }
+}
+</style>
