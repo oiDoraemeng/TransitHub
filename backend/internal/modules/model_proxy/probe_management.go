@@ -51,14 +51,14 @@ for _, id in ipairs(redis.call('SMEMBERS', KEYS[3])) do
   redis.call('DEL', ARGV[2] .. id)
 end
 redis.call('ZREM', KEYS[2], ARGV[1])
-redis.call('DEL', KEYS[1], KEYS[3], KEYS[5], KEYS[6], KEYS[7])
+redis.call('DEL', KEYS[1], KEYS[3], KEYS[5], KEYS[6], KEYS[7], KEYS[8])
 redis.call('HSET', KEYS[1], 'epoch', epoch, 'deleted', 1)
 return 1
 `)
 
 func (l *Limiter) removeRouteRuntime(ctx context.Context, routeID string) error {
 	return removeRouteRuntimeScript.Run(ctx, l.redis,
-		[]string{healthKey(routeID), probeDueKey(), routeModelIndexKey(routeID), modelProbeDueKey(), leaseKey(routeID), latencyKey(routeID), manualTestKey(routeID)},
+		[]string{healthKey(routeID), probeDueKey(), routeModelIndexKey(routeID), modelProbeDueKey(), leaseKey(routeID), latencyKey(routeID), manualTestKey(routeID), schedulerBalanceKey(routeID)},
 		routeID, modelHealthKey("")).Err()
 }
 
