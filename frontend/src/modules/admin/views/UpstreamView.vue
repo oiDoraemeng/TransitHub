@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip } from '@/components/ui/tooltip'
 import { getStrategySettings } from '../api/settings'
+import { listModelEgressProxies } from '../api/modelProxy'
 import { useUpstreamSites } from '../composables/useUpstreamSites'
 import SiteSettingsModal from '../components/upstream/SiteSettingsModal.vue'
 import type { UpstreamGroupInfo, UpstreamMetricValue, UpstreamSite, UpstreamSiteForm, UpstreamStatus } from '../types/upstream'
+import type { ModelEgressProxy } from '../types/modelProxy'
 
 const { t, locale } = useI18n()
 
@@ -22,6 +24,15 @@ const refreshIntervalSeconds = ref<number | null>(null)
 const remainingSeconds = ref(0)
 let countdownTimer: ReturnType<typeof window.setInterval> | null = null
 const nextRefreshAtStorageKey = 'transit-hub:upstream-next-refresh-at'
+const egressProxies = ref<ModelEgressProxy[]>([])
+
+const loadEgressProxies = async () => {
+  try {
+    egressProxies.value = await listModelEgressProxies()
+  } catch {
+    egressProxies.value = []
+  }
+}
 
 const viewMode = ref<'card' | 'list'>('card')
 
@@ -97,6 +108,7 @@ const createEmptyForm = (): UpstreamSiteForm => ({
   userId: '',
   rechargeRate: 1,
   remark: '',
+  proxyId: '',
 })
 
 const newSiteForm = ref<UpstreamSiteForm>(createEmptyForm())
@@ -122,7 +134,13 @@ const handleAddSite = async () => {
   editingSiteId.value = null
 }
 
+const openAddSite = () => {
+  void loadEgressProxies()
+  isAddModalOpen.value = true
+}
+
 const handleEditSite = (site: UpstreamSite) => {
+  void loadEgressProxies()
   editingSiteId.value = site.id
   newSiteForm.value = {
     name: site.name,
@@ -137,6 +155,7 @@ const handleEditSite = (site: UpstreamSite) => {
     userId: '',
     rechargeRate: site.rechargeRate > 0 ? site.rechargeRate : 1,
     remark: site.remark,
+    proxyId: site.proxyId ?? '',
   }
   isAddModalOpen.value = true
 }
@@ -254,6 +273,7 @@ const lastUpdatedDisplay = (site: UpstreamSite): string => {
 
 onMounted(() => {
   void loadRefreshSettings()
+  void loadEgressProxies()
 })
 
 onBeforeUnmount(() => {
@@ -317,7 +337,7 @@ onBeforeUnmount(() => {
           <RefreshCw v-else class="w-4 h-4" />
           {{ isRefreshing ? t('admin.upstream.refresh.refreshing') : t('admin.upstream.refresh.action') }}
         </Button>
-        <Button @click="isAddModalOpen = true" class="h-10 flex-1 gap-2 px-4 shadow-sm sm:flex-none">
+        <Button @click="openAddSite" class="h-10 flex-1 gap-2 px-4 shadow-sm sm:flex-none">
           <Plus class="w-4 h-4" />
           {{ t('admin.upstream.addSite') }}
         </Button>
@@ -814,6 +834,28 @@ onBeforeUnmount(() => {
                   required
                   class="bg-surface border-border/50 focus:border-primary h-10"
                 />
+              </div>
+
+              <!-- Optional IP management egress -->
+              <div class="space-y-2 sm:col-span-2">
+                <label for="upstream-site-proxy" class="text-sm font-medium text-foreground">
+                  {{ t('admin.upstream.modal.form.proxy') }}
+                </label>
+                <select
+                  id="upstream-site-proxy"
+                  v-model="newSiteForm.proxyId"
+                  name="proxyId"
+                  :disabled="isAdding"
+                  class="h-10 w-full rounded-lg border border-border/50 bg-surface px-3 text-sm text-foreground outline-none transition-[color,background-color,border-color,box-shadow] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">{{ t('admin.upstream.modal.form.proxyDirect') }}</option>
+                  <option v-for="proxy in egressProxies" :key="proxy.id" :value="proxy.id" :disabled="!proxy.enabled">
+                    {{ proxy.name }} · {{ proxy.address }}{{ proxy.enabled ? '' : ` (${t('admin.upstream.modal.form.proxyDisabled')})` }}
+                  </option>
+                </select>
+                <p class="text-xs leading-5 text-muted-foreground">
+                  {{ t('admin.upstream.modal.form.proxyHelp') }}
+                </p>
               </div>
 
               <!-- Auth Mode -->

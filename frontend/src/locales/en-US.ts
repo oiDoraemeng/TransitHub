@@ -1465,6 +1465,10 @@ export default {
           siteNamePlaceholder: 'Enter site name',
           siteUrl: 'Site URL',
           siteUrlPlaceholder: 'Enter full site URL, e.g. https://api.example.com',
+          proxy: 'Balance Request Proxy',
+          proxyDirect: 'Direct (default)',
+          proxyDisabled: 'Disabled',
+          proxyHelp: 'Choose an egress proxy from IP Management. Leave it empty to access the upstream directly.',
           platform: 'Platform',
           platforms: {
             auto: 'Auto Detect',

@@ -30,6 +30,13 @@ type SiteDeleteGuard interface {
 	SiteInUse(ctx context.Context, siteID string) (bool, error)
 }
 
+// EgressProxyClientProvider resolves an optional IP-management proxy into a
+// short-lived HTTP client. The upstream package depends only on this narrow
+// interface to avoid coupling its persistence and request logic to model_proxy.
+type EgressProxyClientProvider interface {
+	EgressHTTPClient(ctx context.Context, userID, adminAccountID, proxyID string) (*HTTPClient, func(), error)
+}
+
 // RefreshConfig 控制后台定时同步行为，由系统设置模块驱动。
 type RefreshConfig struct {
 	Enabled  bool
@@ -46,6 +53,7 @@ type Service struct {
 	cache           SiteCache
 	accounts        AdminAccountResolver
 	deleteGuard     SiteDeleteGuard
+	proxyProvider   EgressProxyClientProvider
 	refreshConfig   RefreshConfig
 	timers          map[string]*time.Timer
 	deletedSites    map[string]struct{}
@@ -60,6 +68,35 @@ func (s *Service) SetAdminAccountResolver(accounts AdminAccountResolver) {
 }
 
 func (s *Service) SetSiteDeleteGuard(guard SiteDeleteGuard) { s.deleteGuard = guard }
+
+func (s *Service) SetEgressProxyClientProvider(provider EgressProxyClientProvider) {
+	s.proxyProvider = provider
+}
+
+func (s *Service) platformForProxy(ctx context.Context, site *Site) (*PlatformService, func(), error) {
+	if site == nil || strings.TrimSpace(site.ProxyID) == "" {
+		return s.platformService, func() {}, nil
+	}
+	if s.proxyProvider == nil {
+		return nil, func() {}, errors.New("selected upstream IP proxy is unavailable")
+	}
+	client, release, err := s.proxyProvider.EgressHTTPClient(ctx, site.UserID, site.AdminAccountID, strings.TrimSpace(site.ProxyID))
+	if err != nil {
+		return nil, func() {}, err
+	}
+	if release == nil {
+		release = func() {}
+	}
+	return s.platformService.WithHTTPClient(client), release, nil
+}
+
+func (s *Service) validateProxy(ctx context.Context, site *Site) error {
+	_, release, err := s.platformForProxy(ctx, site)
+	if release != nil {
+		defer release()
+	}
+	return err
+}
 
 // requireCurrentAdminAccountID 解析当前工作区 ID，解析失败时返回错误（fail-closed）。
 // 面向用户的业务接口必须使用此方法，确保无法解析 workspace 时不会泄露全量数据。
@@ -212,15 +249,20 @@ func (s *Service) FetchGroupDailyStats(ctx context.Context, userID string, id st
 	session := *site.Session
 	groups := append([]GroupInfo(nil), site.Metrics.Groups...)
 
-	refreshedSession, err := s.platformService.RefreshSession(session)
+	platformService, release, err := s.platformForProxy(ctx, site)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	refreshedSession, err := platformService.RefreshSession(session)
 	if err != nil {
 		return nil, err
 	}
 	var stats []GroupDailyStat
 	if refreshedSession.Platform == PlatformNewAPI {
-		stats, err = s.platformService.FetchNewAPIGroupDailyStats(refreshedSession, groups)
+		stats, err = platformService.FetchNewAPIGroupDailyStats(refreshedSession, groups)
 	} else if refreshedSession.Platform == PlatformSub2API {
-		stats, err = s.platformService.FetchSub2APIGroupDailyStats(refreshedSession, groups)
+		stats, err = platformService.FetchSub2APIGroupDailyStats(refreshedSession, groups)
 	} else {
 		return nil, newRequestError(ErrorNotFound, "")
 	}
@@ -286,13 +328,19 @@ func (s *Service) KeyUsageToday(ctx context.Context, userID string) ([]KeyUsageT
 			session := *site.Session
 			groups := append([]GroupInfo(nil), site.Metrics.Groups...)
 
-			refreshedSession, refreshErr := s.platformService.RefreshSession(session)
+			platformService, release, refreshErr := s.platformForProxy(ctx, site)
+			if refreshErr != nil {
+				recordFailure(refreshErr)
+				return
+			}
+			defer release()
+			refreshedSession, refreshErr := platformService.RefreshSession(session)
 			if refreshErr != nil {
 				recordFailure(refreshErr)
 				return
 			}
 
-			stats, fetchErr := s.platformService.FetchKeyUsageToday(refreshedSession, groups)
+			stats, fetchErr := platformService.FetchKeyUsageToday(refreshedSession, groups)
 			if fetchErr != nil {
 				recordFailure(fetchErr)
 				return
@@ -404,6 +452,7 @@ func (s *Service) Create(ctx context.Context, userID string, dto CreateRequest) 
 		ID:                id,
 		UserID:            userID,
 		AdminAccountID:    adminAccountID,
+		ProxyID:           strings.TrimSpace(dto.ProxyID),
 		Name:              strings.TrimSpace(dto.Name),
 		BaseURL:           strings.TrimSpace(dto.SiteURL),
 		Platform:          platform,
@@ -417,6 +466,9 @@ func (s *Service) Create(ctx context.Context, userID string, dto CreateRequest) 
 		LastSyncedAt:      nil,
 		Session:           nil,
 	}
+	if err := s.validateProxy(ctx, site); err != nil {
+		return Response{}, newRequestError(ErrorRequest, site.Platform)
+	}
 
 	// 先写入缓存和数据库。
 	if err := s.setCachedSite(ctx, site); err != nil {
@@ -428,7 +480,7 @@ func (s *Service) Create(ctx context.Context, userID string, dto CreateRequest) 
 	}
 
 	log.Printf("[upstream] 创建站点登录开始 name=%s url=%s platform=%s", dto.Name, dto.SiteURL, dto.Platform)
-	result, loginErr := s.createLogin(dto)
+	result, loginErr := s.createLogin(ctx, site, dto)
 	if loginErr != nil {
 		log.Printf("[upstream] 创建站点登录失败 name=%s err=%v", dto.Name, loginErr)
 		site.Status = StatusError
@@ -501,14 +553,19 @@ func (s *Service) Update(ctx context.Context, userID string, id string, dto Upda
 	}
 	site.Remark = strings.TrimSpace(dto.Remark)
 	site.RechargeRate = dto.RechargeRate
+	site.ProxyID = strings.TrimSpace(dto.ProxyID)
 	shouldRelogin := strings.TrimSpace(dto.Password) != "" || strings.TrimSpace(dto.AccessToken) != "" || strings.TrimSpace(dto.RefreshToken) != ""
+	if err := s.validateProxy(ctx, site); err != nil {
+		s.restoreSite(ctx, id, &previousSite)
+		return Response{}, newRequestError(ErrorRequest, site.Platform)
+	}
 
 	if shouldRelogin {
 		// 先保存基本字段更新到缓存。
 		_ = s.setCachedSite(ctx, site)
 
 		log.Printf("[upstream] 更新站点登录开始 id=%s name=%s url=%s", id, dto.Name, dto.SiteURL)
-		result, loginErr := s.updateLogin(dto)
+		result, loginErr := s.updateLogin(ctx, site, dto)
 		if loginErr != nil {
 			log.Printf("[upstream] 更新站点登录失败 id=%s name=%s err=%v", id, dto.Name, loginErr)
 		} else {
@@ -578,25 +635,35 @@ func resolvedPlatform(platform Platform) Platform {
 	return PlatformNewAPI
 }
 
-func (s *Service) createLogin(dto CreateRequest) (LoginResult, error) {
+func (s *Service) createLogin(ctx context.Context, site *Site, dto CreateRequest) (LoginResult, error) {
+	platformService, release, err := s.platformForProxy(ctx, site)
+	if err != nil {
+		return LoginResult{}, err
+	}
+	defer release()
 	switch normalizedAuthMode(dto.AuthMode) {
 	case AuthModeToken:
-		return s.platformService.LoginWithToken(dto.SiteURL, dto.Platform, dto.Account, dto.AccessToken, dto.RefreshToken, dto.TokenType)
+		return platformService.LoginWithToken(dto.SiteURL, dto.Platform, dto.Account, dto.AccessToken, dto.RefreshToken, dto.TokenType)
 	case AuthModeUserKey:
-		return s.platformService.LoginWithUserKey(dto.SiteURL, dto.UserID, dto.AccessToken)
+		return platformService.LoginWithUserKey(dto.SiteURL, dto.UserID, dto.AccessToken)
 	default:
-		return s.platformService.Login(dto.SiteURL, dto.Platform, dto.Account, dto.Password)
+		return platformService.Login(dto.SiteURL, dto.Platform, dto.Account, dto.Password)
 	}
 }
 
-func (s *Service) updateLogin(dto UpdateRequest) (LoginResult, error) {
+func (s *Service) updateLogin(ctx context.Context, site *Site, dto UpdateRequest) (LoginResult, error) {
+	platformService, release, err := s.platformForProxy(ctx, site)
+	if err != nil {
+		return LoginResult{}, err
+	}
+	defer release()
 	switch normalizedAuthMode(dto.AuthMode) {
 	case AuthModeToken:
-		return s.platformService.LoginWithToken(dto.SiteURL, dto.Platform, dto.Account, dto.AccessToken, dto.RefreshToken, dto.TokenType)
+		return platformService.LoginWithToken(dto.SiteURL, dto.Platform, dto.Account, dto.AccessToken, dto.RefreshToken, dto.TokenType)
 	case AuthModeUserKey:
-		return s.platformService.LoginWithUserKey(dto.SiteURL, dto.UserID, dto.AccessToken)
+		return platformService.LoginWithUserKey(dto.SiteURL, dto.UserID, dto.AccessToken)
 	default:
-		return s.platformService.Login(dto.SiteURL, dto.Platform, dto.Account, dto.Password)
+		return platformService.Login(dto.SiteURL, dto.Platform, dto.Account, dto.Password)
 	}
 }
 
@@ -775,10 +842,18 @@ func (s *Service) sync(ctx context.Context, id string) (Response, error) {
 	session := *site.Session
 
 	// 刷新会话并拉取指标（无锁操作，可能耗时较长）。
-	refreshedSession, refreshErr := s.platformService.RefreshSession(session)
+	platformService, release, proxyErr := s.platformForProxy(ctx, site)
+	defer release()
+	refreshedSession := session
+	var refreshErr error
+	if proxyErr != nil {
+		refreshErr = proxyErr
+	} else {
+		refreshedSession, refreshErr = platformService.RefreshSession(session)
+	}
 	metrics := Metrics{}
 	if refreshErr == nil {
-		metrics, refreshErr = s.platformService.FetchMetrics(refreshedSession)
+		metrics, refreshErr = platformService.FetchMetrics(refreshedSession)
 	}
 
 	// 重新读取站点确认仍存在（可能在同步期间被删除）。
@@ -1087,7 +1162,12 @@ func (s *Service) FreshSiteSession(ctx context.Context, siteID string) (Session,
 	if site == nil || site.Session == nil {
 		return Session{}, newRequestError(ErrorNotFound, "")
 	}
-	refreshed, err := s.platformService.RefreshSession(*site.Session)
+	platformService, release, proxyErr := s.platformForProxy(ctx, site)
+	defer release()
+	if proxyErr != nil {
+		return Session{}, proxyErr
+	}
+	refreshed, err := platformService.RefreshSession(*site.Session)
 	if err != nil {
 		return Session{}, err
 	}
@@ -1108,7 +1188,12 @@ func (s *Service) ForceRefreshSiteSession(ctx context.Context, siteID string) (S
 	if site == nil || site.Session == nil {
 		return Session{}, newRequestError(ErrorNotFound, "")
 	}
-	refreshed, err := s.platformService.ForceRefreshSession(*site.Session)
+	platformService, release, proxyErr := s.platformForProxy(ctx, site)
+	defer release()
+	if proxyErr != nil {
+		return Session{}, proxyErr
+	}
+	refreshed, err := platformService.ForceRefreshSession(*site.Session)
 	if err != nil {
 		return Session{}, err
 	}
@@ -1125,6 +1210,8 @@ func toResponse(site *Site) Response {
 	return Response{
 		ID:                site.ID,
 		UserID:            site.UserID,
+		AdminAccountID:    site.AdminAccountID,
+		ProxyID:           site.ProxyID,
 		Name:              site.Name,
 		BaseURL:           site.BaseURL,
 		Platform:          site.Platform,

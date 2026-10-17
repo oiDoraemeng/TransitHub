@@ -60,6 +60,11 @@ func (r *Repository) EnsureSchema(ctx context.Context) error {
 		return err
 	}
 	if _, err := r.db.Exec(ctx, `
+		ALTER TABLE upstream_sites ADD COLUMN IF NOT EXISTS egress_proxy_id text NULL
+	`); err != nil {
+		return err
+	}
+	if _, err := r.db.Exec(ctx, `
 		WITH single_user AS (
 			SELECT min(id) AS id
 			FROM users
@@ -72,16 +77,23 @@ func (r *Repository) EnsureSchema(ctx context.Context) error {
 	`); err != nil {
 		return err
 	}
-	_, err := r.db.Exec(ctx, `
+	if _, err := r.db.Exec(ctx, `
 		CREATE INDEX IF NOT EXISTS idx_upstream_sites_user_created
 		ON upstream_sites (user_id, created_at ASC, id ASC)
+	`); err != nil {
+		return err
+	}
+	_, err := r.db.Exec(ctx, `
+		CREATE INDEX IF NOT EXISTS idx_upstream_sites_egress_proxy
+		ON upstream_sites (egress_proxy_id)
+		WHERE egress_proxy_id IS NOT NULL
 	`)
 	return err
 }
 
 func (r *Repository) ListSites(ctx context.Context) ([]Site, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, user_id, admin_account_id, name, base_url, platform, requested_platform, account, remark,
+		SELECT id, user_id, admin_account_id, egress_proxy_id, name, base_url, platform, requested_platform, account, remark,
 			recharge_rate, status, error_key, metrics, session, settings, last_synced_at
 		FROM upstream_sites
 		WHERE user_id <> ''
@@ -95,7 +107,7 @@ func (r *Repository) ListSites(ctx context.Context) ([]Site, error) {
 
 func (r *Repository) ListSitesForUser(ctx context.Context, userID string) ([]Site, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, user_id, admin_account_id, name, base_url, platform, requested_platform, account, remark,
+		SELECT id, user_id, admin_account_id, egress_proxy_id, name, base_url, platform, requested_platform, account, remark,
 			recharge_rate, status, error_key, metrics, session, settings, last_synced_at
 		FROM upstream_sites
 		WHERE user_id = $1
@@ -129,15 +141,16 @@ func (r *Repository) SaveSite(ctx context.Context, site Site) error {
 	now := time.Now()
 	result, err := r.db.Exec(ctx, `
 		INSERT INTO upstream_sites (
-			id, user_id, admin_account_id, name, base_url, platform, requested_platform, account, remark,
+			id, user_id, admin_account_id, egress_proxy_id, name, base_url, platform, requested_platform, account, remark,
 			recharge_rate, status, error_key, metrics, session, settings, last_synced_at,
 			created_at, updated_at
 		)
-		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb, $15::jsonb, $16, $17, $17
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15::jsonb, $16::jsonb, $17, $18, $18
 		WHERE EXISTS (SELECT 1 FROM admin_accounts WHERE user_id = $2 AND id = $3)
 		ON CONFLICT (id) DO UPDATE SET
 			user_id = EXCLUDED.user_id,
 			admin_account_id = EXCLUDED.admin_account_id,
+			egress_proxy_id = EXCLUDED.egress_proxy_id,
 			name = EXCLUDED.name,
 			base_url = EXCLUDED.base_url,
 			platform = EXCLUDED.platform,
@@ -153,7 +166,7 @@ func (r *Repository) SaveSite(ctx context.Context, site Site) error {
 			last_synced_at = EXCLUDED.last_synced_at,
 			updated_at = EXCLUDED.updated_at
 		WHERE EXISTS (SELECT 1 FROM admin_accounts WHERE user_id = EXCLUDED.user_id AND id = EXCLUDED.admin_account_id)
-	`, site.ID, site.UserID, site.AdminAccountID, site.Name, site.BaseURL, site.Platform, site.RequestedPlatform, site.Account, site.Remark,
+	`, site.ID, site.UserID, site.AdminAccountID, nullableString(site.ProxyID), site.Name, site.BaseURL, site.Platform, site.RequestedPlatform, site.Account, site.Remark,
 		site.RechargeRate, site.Status, site.ErrorKey, string(metricsJSON), nullableJSONString(sessionJSON), string(settingsJSON), site.LastSyncedAt, now)
 	if err != nil {
 		return err
@@ -192,10 +205,12 @@ func scanSites(rows pgx.Rows) ([]Site, error) {
 		var metricsJSON []byte
 		var sessionJSON []byte
 		var settingsJSON []byte
+		var proxyID *string
 		if err := rows.Scan(
 			&site.ID,
 			&site.UserID,
 			&site.AdminAccountID,
+			&proxyID,
 			&site.Name,
 			&site.BaseURL,
 			&site.Platform,
@@ -211,6 +226,9 @@ func scanSites(rows pgx.Rows) ([]Site, error) {
 			&site.LastSyncedAt,
 		); err != nil {
 			return nil, err
+		}
+		if proxyID != nil {
+			site.ProxyID = *proxyID
 		}
 		if err := json.Unmarshal(metricsJSON, &site.Metrics); err != nil {
 			return nil, err
@@ -238,4 +256,11 @@ func nullableJSONString(value []byte) any {
 		return nil
 	}
 	return string(value)
+}
+
+func nullableString(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
 }

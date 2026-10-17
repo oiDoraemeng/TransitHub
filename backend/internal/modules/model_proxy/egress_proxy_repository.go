@@ -82,8 +82,12 @@ func (r *Repository) DeleteEgressProxy(ctx context.Context, userID, accountID, p
 	if err := r.db.QueryRow(ctx, `SELECT count(*) FROM proxy_routes WHERE egress_proxy_id=$1 AND user_id=$2 AND admin_account_id=$3`, proxyID, userID, accountID).Scan(&routeCount); err != nil {
 		return err
 	}
-	if routeCount > 0 {
-		return &requestError{Status: 409, Message: "model proxy is still used by one or more routes"}
+	var upstreamCount int
+	if err := r.db.QueryRow(ctx, `SELECT count(*) FROM upstream_sites WHERE egress_proxy_id=$1 AND user_id=$2 AND admin_account_id=$3`, proxyID, userID, accountID).Scan(&upstreamCount); err != nil {
+		return err
+	}
+	if routeCount > 0 || upstreamCount > 0 {
+		return &requestError{Status: 409, Message: "model proxy is still used by one or more routes or upstream sites"}
 	}
 	result, err := r.db.Exec(ctx, `DELETE FROM model_egress_proxies WHERE id=$1 AND user_id=$2 AND admin_account_id=$3`, proxyID, userID, accountID)
 	if err != nil {

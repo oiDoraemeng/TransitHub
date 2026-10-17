@@ -36,6 +36,15 @@ func NewPlatformService(httpClient *HTTPClient) *PlatformService {
 	return &PlatformService{httpClient: httpClient}
 }
 
+// WithHTTPClient returns a platform service sharing all behavior with the
+// receiver while sending requests through the supplied HTTP client.
+func (s *PlatformService) WithHTTPClient(httpClient *HTTPClient) *PlatformService {
+	if httpClient == nil {
+		return s
+	}
+	return &PlatformService{httpClient: httpClient}
+}
+
 // newAPIAuthOptions supports both legacy cookie sessions and system access tokens.
 // New-Api-User is required by new-api for either authentication mechanism.
 func newAPIAuthOptions(session Session) requestOptions {

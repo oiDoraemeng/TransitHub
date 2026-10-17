@@ -126,6 +126,7 @@ type CreateRequest struct {
 	UserID       string   `json:"userId"`
 	Remark       string   `json:"remark"`
 	RechargeRate float64  `json:"rechargeRate"`
+	ProxyID      string   `json:"proxyId"`
 }
 
 type UpdateRequest struct {
@@ -141,6 +142,7 @@ type UpdateRequest struct {
 	UserID       string   `json:"userId"`
 	Remark       string   `json:"remark"`
 	RechargeRate float64  `json:"rechargeRate"`
+	ProxyID      string   `json:"proxyId"`
 }
 
 // SiteSettings 站点级预警覆盖配置。nil 表示使用全局默认值。
@@ -152,6 +154,7 @@ type Site struct {
 	ID                string       `json:"id"`
 	UserID            string       `json:"-"`
 	AdminAccountID    string       `json:"-"`
+	ProxyID           string       `json:"proxyId,omitempty"`
 	Name              string       `json:"name"`
 	BaseURL           string       `json:"baseUrl"`
 	Platform          Platform     `json:"platform"`
@@ -171,6 +174,7 @@ type Response struct {
 	ID                string       `json:"id"`
 	UserID            string       `json:"-"`
 	AdminAccountID    string       `json:"-"`
+	ProxyID           string       `json:"proxyId,omitempty"`
 	Name              string       `json:"name"`
 	BaseURL           string       `json:"baseUrl"`
 	Platform          Platform     `json:"platform"`

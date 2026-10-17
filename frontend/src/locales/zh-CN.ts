@@ -1465,6 +1465,10 @@ export default {
           siteNamePlaceholder: '输入站点名称',
           siteUrl: '站点 URL',
           siteUrlPlaceholder: '输入完整的站点地址，如 https://api.example.com',
+          proxy: '余额请求代理',
+          proxyDirect: '直连（默认）',
+          proxyDisabled: '已停用',
+          proxyHelp: '可从 IP 管理中选择出口代理。未选择时直接访问上游站点。',
           platform: '选择平台',
           platforms: {
             auto: '自动识别',

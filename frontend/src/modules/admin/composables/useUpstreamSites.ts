@@ -36,6 +36,7 @@ const normalizeMetrics = (metrics: UpstreamSiteResponse['metrics'] | null | unde
 
 const normalizeSite = (site: UpstreamSiteResponse, logoBg: string): UpstreamSite => ({
   ...site,
+  proxyId: site.proxyId ?? '',
   metrics: normalizeMetrics(site.metrics),
   settings: site.settings ?? { balanceThreshold: null },
   logo: siteLogo(site.name),

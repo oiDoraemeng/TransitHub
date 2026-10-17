@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"transithub/backend/internal/modules/upstream"
 )
 
 const proxyTestURL = "https://api.ipify.org?format=json"
@@ -130,6 +132,38 @@ func (s *Service) ListEgressProxies(ctx context.Context, userID string) ([]Egres
 		return nil, err
 	}
 	return s.repository.ListEgressProxies(ctx, userID, accountID)
+}
+
+// EgressHTTPClient exposes a temporary client for upstream balance/metrics
+// requests. Ownership and enabled state are checked against the current
+// workspace; callers must invoke release when the request finishes.
+func (s *Service) EgressHTTPClient(ctx context.Context, userID, accountID, proxyID string) (*upstream.HTTPClient, func(), error) {
+	proxyID = strings.TrimSpace(proxyID)
+	if proxyID == "" {
+		return nil, func() {}, errors.New("proxy id is required")
+	}
+	proxy, err := s.repository.GetEgressProxy(ctx, proxyID)
+	if err != nil {
+		return nil, func() {}, err
+	}
+	if proxy == nil || proxy.UserID != userID || proxy.AdminAccountID != accountID {
+		return nil, func() {}, &requestError{Status: http.StatusNotFound, Message: "model proxy not found"}
+	}
+	if !proxy.Enabled {
+		return nil, func() {}, &requestError{Status: http.StatusBadRequest, Message: "selected model proxy is disabled"}
+	}
+	if s.cipher == nil || !s.cipher.Available() {
+		return nil, func() {}, errEncryptionKeyUnavailable
+	}
+	proxyURL, err := s.cipher.Decrypt(proxy.URLCiphertext)
+	if err != nil {
+		return nil, func() {}, err
+	}
+	client, err := newModelHTTPClient(proxyURL)
+	if err != nil {
+		return nil, func() {}, err
+	}
+	return upstream.NewHTTPClient(client), client.CloseIdleConnections, nil
 }
 
 func (s *Service) CreateEgressProxy(ctx context.Context, userID string, input CreateEgressProxyRequest) (EgressProxy, error) {

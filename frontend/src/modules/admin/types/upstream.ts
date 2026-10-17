@@ -19,6 +19,7 @@ export interface UpstreamSiteForm {
   userId: string
   rechargeRate: number
   remark: string
+  proxyId: string
 }
 
 export interface UpstreamMetricValue {
@@ -77,6 +78,7 @@ export interface UpstreamSite {
   platform: ResolvedUpstreamPlatform
   requestedPlatform: UpstreamPlatform
   account: string
+  proxyId: string
   rechargeRate: number
   remark: string
   logo: string
