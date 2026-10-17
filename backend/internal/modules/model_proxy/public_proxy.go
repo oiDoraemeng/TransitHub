@@ -178,6 +178,7 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 		return
 	}
 	defer lease.Release(context.Background())
+	s.recordRouteRequest(incoming.Context(), route.ID)
 
 	var lastStatus int
 	var lastResponse *http.Response
@@ -338,6 +339,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			lease.Release(context.Background())
 			continue
 		}
+		s.recordRouteRequest(incoming.Context(), route.ID)
 		attempts := 0
 		var lastResponse *http.Response
 		var lastAttemptErr error
@@ -387,6 +389,15 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		return
 	}
 	writeOpenAIError(w, http.StatusTooManyRequests, "smart_group_concurrency_exceeded", "all eligible smart group members are at capacity")
+}
+
+func (s *Service) recordRouteRequest(ctx context.Context, routeID string) {
+	if s.limiter == nil {
+		return
+	}
+	if err := s.limiter.RecordRouteRequest(ctx, routeID); err != nil {
+		log.Printf("[model-proxy] record route request route_id=%s err=%v", routeID, err)
+	}
 }
 
 // attemptSmartGroupMember retries once after the selected member's first failure.

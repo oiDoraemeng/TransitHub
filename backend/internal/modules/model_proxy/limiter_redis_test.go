@@ -62,6 +62,37 @@ func TestLimiterRedisSchedulingStages(t *testing.T) {
 	}
 }
 
+func TestLimiterRedisRecordsTodayRequests(t *testing.T) {
+	limiter, client := redisTestLimiter(t)
+	ctx := context.Background()
+	routeID := fmt.Sprintf("request-count-test-%d", time.Now().UnixNano())
+	key, _ := routeRequestCountKey(time.Now())
+	t.Cleanup(func() { _ = client.HDel(ctx, key, routeID).Err() })
+
+	for i := 0; i < 3; i++ {
+		if err := limiter.RecordRouteRequest(ctx, routeID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	count, err := client.HGet(ctx, key, routeID).Int64()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 3 {
+		t.Fatalf("route request count=%d want 3", count)
+	}
+	runtime := []Route{{ID: routeID, ConcurrencyLimit: 50}}
+	if err := limiter.PopulateRouteRuntime(ctx, runtime); err != nil {
+		t.Fatal(err)
+	}
+	if runtime[0].TodayRequests != 3 {
+		t.Fatalf("runtime route request count=%d want 3", runtime[0].TodayRequests)
+	}
+	if ttl, err := client.TTL(ctx, key).Result(); err != nil || ttl <= 0 {
+		t.Fatalf("route request count ttl=%s err=%v", ttl, err)
+	}
+}
+
 func TestLimiterRedisSoftCapIsAtomic(t *testing.T) {
 	limiter, client := redisTestLimiter(t)
 	ctx := context.Background()

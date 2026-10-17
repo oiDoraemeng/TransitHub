@@ -9,6 +9,7 @@ export interface ProxyRoute {
   groupName: string
   concurrencyLimit: number
   activeConcurrency: number
+  todayRequests: number
   enabled: boolean
   proxyId: string
   proxyName: string

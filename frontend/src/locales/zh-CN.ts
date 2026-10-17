@@ -184,7 +184,7 @@ export default {
         formHelp: '代理仅用于模型列表、响应和聊天补全请求；Key 创建、查询和删除仍然直连。',
         testStatus: { untested: '未测试', healthy: '可用', failed: '不可用' }
       },
-      table: { route: '路由', binding: '站点 / 分组', proxy: '模型出口', concurrency: '并发', models: '模型', status: '状态', actions: '操作' },
+      table: { route: '路由', binding: '站点 / 分组', proxy: '模型出口', concurrency: '并发', models: '模型', todayRequests: '今日请求', status: '状态', actions: '操作' },
       form: { name: '名称', site: '上游站点', group: '分组（可选）', proxy: '模型出口代理（可选）', proxyHelp: '仅模型请求使用此代理。代理停用或不可用时请求会失败，不会回退到直连。', concurrency: '并发额度', enabled: '创建后立即启用', selectSite: '选择站点', selectGroup: '选择分组', noGroup: '不选择分组，使用预置上游 Key', preparedKeyBinding: '预置上游 Key', upstreamKey: '预置上游 Key', upstreamKeyKeep: '留空则保留当前 Key', upstreamKeyHelp: 'Key 会加密保存，并作为该路由在所有智能分组中的默认上游凭据。', upstreamKeyRequired: '不选择分组时必须填写预置上游 Key。' },
       actions: { reveal: '查看 Key', rotate: '轮换 Key', edit: '编辑', delete: '删除', test: '测试代理', copy: '复制', addMember: '添加成员', removeMember: '移除成员' },
       cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个待自动重试', processing: '{count} 个正在清理', routePending: '{count} 个待清理' },

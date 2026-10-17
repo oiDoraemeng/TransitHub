@@ -22,6 +22,7 @@ type Route struct {
 	GroupName           string                       `json:"groupName"`
 	ConcurrencyLimit    int                          `json:"concurrencyLimit"`
 	ActiveConcurrency   int64                        `json:"activeConcurrency"`
+	TodayRequests       int64                        `json:"todayRequests"`
 	Enabled             bool                         `json:"enabled"`
 	ProxyID             string                       `json:"proxyId"`
 	ProxyName           string                       `json:"proxyName"`

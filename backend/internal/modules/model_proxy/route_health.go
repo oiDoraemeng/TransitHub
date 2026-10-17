@@ -138,13 +138,14 @@ var routeRuntimeScript = redis.NewScript(routeHealthLua + `
 local now = clockMS()
 local result = {}
 for index, routeID in ipairs(ARGV) do
-  local offset = index * 2
+  local offset = 3 + (index - 1) * 2
   local untilMS = resumeExpired(KEYS[offset + 1], KEYS[1], routeID, now)
   redis.call('ZREMRANGEBYSCORE', KEYS[offset], '-inf', now)
   table.insert(result, redis.call('ZCARD', KEYS[offset]))
   table.insert(result, untilMS)
   table.insert(result, tonumber(redis.call('ZSCORE', KEYS[1], routeID) or '0'))
   table.insert(result, tonumber(redis.call('HGET', KEYS[offset + 1], 'failures') or '0'))
+  table.insert(result, tonumber(redis.call('HGET', KEYS[2], routeID) or '0'))
 end
 return result
 `)
@@ -153,7 +154,8 @@ func (l *Limiter) PopulateRouteRuntime(ctx context.Context, routes []Route) erro
 	if len(routes) == 0 {
 		return nil
 	}
-	keys := []string{probeDueKey()}
+	countKey, _ := routeRequestCountKey(time.Now())
+	keys := []string{probeDueKey(), countKey}
 	args := make([]any, 0, len(routes))
 	for _, route := range routes {
 		keys = append(keys, leaseKey(route.ID), healthKey(route.ID))
@@ -163,19 +165,20 @@ func (l *Limiter) PopulateRouteRuntime(ctx context.Context, routes []Route) erro
 	if err != nil {
 		return err
 	}
-	if len(values) != len(routes)*4 {
+	if len(values) != len(routes)*5 {
 		return errors.New("invalid route runtime response")
 	}
 	for index := range routes {
 		route := &routes[index]
-		route.ActiveConcurrency = values[index*4]
-		route.ConsecutiveFailures = values[index*4+3]
+		route.ActiveConcurrency = values[index*5]
+		route.ConsecutiveFailures = values[index*5+3]
+		route.TodayRequests = values[index*5+4]
 		route.PausedUntil, route.NextProbeAt = nil, nil
-		if values[index*4+1] > 0 {
-			until := time.UnixMilli(values[index*4+1]).UTC()
+		if values[index*5+1] > 0 {
+			until := time.UnixMilli(values[index*5+1]).UTC()
 			route.PausedUntil = &until
-			if values[index*4+2] > 0 {
-				due := time.UnixMilli(values[index*4+2]).UTC()
+			if values[index*5+2] > 0 {
+				due := time.UnixMilli(values[index*5+2]).UTC()
 				route.NextProbeAt = &due
 			}
 		}

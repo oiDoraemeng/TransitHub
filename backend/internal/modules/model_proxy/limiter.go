@@ -92,6 +92,17 @@ redis.call('PEXPIRE', KEYS[1], ARGV[2])
 return 1
 `)
 
+// Route request counters live in a Redis hash for the current Shanghai
+// calendar day. The hash expires at the next local midnight, so no database
+// table or cleanup job is needed for this display-only statistic.
+var incrementRouteRequestCountScript = redis.NewScript(`
+local value = redis.call('HINCRBY', KEYS[1], ARGV[1], 1)
+if value == 1 then
+  redis.call('EXPIREAT', KEYS[1], ARGV[2])
+end
+return value
+`)
+
 type Limiter struct {
 	redis *redis.Client
 }
@@ -120,6 +131,27 @@ func roundRobinKey() string { return "proxy:round-robin:{routes}" }
 
 func requestRateKey(groupID, routeID string) string {
 	return "proxy:requests:{" + groupID + ":" + routeID + "}"
+}
+
+var shanghaiLocation = time.FixedZone("Asia/Shanghai", 8*60*60)
+
+func routeRequestCountKey(now time.Time) (string, int64) {
+	local := now.In(shanghaiLocation)
+	day := local.Format("20060102")
+	nextMidnight := time.Date(local.Year(), local.Month(), local.Day()+1, 0, 0, 0, 0, shanghaiLocation)
+	return "proxy:request-count:{routes}:" + day, nextMidnight.Unix()
+}
+
+// RecordRouteRequest counts one logical upstream dispatch. Callers should
+// invoke it once after a route is selected; retries within that request do
+// not increment the counter again.
+func (l *Limiter) RecordRouteRequest(ctx context.Context, routeID string) error {
+	if l == nil || l.redis == nil || routeID == "" {
+		return errors.New("route request counter unavailable")
+	}
+	key, expiresAt := routeRequestCountKey(time.Now())
+	_, err := incrementRouteRequestCountScript.Run(ctx, l.redis, []string{key}, routeID, expiresAt).Int64()
+	return err
 }
 
 func (l *Limiter) AllowRequestsPerMinute(ctx context.Context, groupID, routeID string, limit int, requestID string) (bool, error) {
