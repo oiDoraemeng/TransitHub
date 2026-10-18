@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check, FlaskConical, Loader2, Play, RefreshCw, X } from 'lucide-vue-next'
+import { ArrowRight, Check, FlaskConical, Loader2, Play, RefreshCw, X } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
 import { listRouteTestModels, restoreRouteScheduling, testRouteModel } from '../api/modelProxy'
 import type { ProxyModel, ProxyRoute, ProxySmartGroup, RouteModelTestResult, RouteTestProtocol } from '../types/modelProxy'
@@ -21,6 +21,11 @@ const result = ref<RouteModelTestResult | null>(null)
 const errorMessage = ref('')
 const controller = new AbortController()
 const busy = computed(() => loadingModels.value || testing.value || restoring.value)
+const mappedModel = computed(() => {
+  const requested = modelId.value.trim()
+  const target = props.route.modelMappingEnabled ? props.route.modelMapping?.[requested]?.trim() : ''
+  return target && target !== requested ? target : ''
+})
 const friendlyError = (error: unknown) => {
   const message = error instanceof Error ? error.message : 'admin.modelProxy.errors.request'
   return message.startsWith('admin.') ? t(message) : message
@@ -109,6 +114,14 @@ onBeforeUnmount(() => controller.abort())
             </select>
             <input v-if="selectedModel === customModel" v-model="modelId" required :disabled="busy" :aria-label="t('admin.modelProxy.manualTest.customModel')" :placeholder="t('admin.modelProxy.manualTest.modelPlaceholder')" autocomplete="off" class="border border-border bg-background px-3 py-2 font-normal outline-none focus:border-primary" />
             <small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.manualTest.modelCount', { count: models.length }) }}</small>
+          </div>
+          <div v-if="mappedModel" role="status" aria-live="polite" class="rounded-lg border border-primary/20 bg-primary/5 px-3 py-3">
+            <p class="mb-2 text-xs font-medium text-primary">{{ t('admin.modelProxy.manualTest.mappingApplied') }}</p>
+            <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+              <div class="min-w-0"><p class="text-xs text-muted-foreground">{{ t('admin.modelProxy.manualTest.selectedModel') }}</p><p class="mt-1 break-all font-mono text-sm">{{ modelId.trim() }}</p></div>
+              <ArrowRight aria-hidden="true" class="h-4 w-4 shrink-0 text-primary" />
+              <div class="min-w-0"><p class="text-xs text-muted-foreground">{{ t('admin.modelProxy.manualTest.actualModel') }}</p><p class="mt-1 break-all font-mono text-sm font-medium text-primary">{{ mappedModel }}</p></div>
+            </div>
           </div>
           <label class="grid gap-2 text-sm font-medium"><span>{{ t('admin.modelProxy.manualTest.protocol') }}</span><select v-model="protocol" :disabled="busy" class="border border-border bg-background px-3 py-2 font-normal outline-none focus:border-primary"><option value="chat">OpenAI Chat Completions</option><option value="responses">OpenAI Responses</option><option value="compact">OpenAI Responses Compact</option><option value="messages">Anthropic Messages</option><option value="gemini">Gemini</option></select></label>
           <div v-if="result" role="status" aria-live="polite" class="border px-3 py-3 text-sm" :class="result.success ? 'border-signal/30 bg-signal/10 text-signal' : 'border-destructive/30 bg-destructive/10 text-destructive'">
