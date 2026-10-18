@@ -310,12 +310,18 @@ func TestManualProbeModelRefreshUsesSelectedMemberDuringBackgroundRefresh(t *tes
 	}
 }
 
-func TestManualProbeCatalogIncludesAllNativeModelsAndAvailableAliases(t *testing.T) {
+func TestManualProbeCatalogIncludesAllNativeModelsAndConfiguredAliases(t *testing.T) {
 	service, route, _ := manualProbeFixture(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{"data":[{"id":"model"},{"id":"another-model"},{"id":"third-model"}]}`)
 	})
 	ctx := context.Background()
-	mapping := map[string]string{"alias": "model", "another-model": "another-model", "unavailable-alias": "missing-model"}
+	mapping := map[string]string{
+		"alias":             "model",
+		"alias-copy-a":      "model",
+		"alias-copy-b":      "model",
+		"another-model":     "another-model",
+		"unavailable-alias": "missing-model",
+	}
 	if err := service.UpdateMemberPolicy(ctx, "user", "a", route.ID, UpdateMemberPolicyRequest{ModelMapping: &mapping}); err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +329,7 @@ func TestManualProbeCatalogIncludesAllNativeModelsAndAvailableAliases(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"alias", "another-model", "model", "third-model"}
+	want := []string{"alias", "alias-copy-a", "alias-copy-b", "another-model", "model", "third-model", "unavailable-alias"}
 	if len(models) != len(want) {
 		t.Fatalf("catalog=%+v want %v", models, want)
 	}

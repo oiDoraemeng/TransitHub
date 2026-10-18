@@ -244,15 +244,18 @@ func (s *Service) ListRouteTestModels(ctx context.Context, userID, routeID, grou
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	// Testing accepts native models as well as member aliases. Do not hide the
-	// route's catalog just because a member maps a smaller set of public names.
+	// Testing accepts native models as well as every configured member alias.
+	// Aliases are virtual public model names and must remain selectable even when
+	// the upstream catalog is incomplete or contains only the shared target model.
+	// The actual target is still applied by performAttemptWithResponseHeaderTimeout
+	// before the request is sent upstream.
 	selectable := make(map[string]bool, len(available)+len(route.ModelMapping))
 	for id := range available {
 		selectable[id] = true
 	}
 	if route.ModelMappingEnabled {
 		for alias, target := range route.ModelMapping {
-			if available[target] {
+			if strings.TrimSpace(alias) != "" && strings.TrimSpace(target) != "" {
 				selectable[alias] = true
 			}
 		}
