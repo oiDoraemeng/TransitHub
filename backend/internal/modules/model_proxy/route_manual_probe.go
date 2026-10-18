@@ -36,11 +36,13 @@ type RouteRecoveryRequest struct {
 }
 
 type manualRecoveryProof struct {
-	TokenHash     string `json:"tokenHash"`
-	Epoch         int64  `json:"epoch"`
-	Fingerprint   string `json:"fingerprint"`
-	ModelHealthID string `json:"modelHealthId,omitempty"`
-	ModelEpoch    int64  `json:"modelEpoch"`
+	TokenHash              string `json:"tokenHash"`
+	Epoch                  int64  `json:"epoch"`
+	Fingerprint            string `json:"fingerprint"`
+	ModelHealthID          string `json:"modelHealthId,omitempty"`
+	ModelEpoch             int64  `json:"modelEpoch"`
+	RequestedModelHealthID string `json:"requestedModelHealthId,omitempty"`
+	RequestedModelEpoch    int64  `json:"requestedModelEpoch,omitempty"`
 }
 
 func manualTestKey(routeID string) string { return "proxy:manual-test:{routes}:" + routeID }
@@ -63,7 +65,9 @@ redis.call('SET', KEYS[4], ARGV[2], 'PX', ARGV[4])
 redis.call('ZADD', KEYS[1], now + tonumber(ARGV[4]), ARGV[2])
 redis.call('PEXPIRE', KEYS[1], ARGV[4])
 redis.call('DEL', KEYS[5])
-return {1, tonumber(redis.call('HGET', KEYS[2], 'epoch') or '0'), tonumber(redis.call('HGET', KEYS[6], 'epoch') or '0')}
+return {1, tonumber(redis.call('HGET', KEYS[2], 'epoch') or '0'),
+        tonumber(redis.call('HGET', KEYS[6], 'epoch') or '0'),
+        tonumber(redis.call('HGET', KEYS[7], 'epoch') or '0')}
 `)
 
 var releaseManualTestScript = redis.NewScript(`
@@ -77,7 +81,8 @@ local now = clockMS()
 resumeExpired(KEYS[1], KEYS[2], ARGV[1], now)
 if redis.call('GET', KEYS[3]) ~= ARGV[2]
    or tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0') ~= tonumber(ARGV[3])
-   or tonumber(redis.call('HGET', KEYS[5], 'epoch') or '0') ~= tonumber(ARGV[6]) then return 0 end
+   or tonumber(redis.call('HGET', KEYS[5], 'epoch') or '0') ~= tonumber(ARGV[6])
+   or tonumber(redis.call('HGET', KEYS[6], 'epoch') or '0') ~= tonumber(ARGV[7]) then return 0 end
 redis.call('SET', KEYS[4], ARGV[4], 'PX', ARGV[5])
 return now + tonumber(ARGV[5])
 `)
@@ -88,7 +93,8 @@ resumeExpired(KEYS[1], KEYS[2], ARGV[1], now)
 if redis.call('GET', KEYS[3]) ~= ARGV[2]
    or redis.call('EXISTS', KEYS[4]) == 1
    or tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0') ~= tonumber(ARGV[3])
-   or tonumber(redis.call('HGET', KEYS[6], 'epoch') or '0') ~= tonumber(ARGV[5]) then return 0 end
+   or tonumber(redis.call('HGET', KEYS[6], 'epoch') or '0') ~= tonumber(ARGV[5])
+   or (ARGV[6] ~= '' and tonumber(redis.call('HGET', KEYS[8], 'epoch') or '0') ~= tonumber(ARGV[7])) then return 0 end
 redis.call('DEL', KEYS[3], KEYS[5])
 redis.call('HINCRBY', KEYS[1], 'epoch', 1)
 redis.call('HSET', KEYS[1], 'failures', 0)
@@ -100,6 +106,12 @@ if ARGV[4] ~= '' then
   redis.call('HDEL', KEYS[6], 'isolated', 'isolated_at', 'probe_token', 'probe_spec', 'probe_disabled')
   redis.call('ZREM', KEYS[7], ARGV[4])
 end
+if ARGV[6] ~= '' then
+  redis.call('HINCRBY', KEYS[8], 'epoch', 1)
+  redis.call('HSET', KEYS[8], 'failures', 0, 'probe_attempts', 0)
+  redis.call('HDEL', KEYS[8], 'isolated', 'isolated_at', 'probe_token', 'probe_spec', 'probe_disabled')
+  redis.call('ZREM', KEYS[7], ARGV[6])
+end
 return 1
 `)
 
@@ -109,11 +121,16 @@ func (l *Limiter) acquireManualTest(ctx context.Context, route Route, proofKey s
 		return nil, err
 	}
 	modelID := ""
+	requestedID := ""
 	if len(specs) > 0 {
 		modelID = modelHealthID(route, specs[0])
+		requestedID = modelHealthID(Route{ID: route.ID}, specs[0])
+		if requestedID == modelID {
+			requestedID = ""
+		}
 	}
 	values, err := acquireManualTestScript.Run(ctx, l.redis,
-		[]string{leaseKey(route.ID), healthKey(route.ID), probeDueKey(), manualTestKey(route.ID), proofKey, modelHealthKey(modelID)},
+		[]string{leaseKey(route.ID), healthKey(route.ID), probeDueKey(), manualTestKey(route.ID), proofKey, modelHealthKey(modelID), modelHealthKey(requestedID)},
 		route.ID, token, route.ConcurrencyLimit, leaseTTL.Milliseconds()).Int64Slice()
 	if err != nil {
 		return nil, err
@@ -124,10 +141,10 @@ func (l *Limiter) acquireManualTest(ctx context.Context, route Route, proofKey s
 	if values[0] != 1 {
 		return nil, &requestError{Status: http.StatusConflict, Message: "admin.modelProxy.manualTest.busy"}
 	}
-	if len(values) != 3 {
+	if len(values) != 4 {
 		return nil, errors.New("invalid manual model lease response")
 	}
-	lease := &Lease{limiter: l, routeID: route.ID, id: token, epoch: values[1], modelHealthID: modelID, modelEpoch: values[2], manualTestToken: token, stop: make(chan struct{})}
+	lease := &Lease{limiter: l, routeID: route.ID, id: token, epoch: values[1], modelHealthID: modelID, modelEpoch: values[2], requestedModelHealthID: requestedID, requestedModelEpoch: values[3], manualTestToken: token, stop: make(chan struct{})}
 	go lease.renew()
 	return lease, nil
 }
@@ -326,13 +343,17 @@ func (s *Service) TestRouteModel(ctx context.Context, userID, routeID string, in
 	if err != nil {
 		return RouteTestResult{}, err
 	}
-	encoded, err := json.Marshal(manualRecoveryProof{TokenHash: hashKey(token), Epoch: lease.epoch, Fingerprint: fingerprint, ModelHealthID: lease.modelHealthID, ModelEpoch: lease.modelEpoch})
+	encoded, err := json.Marshal(manualRecoveryProof{
+		TokenHash: hashKey(token), Epoch: lease.epoch, Fingerprint: fingerprint,
+		ModelHealthID: lease.modelHealthID, ModelEpoch: lease.modelEpoch,
+		RequestedModelHealthID: lease.requestedModelHealthID, RequestedModelEpoch: lease.requestedModelEpoch,
+	})
 	if err != nil {
 		return RouteTestResult{}, err
 	}
 	expires, err := saveManualRecoveryScript.Run(ctx, s.limiter.redis,
-		[]string{healthKey(route.ID), probeDueKey(), manualTestKey(route.ID), proofKey, modelHealthKey(lease.modelHealthID)},
-		route.ID, lease.manualTestToken, lease.epoch, string(encoded), manualRecoveryTTL.Milliseconds(), lease.modelEpoch).Int64()
+		[]string{healthKey(route.ID), probeDueKey(), manualTestKey(route.ID), proofKey, modelHealthKey(lease.modelHealthID), modelHealthKey(lease.requestedModelHealthID)},
+		route.ID, lease.manualTestToken, lease.epoch, string(encoded), manualRecoveryTTL.Milliseconds(), lease.modelEpoch, lease.requestedModelEpoch).Int64()
 	if err != nil {
 		return RouteTestResult{}, err
 	}
@@ -391,7 +412,9 @@ func (s *Service) RestoreRouteScheduling(ctx context.Context, userID, routeID st
 		return &requestError{Status: 409, Message: "admin.modelProxy.manualTest.retest"}
 	}
 	if proof.ModelHealthID != "" {
-		if _, err := tx.Exec(ctx, `UPDATE proxy_routes SET removed_models=removed_models-$2 WHERE id=$1`, routeID, proof.ModelHealthID); err != nil {
+		// Successful mapped inference validates both the requested name and the
+		// current target for this protocol. Old exclusions may predate the mapping.
+		if _, err := tx.Exec(ctx, `UPDATE proxy_routes SET removed_models=removed_models-$2-$3 WHERE id=$1`, routeID, proof.ModelHealthID, proof.RequestedModelHealthID); err != nil {
 			return err
 		}
 	}
@@ -403,8 +426,8 @@ func (s *Service) RestoreRouteScheduling(ctx context.Context, userID, routeID st
 	stateCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	value, err := restoreManualRecoveryScript.Run(stateCtx, s.limiter.redis,
-		[]string{healthKey(routeID), probeDueKey(), proofKey, manualTestKey(routeID), latencyKey(routeID), modelHealthKey(proof.ModelHealthID), modelProbeDueKey()},
-		routeID, encoded, proof.Epoch, proof.ModelHealthID, proof.ModelEpoch).Int64()
+		[]string{healthKey(routeID), probeDueKey(), proofKey, manualTestKey(routeID), latencyKey(routeID), modelHealthKey(proof.ModelHealthID), modelProbeDueKey(), modelHealthKey(proof.RequestedModelHealthID)},
+		routeID, encoded, proof.Epoch, proof.ModelHealthID, proof.ModelEpoch, proof.RequestedModelHealthID, proof.RequestedModelEpoch).Int64()
 	if err != nil {
 		return err
 	}

@@ -118,7 +118,11 @@ type Lease struct {
 	modelHealthID   string
 	modelEpoch      int64
 	modelProbeToken string
-	once            sync.Once
+	// A manual mapped test may also restore an exclusion saved under its
+	// requested name before mapping was enabled or changed.
+	requestedModelHealthID string
+	requestedModelEpoch    int64
+	once                   sync.Once
 }
 
 func NewLimiter(client *redis.Client) *Limiter { return &Limiter{redis: client} }

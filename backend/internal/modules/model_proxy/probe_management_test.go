@@ -2,6 +2,7 @@ package model_proxy
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -228,6 +229,89 @@ func TestRemovedModelRequiresFreshSuccessfulTestToRestore(t *testing.T) {
 	fresh, err = service.repository.GetRoute(ctx, route.ID)
 	if err != nil || len(fresh.RemovedModels) != 0 {
 		t.Fatal("manual recovery did not clear persistent removal")
+	}
+}
+
+func TestMappedRecoveryClearsPreviouslyRemovedSourceAndTarget(t *testing.T) {
+	for _, resetCache := range []bool{false, true} {
+		t.Run(map[bool]string{false: "with-cache", true: "cache-reset"}[resetCache], func(t *testing.T) {
+			service, route, client := manualProbeFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				var payload struct{ Model string }
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || payload.Model != "model" || r.URL.Path != "/v1/responses" {
+					t.Errorf("test must use mapped target and selected protocol: %+v path=%s err=%v", payload, r.URL.Path, err)
+				}
+				_, _ = io.WriteString(w, `{"output":[]}`)
+			})
+			ctx := context.Background()
+			source := routeProbeSpec{ModelID: "alias", Path: "/v1/responses"}
+			target := routeProbeSpec{ModelID: "model", Path: source.Path}
+			otherProtocol := routeProbeSpec{ModelID: "alias", Path: "/v1/chat/completions"}
+			otherModel := routeProbeSpec{ModelID: "untested", Path: source.Path}
+			for _, spec := range []routeProbeSpec{source, target, otherProtocol, otherModel} {
+				id := modelHealthID(route, spec) // State from before the member mapping.
+				if err := client.HSet(ctx, modelHealthKey(id), "isolated", 1, "epoch", 1, "route_id", route.ID, "model_id", spec.ModelID, "protocol", spec.Path).Err(); err != nil {
+					t.Fatal(err)
+				}
+				if err := client.SAdd(ctx, routeModelIndexKey(route.ID), id).Err(); err != nil {
+					t.Fatal(err)
+				}
+				if err := service.RemoveRouteModel(ctx, "user", route.ID, RemoveRouteModelRequest{ModelID: spec.ModelID, Protocol: spec.Path}); err != nil {
+					t.Fatal(err)
+				}
+				if resetCache {
+					_ = client.Del(ctx, modelHealthKey(id)).Err()
+				}
+			}
+			run := func() RouteTestResult {
+				result, err := service.TestRouteModel(ctx, "user", route.ID, RouteTestRequest{GroupID: "a", ModelID: "alias", Protocol: "responses"})
+				if err != nil || !result.Success || result.RecoveryToken == "" {
+					t.Fatalf("mapped test: %+v %v", result, err)
+				}
+				return result
+			}
+			stale := run()
+			sourceID := modelHealthID(route, source)
+			if err := client.HIncrBy(ctx, modelHealthKey(sourceID), "epoch", 1).Err(); err != nil {
+				t.Fatal(err)
+			}
+			// A new manual removal after testing must invalidate that test.
+			requireRetest(t, service.RestoreRouteScheduling(ctx, "user", route.ID, RouteRecoveryRequest{GroupID: "a", Token: stale.RecoveryToken}))
+			result := run()
+			fresh, err := service.repository.GetRoute(ctx, route.ID)
+			if err != nil || len(fresh.RemovedModels) != 4 {
+				t.Fatalf("testing changed removals: %+v %v", fresh, err)
+			}
+			if err := service.RestoreRouteScheduling(ctx, "user", route.ID, RouteRecoveryRequest{GroupID: "a", Token: result.RecoveryToken}); err != nil {
+				t.Fatal(err)
+			}
+			fresh, err = service.repository.GetRoute(ctx, route.ID)
+			if err != nil || len(fresh.RemovedModels) != 2 {
+				t.Fatalf("mapped recovery did not clear source and target: %+v %v", fresh, err)
+			}
+			for _, spec := range []routeProbeSpec{source, target} {
+				id := modelHealthID(route, spec)
+				if _, removed := fresh.RemovedModels[id]; removed || client.HExists(ctx, modelHealthKey(id), "isolated").Val() || client.HExists(ctx, modelHealthKey(id), "probe_disabled").Val() {
+					t.Fatalf("tested model still removed: %+v", spec)
+				}
+			}
+			for _, spec := range []routeProbeSpec{otherProtocol, otherModel} {
+				if _, removed := fresh.RemovedModels[modelHealthID(route, spec)]; !removed {
+					t.Fatalf("untested model/protocol restored: %+v", spec)
+				}
+			}
+			members, err := service.repository.ListGroupRoutes(ctx, "a", false, "")
+			if err != nil || len(members) != 1 || members[0].SchedulingPaused {
+				t.Fatalf("member remains paused: %+v %v", members, err)
+			}
+			lease, ok, err := service.limiter.AcquireForModel(ctx, members[0], "after-mapped-recovery", routeProbeSpec{GroupID: "a", ModelID: "alias", Path: source.Path})
+			if err != nil || !ok {
+				t.Fatalf("mapped model still not schedulable: %v %v", ok, err)
+			}
+			lease.Release(ctx)
+			if err := service.limiter.PopulateRouteRuntime(ctx, members); err != nil || len(members[0].ModelHealth) != 2 {
+				t.Fatalf("removed state still visible: %+v %v", members, err)
+			}
+		})
 	}
 }
 
