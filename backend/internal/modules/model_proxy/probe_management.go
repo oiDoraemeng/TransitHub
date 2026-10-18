@@ -105,7 +105,7 @@ func (s *Service) RemoveRouteModel(ctx context.Context, userID, routeID string, 
 	input.ModelID = strings.TrimSpace(input.ModelID)
 	input.Protocol = strings.TrimSpace(input.Protocol)
 	switch input.Protocol {
-	case "/v1/chat/completions", "/v1/responses", "/v1/responses/compact", "/v1/messages", "/v1/embeddings", "gemini":
+	case "/v1/chat/completions", "/v1/responses", "/v1/responses/compact", "/v1/messages", "gemini":
 	default:
 		return &requestError{Status: http.StatusBadRequest, Message: "invalid model protocol"}
 	}

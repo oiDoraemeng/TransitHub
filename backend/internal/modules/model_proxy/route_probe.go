@@ -71,6 +71,11 @@ func (s *Service) routeProbeLoop(ctx context.Context) {
 	if s.limiter == nil {
 		return
 	}
+	cleanupCtx, cleanupCancel := context.WithTimeout(ctx, 30*time.Second)
+	if err := s.limiter.discardEmbeddingRecovery(cleanupCtx); err != nil && ctx.Err() == nil {
+		log.Printf("[model-proxy] remove legacy embedding probes: %v", err)
+	}
+	cleanupCancel()
 	type probeJob struct {
 		id    string
 		model bool
@@ -219,8 +224,6 @@ func newRouteProbeRequest(ctx context.Context, spec routeProbeSpec) (*http.Reque
 	switch {
 	case path == "/v1/models" || path == "/v1beta/models" || (strings.HasPrefix(path, "/v1beta/models/") && !strings.Contains(path, ":")):
 		method = http.MethodGet
-	case path == "/v1/embeddings":
-		payload = map[string]any{"model": spec.ModelID, "input": "ping"}
 	case path == "/v1/chat/completions" || path == "/v1/messages":
 		payload = map[string]any{"model": spec.ModelID, "messages": []map[string]string{{"role": "user", "content": "Reply OK."}}, "max_tokens": 16, "stream": false}
 	case path == "/v1/responses":
@@ -263,7 +266,7 @@ func (s *Service) performRouteProbe(ctx context.Context, route Route, spec route
 	if err != nil {
 		return false
 	}
-	// Catalog, embedding and compact endpoints have no streaming protocol.
+	// Catalog and compact endpoints have no streaming protocol.
 	if !streaming {
 		return s.executeRouteProbe(ctx, route, spec, headerTimeout).Success
 	}
@@ -319,7 +322,7 @@ func (s *Service) executeRouteProbe(ctx context.Context, route Route, spec route
 	}
 	expected := "output"
 	switch {
-	case spec.Path == "/v1/models" || spec.Path == "/v1/embeddings":
+	case spec.Path == "/v1/models":
 		expected = "data"
 	case spec.Path == "/v1/chat/completions":
 		expected = "choices"

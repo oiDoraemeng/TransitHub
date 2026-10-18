@@ -106,7 +106,7 @@ func TestRouteProbeRejectsErrorBodiesAndUnavailableUpstream(t *testing.T) {
 }
 
 func TestNewRouteProbeRequestProtocols(t *testing.T) {
-	for _, path := range []string{"/v1/models", "/v1beta/models", "/v1/embeddings", "/v1/chat/completions", "/v1/messages", "/v1/responses", "/v1/responses/compact", "/v1beta/models/gemini-test:streamGenerateContent"} {
+	for _, path := range []string{"/v1/models", "/v1beta/models", "/v1/chat/completions", "/v1/messages", "/v1/responses", "/v1/responses/compact", "/v1beta/models/gemini-test:streamGenerateContent"} {
 		request, body, err := newRouteProbeRequest(context.Background(), routeProbeSpec{ModelID: "model", Path: path})
 		if err != nil {
 			t.Fatalf("path=%s %v", path, err)

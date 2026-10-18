@@ -447,7 +447,7 @@ const openIsolatedModelTest = (route: ProxyRoute, health: ProxyModelHealth, grou
   const alias = route.modelMappingEnabled
     ? Object.entries(route.modelMapping ?? {}).find(([, target]) => target === health.modelId)?.[0]
     : undefined
-  const protocol = ({ '/v1/chat/completions': 'chat', '/v1/responses': 'responses', '/v1/responses/compact': 'compact', '/v1/messages': 'messages', '/v1/embeddings': 'embeddings', gemini: 'gemini' } as Record<string, RouteTestProtocol>)[health.protocol]
+  const protocol = ({ '/v1/chat/completions': 'chat', '/v1/responses': 'responses', '/v1/responses/compact': 'compact', '/v1/messages': 'messages', gemini: 'gemini' } as Record<string, RouteTestProtocol>)[health.protocol]
   routeTestTarget.value = { route, group, model: alias ?? health.modelId, protocol }
 }
 

@@ -29,7 +29,7 @@ const friendlyError = (error: unknown) => {
 watch(modelId, model => {
   const name = model.toLowerCase()
   protocol.value = name.includes('claude') ? 'messages' : name.includes('gemini') ? 'gemini'
-    : name.includes('embedding') ? 'embeddings' : name.includes('gpt-5') || name.includes('codex') ? 'responses' : 'chat'
+    : name.includes('gpt-5') || name.includes('codex') ? 'responses' : 'chat'
 })
 watch([modelId, protocol], () => { result.value = null; errorMessage.value = '' })
 watch(selectedModel, model => { modelId.value = model === customModel ? '' : model })
@@ -110,7 +110,7 @@ onBeforeUnmount(() => controller.abort())
             <input v-if="selectedModel === customModel" v-model="modelId" required :disabled="busy" :aria-label="t('admin.modelProxy.manualTest.customModel')" :placeholder="t('admin.modelProxy.manualTest.modelPlaceholder')" autocomplete="off" class="border border-border bg-background px-3 py-2 font-normal outline-none focus:border-primary" />
             <small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.manualTest.modelCount', { count: models.length }) }}</small>
           </div>
-          <label class="grid gap-2 text-sm font-medium"><span>{{ t('admin.modelProxy.manualTest.protocol') }}</span><select v-model="protocol" :disabled="busy" class="border border-border bg-background px-3 py-2 font-normal outline-none focus:border-primary"><option value="chat">OpenAI Chat Completions</option><option value="responses">OpenAI Responses</option><option value="compact">OpenAI Responses Compact</option><option value="messages">Anthropic Messages</option><option value="gemini">Gemini</option><option value="embeddings">Embeddings</option></select></label>
+          <label class="grid gap-2 text-sm font-medium"><span>{{ t('admin.modelProxy.manualTest.protocol') }}</span><select v-model="protocol" :disabled="busy" class="border border-border bg-background px-3 py-2 font-normal outline-none focus:border-primary"><option value="chat">OpenAI Chat Completions</option><option value="responses">OpenAI Responses</option><option value="compact">OpenAI Responses Compact</option><option value="messages">Anthropic Messages</option><option value="gemini">Gemini</option></select></label>
           <div v-if="result" role="status" aria-live="polite" class="border px-3 py-3 text-sm" :class="result.success ? 'border-signal/30 bg-signal/10 text-signal' : 'border-destructive/30 bg-destructive/10 text-destructive'">
             <div class="flex items-center gap-2 font-medium"><Check v-if="result.success" class="h-4 w-4" />{{ t(result.message) }}</div>
             <p class="mt-1 text-xs">{{ t('admin.modelProxy.manualTest.latency', { ms: result.latencyMs }) }}<span v-if="result.statusCode"> · HTTP {{ result.statusCode }}</span></p>

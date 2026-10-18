@@ -283,8 +283,6 @@ func manualProbeSpec(input RouteTestRequest) (routeProbeSpec, error) {
 		spec.Path = "/v1/responses/compact"
 	case "messages":
 		spec.Path = "/v1/messages"
-	case "embeddings":
-		spec.Path = "/v1/embeddings"
 	case "gemini":
 		name := strings.TrimPrefix(model, "models/")
 		if name == "" || strings.ContainsAny(name, "/\\:?#") || strings.Contains(name, "..") {

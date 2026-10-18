@@ -35,7 +35,7 @@ func modelHealthIdentity(route Route, spec routeProbeSpec) (string, string) {
 
 func modelHealthID(route Route, spec routeProbeSpec) string {
 	model, protocol := modelHealthIdentity(route, spec)
-	if model == "" || spec.Path == "/v1/models" || spec.Path == "/v1beta/models" {
+	if model == "" || spec.Path == "/v1/models" || spec.Path == "/v1beta/models" || spec.Path == embeddingsPath {
 		return ""
 	}
 	encoded, _ := json.Marshal([]string{route.ID, model, protocol})
@@ -79,7 +79,7 @@ return 0
 `)
 
 func (l *Limiter) ObserveModelResult(ctx context.Context, lease *Lease, success, immediate bool, route Route, spec routeProbeSpec) (bool, error) {
-	if lease.modelHealthID == "" {
+	if lease.modelHealthID == "" || spec.Path == embeddingsPath {
 		return false, nil
 	}
 	encoded, err := json.Marshal(spec)
@@ -94,7 +94,8 @@ func (l *Limiter) ObserveModelResult(ctx context.Context, lease *Lease, success,
 	return value == 1, err
 }
 
-var claimModelProbeScript = redis.NewScript(routeHealthLua + `
+var claimModelProbeScript = redis.NewScript(routeHealthLua + embeddingModelHealthLua + `
+if discardEmbeddingModel(KEYS[1], KEYS[2], nil, ARGV[1]) then return {} end
 local now = clockMS()
 if redis.call('HGET', KEYS[1], 'isolated') ~= '1' or redis.call('HGET', KEYS[1], 'probe_disabled') == '1' then
   redis.call('ZREM', KEYS[2], ARGV[1])
@@ -236,15 +237,16 @@ func (s *Service) probeIsolatedModel(parent context.Context, id string) {
 	success = s.performRouteProbe(probeCtx, *route, claim.spec, timeout)
 }
 
-var modelRuntimeScript = redis.NewScript(`
+var modelRuntimeScript = redis.NewScript(embeddingModelHealthLua + `
 local result = {}
-for index=2,#KEYS do
+for index=3,#KEYS do
   local key = KEYS[index]
+  discardEmbeddingModel(key, KEYS[1], KEYS[2], ARGV[index - 2])
   table.insert(result, redis.call('HGET', key, 'model_id') or '')
   table.insert(result, redis.call('HGET', key, 'protocol') or '')
   table.insert(result, redis.call('HGET', key, 'isolated') or '0')
   table.insert(result, redis.call('HGET', key, 'failures') or '0')
-  table.insert(result, redis.call('ZSCORE', KEYS[1], ARGV[index - 1]) or '0')
+  table.insert(result, redis.call('ZSCORE', KEYS[1], ARGV[index - 2]) or '0')
   table.insert(result, redis.call('HGET', key, 'probe_attempts') or '0')
   table.insert(result, redis.call('HGET', key, 'probe_disabled') or '0')
 end
@@ -264,12 +266,15 @@ func (l *Limiter) populateModelRuntime(ctx context.Context, routes []Route) erro
 		ids := index.Val()
 		routes[i].ModelHealth = nil
 		for _, removed := range routes[i].RemovedModels {
+			if removed.Protocol == embeddingsPath {
+				continue
+			}
 			routes[i].ModelHealth = append(routes[i].ModelHealth, ModelHealth{ModelID: removed.ModelID, Protocol: removed.Protocol, Isolated: true, ProbeDisabled: true})
 		}
 		if len(ids) == 0 {
 			continue
 		}
-		keys := []string{modelProbeDueKey()}
+		keys := []string{modelProbeDueKey(), routeModelIndexKey(routes[i].ID)}
 		args := make([]any, len(ids))
 		for j, id := range ids {
 			keys = append(keys, modelHealthKey(id))

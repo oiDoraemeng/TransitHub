@@ -10,7 +10,7 @@ const { t, locale } = useI18n()
 const models = computed(() => [...(props.health ?? [])].sort((a, b) => a.modelId.localeCompare(b.modelId) || a.protocol.localeCompare(b.protocol)))
 const protocolLabel = (protocol: string) => ({
   '/v1/chat/completions': 'Chat', '/v1/responses': 'Responses', '/v1/responses/compact': 'Compact', '/v1/messages': 'Messages',
-  '/v1/embeddings': 'Embeddings', gemini: 'Gemini',
+  gemini: 'Gemini',
 }[protocol] ?? protocol)
 const probeTime = (value: string) => new Intl.DateTimeFormat(locale.value, {
   month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',

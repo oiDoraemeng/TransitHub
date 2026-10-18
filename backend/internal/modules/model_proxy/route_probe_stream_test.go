@@ -105,7 +105,7 @@ func TestStreamingRecoveryProbeCancellation(t *testing.T) {
 }
 
 func TestNonStreamingProbeProtocolsRemainSupported(t *testing.T) {
-	for _, path := range []string{"/v1/models", "/v1beta/models", "/v1/embeddings", "/v1/responses/compact"} {
+	for _, path := range []string{"/v1/models", "/v1beta/models", "/v1/responses/compact"} {
 		request, _, streaming, err := newStreamingRouteProbeRequest(context.Background(), routeProbeSpec{ModelID: "model", Path: path})
 		if err != nil || streaming || request.Header.Get("Accept") == "text/event-stream" {
 			t.Fatalf("non-streaming endpoint %s: streaming=%v err=%v", path, streaming, err)

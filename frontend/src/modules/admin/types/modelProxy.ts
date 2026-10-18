@@ -117,7 +117,7 @@ export interface ModelEgressProxyTestResult {
   message: string
 }
 
-export type RouteTestProtocol = 'chat' | 'responses' | 'compact' | 'messages' | 'gemini' | 'embeddings'
+export type RouteTestProtocol = 'chat' | 'responses' | 'compact' | 'messages' | 'gemini'
 
 export interface RouteModelTestResult {
   success: boolean

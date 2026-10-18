@@ -142,6 +142,9 @@ func groupModelsWithMappings(group *SmartGroup) []Model {
 }
 
 func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, route Route) {
+	if s.serveLocalEmbeddings(w, incoming) {
+		return
+	}
 	source := incoming.Body
 	if source == nil {
 		source = http.NoBody
@@ -234,6 +237,9 @@ func waitForProxyRetry(ctx context.Context, attempt int) bool {
 }
 
 func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request, group SmartGroup) {
+	if s.serveLocalEmbeddings(w, incoming) {
+		return
+	}
 	replay, err := newReplayBody(incoming.Body, s.maxRequestBytes)
 	if err != nil {
 		if errors.Is(err, errBodyTooLarge) {

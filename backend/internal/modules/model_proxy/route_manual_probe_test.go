@@ -21,7 +21,7 @@ import (
 )
 
 func TestManualProbeAcceptsOnlyInferenceProtocols(t *testing.T) {
-	for _, protocol := range []string{"chat", "responses", "messages", "gemini", "embeddings"} {
+	for _, protocol := range []string{"chat", "responses", "compact", "messages", "gemini"} {
 		spec, err := manualProbeSpec(RouteTestRequest{ModelID: "model", Protocol: protocol})
 		if err != nil || spec.Path == "/v1/models" {
 			t.Fatalf("protocol=%s spec=%+v err=%v", protocol, spec, err)
@@ -31,7 +31,7 @@ func TestManualProbeAcceptsOnlyInferenceProtocols(t *testing.T) {
 			t.Fatalf("inference required: %v", err)
 		}
 	}
-	for _, input := range []RouteTestRequest{{Protocol: "chat"}, {ModelID: "model", Protocol: "models"}, {ModelID: "../escape", Protocol: "gemini"}} {
+	for _, input := range []RouteTestRequest{{Protocol: "chat"}, {ModelID: "model", Protocol: "models"}, {ModelID: "model", Protocol: "embeddings"}, {ModelID: "../escape", Protocol: "gemini"}} {
 		if _, err := manualProbeSpec(input); err == nil {
 			t.Fatalf("invalid input accepted: %+v", input)
 		}
