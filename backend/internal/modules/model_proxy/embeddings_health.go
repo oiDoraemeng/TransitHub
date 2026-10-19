@@ -40,6 +40,10 @@ return discardEmbeddingRoute(KEYS[1], KEYS[2], ARGV[1]) and 1 or 0
 // Remove old queues immediately on startup, including probes not due for
 // another ten minutes. Runtime reads and claims also enforce the same cleanup.
 func (l *Limiter) discardEmbeddingRecovery(ctx context.Context) error {
+	return l.discardRecovery(ctx, discardEmbeddingModelScript, discardEmbeddingRouteScript)
+}
+
+func (l *Limiter) discardRecovery(ctx context.Context, modelScript, routeScript *redis.Script) error {
 	for _, model := range []bool{true, false} {
 		prefix := healthKey("")
 		if model {
@@ -58,12 +62,12 @@ func (l *Limiter) discardEmbeddingRecovery(ctx context.Context) error {
 					if err != nil && err != redis.Nil {
 						return err
 					}
-					err = discardEmbeddingModelScript.Run(ctx, l.redis,
+					err = modelScript.Run(ctx, l.redis,
 						[]string{key, modelProbeDueKey(), routeModelIndexKey(routeID)}, id).Err()
 					if err != nil {
 						return err
 					}
-				} else if err := discardEmbeddingRouteScript.Run(ctx, l.redis, []string{key, probeDueKey()}, id).Err(); err != nil {
+				} else if err := routeScript.Run(ctx, l.redis, []string{key, probeDueKey()}, id).Err(); err != nil {
 					return err
 				}
 			}

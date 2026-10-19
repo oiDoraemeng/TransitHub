@@ -42,6 +42,7 @@ export interface ProxyRoute {
 
 export interface ProxyModelHealth {
 	probeDisabled?: boolean
+  automaticProbeDisabled?: boolean
   modelId: string
   protocol: string
   isolated: boolean

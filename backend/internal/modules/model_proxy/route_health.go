@@ -55,6 +55,17 @@ local function clockMS()
   local t = redis.call('TIME')
   return tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
 end
+local function discardCompactRoute(key, dueKey, routeID)
+  local encoded = redis.call('HGET', key, 'probe_spec')
+  if not encoded then return false end
+  local ok, spec = pcall(cjson.decode, encoded)
+  if not ok or type(spec) ~= 'table' or spec.path ~= '/v1/responses/compact' then return false end
+  redis.call('HINCRBY', key, 'epoch', 1)
+  redis.call('HSET', key, 'failures', 0, 'probe_attempts', 0)
+  redis.call('HDEL', key, 'paused_until', 'probe_token', 'probe_spec')
+  redis.call('ZREM', dueKey, routeID)
+  return true
+end
 local function discardEmbeddingRoute(key, dueKey, routeID)
   local encoded = redis.call('HGET', key, 'probe_spec')
   if not encoded then return false end
@@ -67,6 +78,7 @@ local function discardEmbeddingRoute(key, dueKey, routeID)
   return true
 end
 local function resumeExpired(key, dueKey, routeID, now)
+  if discardCompactRoute(key, dueKey, routeID) then return 0 end
   if discardEmbeddingRoute(key, dueKey, routeID) then return 0 end
   local untilMS = tonumber(redis.call('HGET', key, 'paused_until') or '0')
   if untilMS > 0 and untilMS <= now then
@@ -199,7 +211,7 @@ func (l *Limiter) PopulateRouteRuntime(ctx context.Context, routes []Route) erro
 }
 
 func (l *Limiter) ObserveRouteResult(ctx context.Context, lease *Lease, success bool, spec routeProbeSpec) (bool, error) {
-	if spec.Path == embeddingsPath {
+	if spec.Path == embeddingsPath || spec.Path == compactPath {
 		return false, nil
 	}
 	encoded, err := json.Marshal(spec)

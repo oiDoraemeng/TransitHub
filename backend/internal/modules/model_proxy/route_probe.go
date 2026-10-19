@@ -18,7 +18,11 @@ func writeRoutePaused(w http.ResponseWriter) {
 	writeOpenAIError(w, http.StatusServiceUnavailable, "route_temporarily_paused", "eligible upstream routes are temporarily paused; recovery probes run every 3 minutes")
 }
 
-func writeModelPaused(w http.ResponseWriter) {
+func writeModelPaused(w http.ResponseWriter, path string) {
+	if path == compactPath {
+		writeOpenAIError(w, http.StatusServiceUnavailable, "model_temporarily_paused", "eligible upstream routes for this Compact model are isolated; automatic Compact probes are disabled; a successful manual test allows recovery")
+		return
+	}
 	w.Header().Set("Retry-After", "60")
 	writeOpenAIError(w, http.StatusServiceUnavailable, "model_temporarily_paused", "eligible upstream routes for this model are isolated; recovery probes are scheduled at minutes 1, 3, 5 and 10 after isolation, then every 10 minutes; other models remain available")
 }
@@ -51,9 +55,10 @@ func (s *Service) observeRouteRequest(ctx context.Context, lease *Lease, spec ro
 	health := responseHealth(response)
 	// An HTTP response proves the route is reachable. 5xx/429/403 can be
 	// specific to the requested model; only credential-wide failures promote
-	// them to a route circuit. Transport errors retain the route circuit.
-	modelScoped := lease.modelHealthID != "" && response != nil &&
-		(health.modelMissing || response.StatusCode != http.StatusUnauthorized && !health.credentialError)
+	// them to a route circuit. Compact failures always stay local to Compact,
+	// whose automatic probes are disabled.
+	modelScoped := lease.modelHealthID != "" && (spec.Path == compactPath || response != nil &&
+		(health.modelMissing || response.StatusCode != http.StatusUnauthorized && !health.credentialError))
 	if modelScoped {
 		paused, err = s.limiter.ObserveModelResult(stateCtx, lease, success, health.modelMissing, route, spec)
 	}
@@ -74,6 +79,9 @@ func (s *Service) routeProbeLoop(ctx context.Context) {
 	cleanupCtx, cleanupCancel := context.WithTimeout(ctx, 30*time.Second)
 	if err := s.limiter.discardEmbeddingRecovery(cleanupCtx); err != nil && ctx.Err() == nil {
 		log.Printf("[model-proxy] remove legacy embedding probes: %v", err)
+	}
+	if err := s.limiter.discardCompactRecovery(cleanupCtx); err != nil && ctx.Err() == nil {
+		log.Printf("[model-proxy] remove compact probes: %v", err)
 	}
 	cleanupCancel()
 	type probeJob struct {
@@ -258,6 +266,9 @@ func newRouteProbeRequest(ctx context.Context, spec routeProbeSpec) (*http.Reque
 }
 
 func (s *Service) performRouteProbe(ctx context.Context, route Route, spec routeProbeSpec, timeouts ...time.Duration) bool {
+	if spec.Path == compactPath {
+		return false
+	}
 	headerTimeout := smartGroupFirstResponseHeaderTimeout
 	if len(timeouts) > 0 {
 		headerTimeout = timeouts[0]

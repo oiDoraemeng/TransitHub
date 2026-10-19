@@ -37,10 +37,11 @@ const probeTime = (value: string) => new Intl.DateTimeFormat(locale.value, {
             </div>
           </div>
           <div v-if="model.probeDisabled" class="mt-1.5 rounded bg-surface px-2 py-1 text-[11px] text-muted-foreground">{{ t('admin.modelProxy.circuit.removedModel') }}</div>
+          <div v-else-if="model.automaticProbeDisabled" class="mt-1.5 rounded bg-surface px-2 py-1 text-[11px] text-muted-foreground">{{ t('admin.modelProxy.compactNoProbe') }}</div>
           <div v-else-if="model.nextProbeAt" class="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground"><Clock3 class="h-3 w-3 shrink-0" />{{ t('admin.modelProxy.circuit.nextProbe', { time: probeTime(model.nextProbeAt) }) }}</div>
         </div>
       </div>
-      <p v-if="models.some(model => !model.probeDisabled)" class="px-2.5 py-2 text-[11px] leading-4 text-muted-foreground">{{ t('admin.modelProxy.circuit.modelSchedule') }}</p>
+      <p v-if="models.some(model => !model.probeDisabled && !model.automaticProbeDisabled)" class="px-2.5 py-2 text-[11px] leading-4 text-muted-foreground">{{ t('admin.modelProxy.circuit.modelSchedule') }}</p>
     </div>
   </details>
 </template>

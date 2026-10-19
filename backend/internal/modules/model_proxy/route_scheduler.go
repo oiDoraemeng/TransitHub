@@ -19,6 +19,7 @@ local tied = {}
 local eligible = {}
 local paused = 0
 local modelPaused = 0
+local compact = ARGV[7] == '1'
 for index, route in ipairs(routes) do
   local offset = 3 + (index - 1) * 5
   local untilMS = resumeExpired(KEYS[offset + 2], KEYS[2], route.id, now)
@@ -37,12 +38,15 @@ for index, route in ipairs(routes) do
       if not route.provided and active < math.min(route.limit, tonumber(ARGV[4])) then tier = 0 end
       if route.provided and active < math.min(route.limit, tonumber(ARGV[5])) then tier = 1 end
       local latency = tonumber(redis.call('GET', KEYS[offset + 1]) or '-1')
+      local lastSuccess = 0
+      if compact then lastSuccess = tonumber(redis.call('HGET', KEYS[offset + 3], 'last_success_at') or '0') end
       local item = {index=index, offset=offset, priority=route.priority, tier=tier,
-                    active=active, remaining=remaining, latency=latency, id=route.id}
+                    active=active, remaining=remaining, latency=latency, id=route.id, lastSuccess=lastSuccess}
       table.insert(eligible, item)
       local better = best == nil
       if best ~= nil then
         if item.priority ~= best.priority then better = item.priority > best.priority
+        elseif compact and item.lastSuccess ~= best.lastSuccess then better = item.lastSuccess > best.lastSuccess
         elseif item.tier ~= best.tier then better = item.tier < best.tier
         elseif tier == 2 then better = remaining > best.remaining
         elseif latency ~= best.latency then better = latency < best.latency
@@ -50,13 +54,16 @@ for index, route in ipairs(routes) do
         else better = item.id < best.id end
       end
       if better then best = item; tied = {item}
-      elseif best.priority == item.priority and best.tier == 2 and tier == 2
+      elseif best.priority == item.priority and best.lastSuccess == item.lastSuccess and best.tier == 2 and tier == 2
              and best.remaining == remaining then table.insert(tied, item) end
     end
   end
 end
 if best == nil then return {0, 0, paused, 0, modelPaused} end
-if best.tier == 2 then
+if compact and best.lastSuccess > 0 then
+  -- Compact never sends recovery probes. Reuse the most recently successful
+  -- actual model/endpoint, respecting priority, exclusion and hard capacity.
+elseif best.tier == 2 then
   table.sort(tied, function(a,b) return a.id < b.id end)
   local cursor = redis.call('INCR', KEYS[1])
   best = tied[(cursor - 1) % #tied + 1]
@@ -148,8 +155,9 @@ func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID
 	if err != nil {
 		return nil, nil, err
 	}
+	compact := len(specs) > 0 && specs[0].Path == compactPath
 	values, err := acquireBestRouteScript.Run(ctx, l.redis, keys, string(encoded), leaseID,
-		leaseTTL.Milliseconds(), temporaryKeySoftConcurrency, providedKeySoftConcurrency, routeLatencyTTL.Milliseconds()).Int64Slice()
+		leaseTTL.Milliseconds(), temporaryKeySoftConcurrency, providedKeySoftConcurrency, routeLatencyTTL.Milliseconds(), boolInt(compact)).Int64Slice()
 	if err != nil {
 		return nil, nil, err
 	}

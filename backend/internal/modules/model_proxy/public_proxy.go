@@ -164,7 +164,7 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 	leaseID, _ := randomID("req_")
 	lease, ok, err := s.limiter.AcquireForModel(incoming.Context(), route, newLeaseID(leaseID, route.ID), probeSpec)
 	if errors.Is(err, errModelPaused) {
-		writeModelPaused(w)
+		writeModelPaused(w, incoming.URL.Path)
 		return
 	}
 	if errors.Is(err, errRoutePaused) {
@@ -313,7 +313,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	for len(remaining) > 0 {
 		lease, route, acquireErr := s.limiter.AcquireBest(incoming.Context(), remaining, requestID, requestSpec)
 		if errors.Is(acquireErr, errModelPaused) {
-			writeModelPaused(w)
+			writeModelPaused(w, incoming.URL.Path)
 			return
 		}
 		if errors.Is(acquireErr, errRoutePaused) {

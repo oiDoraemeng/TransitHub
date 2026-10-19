@@ -43,13 +43,14 @@ func modelHealthID(route Route, spec routeProbeSpec) string {
 }
 
 type ModelHealth struct {
-	ModelID             string     `json:"modelId"`
-	Protocol            string     `json:"protocol"`
-	Isolated            bool       `json:"isolated"`
-	ConsecutiveFailures int64      `json:"consecutiveFailures"`
-	NextProbeAt         *time.Time `json:"nextProbeAt,omitempty"`
-	ProbeAttempts       int64      `json:"probeAttempts"`
-	ProbeDisabled       bool       `json:"probeDisabled,omitempty"`
+	ModelID                string     `json:"modelId"`
+	Protocol               string     `json:"protocol"`
+	Isolated               bool       `json:"isolated"`
+	ConsecutiveFailures    int64      `json:"consecutiveFailures"`
+	NextProbeAt            *time.Time `json:"nextProbeAt,omitempty"`
+	ProbeAttempts          int64      `json:"probeAttempts"`
+	ProbeDisabled          bool       `json:"probeDisabled,omitempty"`
+	AutomaticProbeDisabled bool       `json:"automaticProbeDisabled,omitempty"`
 }
 
 // The model circuit stays isolated until a validated probe or manual test
@@ -61,18 +62,30 @@ if tonumber(redis.call('HGET', KEYS[3], 'epoch') or '0') ~= tonumber(ARGV[3]) th
 local epoch = tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0')
 if epoch ~= tonumber(ARGV[2]) then return 0 end
 if redis.call('HGET', KEYS[1], 'isolated') == '1' then return 1 end
+local compact = ARGV[9] == '/v1/responses/compact'
+if compact then
+  redis.call('HSET', KEYS[1], 'route_id', ARGV[7], 'model_id', ARGV[8], 'protocol', ARGV[9], 'automatic_probe_disabled', 1)
+  redis.call('SADD', KEYS[4], ARGV[1])
+end
 if ARGV[4] == '1' then
   redis.call('HSET', KEYS[1], 'failures', 0)
   redis.call('HSET', KEYS[3], 'failures', 0)
+  if compact then redis.call('HSET', KEYS[1], 'last_success_at', now) end
   return 0
 end
+if compact then redis.call('HDEL', KEYS[1], 'last_success_at') end
 local failures = redis.call('HINCRBY', KEYS[1], 'failures', 1)
 redis.call('HSET', KEYS[1], 'route_id', ARGV[7], 'model_id', ARGV[8], 'protocol', ARGV[9])
 redis.call('SADD', KEYS[4], ARGV[1])
 if ARGV[5] == '1' or failures >= tonumber(ARGV[6]) then
   redis.call('HINCRBY', KEYS[1], 'epoch', 1)
   redis.call('HSET', KEYS[1], 'isolated', 1, 'isolated_at', now, 'probe_attempts', 0, 'probe_spec', ARGV[10])
-  redis.call('ZADD', KEYS[2], now + 60000, ARGV[1])
+  if compact then
+    redis.call('HDEL', KEYS[1], 'probe_spec', 'probe_token')
+    redis.call('ZREM', KEYS[2], ARGV[1])
+  else
+    redis.call('ZADD', KEYS[2], now + 60000, ARGV[1])
+  end
   return 1
 end
 return 0
@@ -94,8 +107,9 @@ func (l *Limiter) ObserveModelResult(ctx context.Context, lease *Lease, success,
 	return value == 1, err
 }
 
-var claimModelProbeScript = redis.NewScript(routeHealthLua + embeddingModelHealthLua + `
+var claimModelProbeScript = redis.NewScript(routeHealthLua + embeddingModelHealthLua + compactModelHealthLua + `
 if discardEmbeddingModel(KEYS[1], KEYS[2], nil, ARGV[1]) then return {} end
+if stopCompactModelProbes(KEYS[1], KEYS[2], ARGV[1]) then return {} end
 local now = clockMS()
 if redis.call('HGET', KEYS[1], 'isolated') ~= '1' or redis.call('HGET', KEYS[1], 'probe_disabled') == '1' then
   redis.call('ZREM', KEYS[2], ARGV[1])
@@ -110,7 +124,8 @@ return {tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0'),
         tonumber(redis.call('HGET', KEYS[1], 'probe_attempts') or '0')}
 `)
 
-var finishModelProbeScript = redis.NewScript(routeHealthLua + `
+var finishModelProbeScript = redis.NewScript(routeHealthLua + compactModelHealthLua + `
+if stopCompactModelProbes(KEYS[1], KEYS[2], ARGV[1]) then return 0 end
 local now = clockMS()
 if redis.call('HGET', KEYS[1], 'isolated') ~= '1' or redis.call('HGET', KEYS[1], 'probe_disabled') == '1'
    or tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0') ~= tonumber(ARGV[2])
@@ -237,11 +252,12 @@ func (s *Service) probeIsolatedModel(parent context.Context, id string) {
 	success = s.performRouteProbe(probeCtx, *route, claim.spec, timeout)
 }
 
-var modelRuntimeScript = redis.NewScript(embeddingModelHealthLua + `
+var modelRuntimeScript = redis.NewScript(embeddingModelHealthLua + compactModelHealthLua + `
 local result = {}
 for index=3,#KEYS do
   local key = KEYS[index]
   discardEmbeddingModel(key, KEYS[1], KEYS[2], ARGV[index - 2])
+  stopCompactModelProbes(key, KEYS[1], ARGV[index - 2])
   table.insert(result, redis.call('HGET', key, 'model_id') or '')
   table.insert(result, redis.call('HGET', key, 'protocol') or '')
   table.insert(result, redis.call('HGET', key, 'isolated') or '0')
@@ -249,6 +265,7 @@ for index=3,#KEYS do
   table.insert(result, redis.call('ZSCORE', KEYS[1], ARGV[index - 2]) or '0')
   table.insert(result, redis.call('HGET', key, 'probe_attempts') or '0')
   table.insert(result, redis.call('HGET', key, 'probe_disabled') or '0')
+  table.insert(result, redis.call('HGET', key, 'automatic_probe_disabled') or '0')
 end
 return result
 `)
@@ -284,18 +301,18 @@ func (l *Limiter) populateModelRuntime(ctx context.Context, routes []Route) erro
 		if err != nil {
 			return err
 		}
-		if len(values) != len(ids)*7 {
+		if len(values) != len(ids)*8 {
 			return errors.New("invalid model runtime response")
 		}
 		for j := range ids {
 			if _, removed := routes[i].RemovedModels[ids[j]]; removed {
 				continue
 			}
-			offset := j * 7
+			offset := j * 8
 			if values[offset+2] != "1" {
 				continue
 			}
-			state := ModelHealth{ModelID: values[offset], Protocol: values[offset+1], Isolated: true, ProbeDisabled: values[offset+6] == "1"}
+			state := ModelHealth{ModelID: values[offset], Protocol: values[offset+1], Isolated: true, ProbeDisabled: values[offset+6] == "1", AutomaticProbeDisabled: values[offset+7] == "1"}
 			_, _ = fmt.Sscan(values[offset+3], &state.ConsecutiveFailures)
 			_, _ = fmt.Sscan(values[offset+5], &state.ProbeAttempts)
 			var due int64

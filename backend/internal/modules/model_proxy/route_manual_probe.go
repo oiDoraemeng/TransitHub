@@ -83,6 +83,10 @@ if redis.call('GET', KEYS[3]) ~= ARGV[2]
    or tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0') ~= tonumber(ARGV[3])
    or tonumber(redis.call('HGET', KEYS[5], 'epoch') or '0') ~= tonumber(ARGV[6])
    or tonumber(redis.call('HGET', KEYS[6], 'epoch') or '0') ~= tonumber(ARGV[7]) then return 0 end
+if ARGV[8] == '/v1/responses/compact' then
+  redis.call('HSET', KEYS[5], 'route_id', ARGV[10], 'model_id', ARGV[9], 'protocol', ARGV[8], 'last_success_at', now, 'automatic_probe_disabled', 1)
+  redis.call('SADD', KEYS[7], ARGV[11])
+end
 redis.call('SET', KEYS[4], ARGV[4], 'PX', ARGV[5])
 return now + tonumber(ARGV[5])
 `)
@@ -351,9 +355,11 @@ func (s *Service) TestRouteModel(ctx context.Context, userID, routeID string, in
 	if err != nil {
 		return RouteTestResult{}, err
 	}
+	model, _ := modelHealthIdentity(*route, spec)
 	expires, err := saveManualRecoveryScript.Run(ctx, s.limiter.redis,
-		[]string{healthKey(route.ID), probeDueKey(), manualTestKey(route.ID), proofKey, modelHealthKey(lease.modelHealthID), modelHealthKey(lease.requestedModelHealthID)},
-		route.ID, lease.manualTestToken, lease.epoch, string(encoded), manualRecoveryTTL.Milliseconds(), lease.modelEpoch, lease.requestedModelEpoch).Int64()
+		[]string{healthKey(route.ID), probeDueKey(), manualTestKey(route.ID), proofKey, modelHealthKey(lease.modelHealthID), modelHealthKey(lease.requestedModelHealthID), routeModelIndexKey(route.ID)},
+		route.ID, lease.manualTestToken, lease.epoch, string(encoded), manualRecoveryTTL.Milliseconds(), lease.modelEpoch, lease.requestedModelEpoch,
+		spec.Path, model, route.ID, lease.modelHealthID).Int64()
 	if err != nil {
 		return RouteTestResult{}, err
 	}
