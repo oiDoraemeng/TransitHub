@@ -8,6 +8,7 @@ import {
 import Button from '@/components/ui/button/Button.vue'
 import RouteModelTestDialog from '../components/RouteModelTestDialog.vue'
 import RouteModelHealthStatus from '../components/RouteModelHealthStatus.vue'
+import { hasAutomaticModelProbe } from '../utils/modelProxy'
 import {
   addProxySmartGroupMember, createModelEgressProxy, createProxyRoute, createProxySmartGroup,
   deleteModelEgressProxy, deleteProxyRoute, deleteProxySmartGroup, getProxyCleanupStatus,
@@ -39,7 +40,7 @@ const expandedGroups = ref(new Set<string>())
 const memberPausePending = ref(new Set<string>())
 const routeTestTarget = ref<{ route: ProxyRoute; group?: ProxySmartGroup; model?: string; protocol?: RouteTestProtocol } | null>(null)
 const autoPausedRoutes = computed(() => routes.value.filter(route => route.pausedUntil))
-const isolatedModelCount = computed(() => routes.value.reduce((count, route) => count + (route.modelHealth?.length ?? 0), 0))
+const isolatedModelCount = computed(() => routes.value.reduce((count, route) => count + (route.modelHealth?.filter(hasAutomaticModelProbe).length ?? 0), 0))
 const manuallyPausedMembers = computed(() => smartGroups.value.flatMap(group => group.members.filter(member => member.schedulingPaused)))
 let pollTimer: number | undefined
 let loadInProgress = false

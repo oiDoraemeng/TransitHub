@@ -189,7 +189,6 @@ export default {
       actions: { reveal: '查看 Key', rotate: '轮换 Key', edit: '编辑', delete: '删除', test: '测试代理', copy: '复制', addMember: '添加成员', removeMember: '移除成员' },
       cleanup: { pending: '{count} 个临时 Key 待清理', retrying: '{count} 个待自动重试', processing: '{count} 个正在清理', routePending: '{count} 个待清理' },
       circuit: { removeModel: '移除模型并停止探测', removedModel: '已移除 · 不调度、不探测；测试成功后可恢复', removeConfirm: '移除 {model}（{protocol}）？此操作会停止自动探测，并继续禁止该模型在此接口调度。其他模型不受影响，测试成功后可手动恢复。', modelChanged: '模型状态已变化，请刷新后重试。', unavailable: '不可用', modelSchedule: '仅隔离以上模型。从隔离开始，第 1、3、5、10 分钟恢复探测，之后每隔 10 分钟。', paused: '整条路由暂停至 {time}', nextProbe: '下次恢复探测 {time}', help: '整条路由的连接或凭据连续 3 个请求最终失败后暂停 30 分钟，每 3 分钟流式探测。', modelPaused: '模型 {model} 已隔离', modelSummary: '当前隔离 {count} 个路由模型，其他模型仍可调度。', modelHelp: '同一模型连续 3 个请求（含重试）最终失败才隔离；明确的模型不存在立即隔离。从隔离开始第 1、3、5、10 分钟探测（间隔 1、2、2、5 分钟），之后每隔 10 分钟，成功恢复。' },
-      compactNoProbe: 'Compact 不自动探测；手动测试成功后可恢复。',
       manualTest: {
         mappingApplied: '已应用模型映射', selectedModel: '所选模型', actualModel: '实际测试的上游模型',
         customModel: '手动输入模型', modelCount: '共 {count} 个模型（含可用映射别名）',

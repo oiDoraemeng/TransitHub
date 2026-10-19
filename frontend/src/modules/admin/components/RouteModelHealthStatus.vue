@@ -3,11 +3,12 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, Clock3, FlaskConical, Trash2, TriangleAlert } from 'lucide-vue-next'
 import type { ProxyModelHealth } from '../types/modelProxy'
+import { hasAutomaticModelProbe } from '../utils/modelProxy'
 
 const props = defineProps<{ health?: ProxyModelHealth[]; disabled?: boolean }>()
 const emit = defineEmits<{ test: [model: ProxyModelHealth]; remove: [model: ProxyModelHealth] }>()
 const { t, locale } = useI18n()
-const models = computed(() => [...(props.health ?? [])].sort((a, b) => a.modelId.localeCompare(b.modelId) || a.protocol.localeCompare(b.protocol)))
+const models = computed(() => (props.health ?? []).filter(hasAutomaticModelProbe).sort((a, b) => a.modelId.localeCompare(b.modelId) || a.protocol.localeCompare(b.protocol)))
 const protocolLabel = (protocol: string) => ({
   '/v1/chat/completions': 'Chat', '/v1/responses': 'Responses', '/v1/responses/compact': 'Compact', '/v1/messages': 'Messages',
   gemini: 'Gemini',
@@ -33,15 +34,13 @@ const probeTime = (value: string) => new Intl.DateTimeFormat(locale.value, {
             <div class="min-w-0"><div class="break-all font-mono font-medium text-foreground">{{ model.modelId }}</div><span class="mt-1 inline-block rounded bg-surface px-1.5 py-0.5 text-[10px] text-muted-foreground">{{ protocolLabel(model.protocol) }}</span></div>
             <div class="flex shrink-0 items-center">
               <button type="button" class="rounded-md p-1.5 text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40" :disabled="disabled" :title="t('admin.modelProxy.manualTest.action')" :aria-label="`${t('admin.modelProxy.manualTest.action')} ${model.modelId}`" @click="emit('test', model)"><FlaskConical class="h-4 w-4" /></button>
-              <button v-if="!model.probeDisabled" type="button" class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" :title="t('admin.modelProxy.circuit.removeModel')" :aria-label="`${t('admin.modelProxy.circuit.removeModel')} ${model.modelId}`" @click="emit('remove', model)"><Trash2 class="h-4 w-4" /></button>
+              <button type="button" class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" :title="t('admin.modelProxy.circuit.removeModel')" :aria-label="`${t('admin.modelProxy.circuit.removeModel')} ${model.modelId}`" @click="emit('remove', model)"><Trash2 class="h-4 w-4" /></button>
             </div>
           </div>
-          <div v-if="model.probeDisabled" class="mt-1.5 rounded bg-surface px-2 py-1 text-[11px] text-muted-foreground">{{ t('admin.modelProxy.circuit.removedModel') }}</div>
-          <div v-else-if="model.automaticProbeDisabled" class="mt-1.5 rounded bg-surface px-2 py-1 text-[11px] text-muted-foreground">{{ t('admin.modelProxy.compactNoProbe') }}</div>
-          <div v-else-if="model.nextProbeAt" class="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground"><Clock3 class="h-3 w-3 shrink-0" />{{ t('admin.modelProxy.circuit.nextProbe', { time: probeTime(model.nextProbeAt) }) }}</div>
+          <div v-if="model.nextProbeAt" class="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground"><Clock3 class="h-3 w-3 shrink-0" />{{ t('admin.modelProxy.circuit.nextProbe', { time: probeTime(model.nextProbeAt) }) }}</div>
         </div>
       </div>
-      <p v-if="models.some(model => !model.probeDisabled && !model.automaticProbeDisabled)" class="px-2.5 py-2 text-[11px] leading-4 text-muted-foreground">{{ t('admin.modelProxy.circuit.modelSchedule') }}</p>
+      <p class="px-2.5 py-2 text-[11px] leading-4 text-muted-foreground">{{ t('admin.modelProxy.circuit.modelSchedule') }}</p>
     </div>
   </details>
 </template>
