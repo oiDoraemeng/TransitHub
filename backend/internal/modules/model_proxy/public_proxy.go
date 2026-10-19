@@ -365,6 +365,11 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			response, _, err := s.performAttemptWithResponseHeaderTimeout(incoming, *route, replay.Open, route.ModelMapping, responseMapping, !streaming, responseHeaderTimeout)
 			lastResponse, lastAttemptErr = response, err
 			s.observeSmartGroupLatency(incoming.Context(), route.ID, time.Since(started), responseHeaderTimeout, response, err)
+			status := 0
+			if response != nil {
+				status = response.StatusCode
+			}
+			log.Printf("[model-proxy] dispatch request_id=%s route=%s model=%s attempt=%d status=%d ready_in=%s failed=%t", requestID, route.Name, modelID, attempts, status, time.Since(started), err != nil || status < 200 || status >= 300 || responseHealth(response).failed)
 			return response, err
 		})
 		if attemptErr != nil {
@@ -413,11 +418,18 @@ func attemptSmartGroupMember(ctx context.Context, attempt func(time.Duration) (*
 	var lastErr error
 	for attemptIndex := 0; attemptIndex < smartGroupAttempts; attemptIndex++ {
 		response, err := attempt(smartGroupResponseHeaderTimeout(attemptIndex))
-		if err == nil && response != nil && response.StatusCode >= 200 && response.StatusCode < 300 {
+		if err == nil && response != nil && response.StatusCode >= 200 && response.StatusCode < 300 && !responseHealth(response).failed {
 			return response, nil
 		}
 		if response != nil {
-			lastErr = fmt.Errorf("upstream returned %d", response.StatusCode)
+			switch {
+			case err != nil:
+				lastErr = err
+			case responseHealth(response).failed:
+				lastErr = errors.New("upstream stream reported an error")
+			default:
+				lastErr = fmt.Errorf("upstream returned %d", response.StatusCode)
+			}
 			response.Body.Close()
 			if responseHealth(response).modelMissing {
 				return nil, lastErr
@@ -448,7 +460,7 @@ func (s *Service) observeSmartGroupLatency(ctx context.Context, routeID string, 
 	if s.limiter == nil || s.latencySamples == nil || ctx.Err() != nil {
 		return
 	}
-	if attemptErr != nil || response == nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+	if attemptErr != nil || response == nil || response.StatusCode < 200 || response.StatusCode >= 300 || responseHealth(response).failed {
 		if elapsed < failurePenalty {
 			elapsed = failurePenalty
 		}
@@ -598,6 +610,7 @@ func (s *Service) performAttemptWithResponseHeaderTimeout(incoming *http.Request
 			return s.deleteCleanupJobNow(cleanupJob)
 		})
 	}
+	responseStarted := time.Now()
 	response, err := doWithResponseHeaderTimeout(client, request, responseHeaderTimeout)
 	if deadlineCleanup != nil {
 		if err != nil {
@@ -645,6 +658,17 @@ func (s *Service) performAttemptWithResponseHeaderTimeout(incoming *http.Request
 		cleanup()
 	}
 	trackResponseHealth(response)
+	if responseHeaderTimeout > 0 && response.StatusCode >= 200 && response.StatusCode < 300 && isEventStream(response.Header) {
+		remaining := responseHeaderTimeout - time.Since(responseStarted)
+		if remaining <= 0 {
+			_ = response.Body.Close()
+			return response, true, fmt.Errorf("upstream stream start timeout after %s", responseHeaderTimeout)
+		}
+		if err := prepareStreamStart(incoming.Context(), response, remaining); err != nil {
+			_ = response.Body.Close()
+			return response, true, err
+		}
+	}
 	return response, retryable, nil
 }
 
