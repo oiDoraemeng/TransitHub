@@ -99,8 +99,8 @@ func DefaultNotificationChannelSettings() NotificationChannelSettings {
 
 func DefaultStrategySettings() StrategySettings {
 	return StrategySettings{
-		RecoveryProbeFirstTimeoutSeconds:      60,
-		RecoveryProbeSubsequentTimeoutSeconds: 15,
+		RecoveryProbeFirstTimeoutSeconds:      90,
+		RecoveryProbeSubsequentTimeoutSeconds: 60,
 		RefreshInterval:                       minRefreshIntervalSeconds,
 		BalanceTemplateFormat:                 NotificationTemplateFormatText,
 		MultiplierTemplateFormat:              NotificationTemplateFormatText,
@@ -314,10 +314,10 @@ func normalizeNotificationChannelSettings(settings NotificationChannelSettings) 
 
 func normalizeStrategySettings(settings StrategySettings) StrategySettings {
 	if settings.RecoveryProbeFirstTimeoutSeconds < 1 {
-		settings.RecoveryProbeFirstTimeoutSeconds = 60
+		settings.RecoveryProbeFirstTimeoutSeconds = 90
 	}
 	if settings.RecoveryProbeSubsequentTimeoutSeconds < 1 {
-		settings.RecoveryProbeSubsequentTimeoutSeconds = 15
+		settings.RecoveryProbeSubsequentTimeoutSeconds = 60
 	}
 	settings.RecoveryProbeFirstTimeoutSeconds = min(settings.RecoveryProbeFirstTimeoutSeconds, 300)
 	settings.RecoveryProbeSubsequentTimeoutSeconds = min(settings.RecoveryProbeSubsequentTimeoutSeconds, 300)

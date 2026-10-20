@@ -43,7 +43,7 @@ func newStreamingRouteProbeRequest(ctx context.Context, spec routeProbeSpec) (*h
 
 // A 200 header or an initial role/heartbeat event alone cannot prove recovery.
 // Read bounded SSE events until a protocol completion, rejecting truncated and
-// error streams. The caller's 45-second context bounds an upstream that stalls.
+// error streams. The caller's configured timeout bounds an upstream that stalls.
 func validateRouteProbeStream(body io.Reader, path string) bool {
 	scanner := bufio.NewScanner(io.LimitReader(body, 1<<20))
 	scanner.Buffer(make([]byte, 4096), 1<<20)

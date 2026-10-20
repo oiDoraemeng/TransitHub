@@ -21,7 +21,7 @@ func (s *Service) SetRecoveryProbeSettings(settings RecoveryProbeSettings) {
 }
 
 func (s *Service) recoveryProbeTimeout(ctx context.Context, route Route, attempts int64) (time.Duration, error) {
-	first, subsequent := 60, 15
+	first, subsequent := 90, 60
 	if s.probeSettings != nil {
 		var err error
 		first, subsequent, err = s.probeSettings.GetRecoveryProbeTimeouts(ctx, route.UserID, route.AdminAccountID)
@@ -34,9 +34,9 @@ func (s *Service) recoveryProbeTimeout(ctx context.Context, route Route, attempt
 		seconds = subsequent
 	}
 	if seconds < 1 || seconds > 300 {
-		seconds = 60
+		seconds = 90
 		if attempts > 0 {
-			seconds = 15
+			seconds = 60
 		}
 	}
 	return time.Duration(seconds) * time.Second, nil

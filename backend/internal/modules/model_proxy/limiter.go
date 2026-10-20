@@ -118,6 +118,7 @@ type Lease struct {
 	modelHealthID   string
 	modelEpoch      int64
 	modelProbeToken string
+	neverAutoPause  bool
 	// A manual mapped test may also restore an exclusion saved under its
 	// requested name before mapping was enabled or changed.
 	requestedModelHealthID string

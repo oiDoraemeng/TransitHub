@@ -658,7 +658,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 		}
 		input.KeywordMatchMode = &mode
 	}
-	if input.SchedulingPaused == nil && input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordMatchMode == nil && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
+	if input.NeverAutoPause == nil && input.SchedulingPaused == nil && input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordMatchMode == nil && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
 	var keyCiphertext, keyPreviewValue *string
@@ -698,7 +698,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
 		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
 		input.ModelMappingEnabled, modelMappingJSON, input.UseProvidedKey, keyCiphertext, keyPreviewValue,
-		input.KeywordMatchMode, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS, input.SchedulingPaused)
+		input.KeywordMatchMode, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS, input.SchedulingPaused, input.NeverAutoPause)
 }
 
 const (

@@ -53,6 +53,15 @@ func (s *Service) observeRouteRequest(ctx context.Context, lease *Lease, spec ro
 	var paused bool
 	var err error
 	health := responseHealth(response)
+	if route.NeverAutoPause {
+		if spec.Path == compactPath {
+			_, err = s.limiter.ObserveModelResult(stateCtx, lease, success, health.modelMissing, route, spec)
+			if err != nil {
+				log.Printf("[model-proxy] Compact success update route_id=%s err=%v", route.ID, err)
+			}
+		}
+		return false
+	}
 	// An HTTP response proves the route is reachable. 5xx/429/403 can be
 	// specific to the requested model; only credential-wide failures promote
 	// them to a route circuit. Compact failures always stay local to Compact,
@@ -219,6 +228,9 @@ func (s *Service) loadProbeRoute(ctx context.Context, claim *routeProbeClaim) (*
 	}
 	for _, route := range routes {
 		if route.ID == claim.routeID {
+			if route.NeverAutoPause {
+				return nil, nil
+			}
 			return &route, nil
 		}
 	}

@@ -157,6 +157,8 @@ export default {
         customKeys: '自定义入口 Key', customKeyTotal: '当前 {count} 个', noCustomKeys: '尚未设置自定义 Key，系统生成的主 Key 不受影响。',
         addCustomKeys: '新增自定义 Key', customKeyPlaceholder: '每行填写一个自定义 Key', customKeyHelp: '最多 32 个；保存后与系统生成的主 Key 同时有效。留空不会修改现有自定义 Key。', removeCustomKey: '移除此自定义 Key',
         policy: {
+          neverAutoPause: '永不自动暂停',
+          neverAutoPauseHelp: '仅对当前分组成员生效。请求失败不会触发自动暂停或模型隔离，已有自动隔离也不影响调度。手动暂停、手动移除模型和并发限制仍生效。',
           edit: '成员策略', streamOnly: '仅接收流式请求', minInput: '最少输入 Token',
           minInputHelp: '0 表示不限；可填写任意非负整数，低于门槛会跳过此成员。',
           minInputError: '最少输入 Token 必须是非负整数。',

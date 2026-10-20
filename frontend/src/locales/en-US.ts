@@ -157,6 +157,8 @@ export default {
         customKeys: 'Custom entry keys', customKeyTotal: '{count} currently', noCustomKeys: 'No custom keys are configured. The system-generated primary key is unchanged.',
         addCustomKeys: 'Add custom keys', customKeyPlaceholder: 'One custom key per line', customKeyHelp: 'Up to 32. After saving, each custom key works alongside the system-generated primary key. Leaving this empty keeps existing custom keys.', removeCustomKey: 'Remove this custom key',
         policy: {
+          neverAutoPause: 'Never pause automatically',
+          neverAutoPauseHelp: 'Applies to this group member only. Failures do not trigger automatic pauses or model isolation, and existing automatic isolation does not block scheduling. Manual pauses, removed models and concurrency limits still apply.',
           edit: 'Member policy', streamOnly: 'Accept streaming requests only', minInput: 'Minimum input tokens',
           minInputHelp: '0 disables this rule. Enter any non-negative integer; smaller requests skip this member.',
           minInputError: 'Minimum input tokens must be a non-negative integer.',

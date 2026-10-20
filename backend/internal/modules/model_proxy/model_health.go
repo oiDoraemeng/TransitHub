@@ -61,8 +61,17 @@ if redis.call('HGET', KEYS[3], 'deleted') == '1' then return 0 end
 if tonumber(redis.call('HGET', KEYS[3], 'epoch') or '0') ~= tonumber(ARGV[3]) then return 0 end
 local epoch = tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0')
 if epoch ~= tonumber(ARGV[2]) then return 0 end
-if redis.call('HGET', KEYS[1], 'isolated') == '1' then return 1 end
 local compact = ARGV[9] == '/v1/responses/compact'
+if ARGV[11] == '1' then
+  if compact then
+    redis.call('HSET', KEYS[1], 'route_id', ARGV[7], 'model_id', ARGV[8], 'protocol', ARGV[9], 'automatic_probe_disabled', 1)
+    redis.call('SADD', KEYS[4], ARGV[1])
+    if ARGV[4] == '1' then redis.call('HSET', KEYS[1], 'last_success_at', now)
+    else redis.call('HDEL', KEYS[1], 'last_success_at') end
+  end
+  return 0
+end
+if redis.call('HGET', KEYS[1], 'isolated') == '1' then return 1 end
 if compact then
   redis.call('HSET', KEYS[1], 'route_id', ARGV[7], 'model_id', ARGV[8], 'protocol', ARGV[9], 'automatic_probe_disabled', 1)
   redis.call('SADD', KEYS[4], ARGV[1])
@@ -95,6 +104,9 @@ func (l *Limiter) ObserveModelResult(ctx context.Context, lease *Lease, success,
 	if lease.modelHealthID == "" || spec.Path == embeddingsPath {
 		return false, nil
 	}
+	if route.NeverAutoPause && spec.Path != compactPath {
+		return false, nil
+	}
 	encoded, err := json.Marshal(spec)
 	if err != nil {
 		return false, err
@@ -103,7 +115,7 @@ func (l *Limiter) ObserveModelResult(ctx context.Context, lease *Lease, success,
 	value, err := observeModelResultScript.Run(ctx, l.redis,
 		[]string{modelHealthKey(lease.modelHealthID), modelProbeDueKey(), healthKey(route.ID), routeModelIndexKey(route.ID)},
 		lease.modelHealthID, lease.modelEpoch, lease.epoch, boolInt(success), boolInt(immediate), routeFailureThreshold,
-		route.ID, model, protocol, string(encoded)).Int64()
+		route.ID, model, protocol, string(encoded), boolInt(route.NeverAutoPause)).Int64()
 	return value == 1, err
 }
 

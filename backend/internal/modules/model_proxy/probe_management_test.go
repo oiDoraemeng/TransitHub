@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -78,7 +79,7 @@ func TestRecoveryProbeSettingsRemainWorkspaceScoped(t *testing.T) {
 		}
 	}
 	first, subsequent, err := service.GetRecoveryProbeTimeouts(ctx, "other-user", "one")
-	if err != nil || first != 60 || subsequent != 15 {
+	if err != nil || first != 90 || subsequent != 60 {
 		t.Fatalf("cross-user settings leak: %d %d %v", first, subsequent, err)
 	}
 }
@@ -334,7 +335,7 @@ func TestAutomaticProbeUsesScopedFirstAndSubsequentDeadlines(t *testing.T) {
 	service.repository, service.limiter = repo, limiter
 	route.ID = healthTestRoute(t, client).ID
 	seedPauseMember(t, repo, route)
-	settings := &testProbeSettings{first: 60, subsequent: 15}
+	settings := &testProbeSettings{first: 90, subsequent: 60}
 	service.SetRecoveryProbeSettings(settings)
 	var deadline time.Duration
 	service.dataClient.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
@@ -348,7 +349,7 @@ func TestAutomaticProbeUsesScopedFirstAndSubsequentDeadlines(t *testing.T) {
 	spec := routeProbeSpec{ModelID: "bad", Path: "/v1/responses"}
 	_ = failTestModel(t, limiter, route, spec)
 	id := modelHealthID(route, spec)
-	for _, want := range []time.Duration{60 * time.Second, 15 * time.Second, 15 * time.Second} {
+	for _, want := range []time.Duration{90 * time.Second, 60 * time.Second, 60 * time.Second} {
 		forceModelProbeDue(t, client, id)
 		service.probeIsolatedModel(context.Background(), id)
 		if deadline > want || deadline < want-time.Second {
@@ -364,12 +365,67 @@ func TestAutomaticProbeUsesScopedFirstAndSubsequentDeadlines(t *testing.T) {
 	if err := client.HSet(context.Background(), healthKey(route.ID), "probe_spec", `{"modelId":"model","path":"/v1/responses"}`).Err(); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []time.Duration{60 * time.Second, 15 * time.Second} {
+	for _, want := range []time.Duration{90 * time.Second, 60 * time.Second} {
 		forceProbeDue(t, client, route.ID)
 		service.probePausedRoute(context.Background(), route.ID)
 		if deadline > want || deadline < want-time.Second {
 			t.Fatalf("route deadline=%s want=%s", deadline, want)
 		}
+	}
+}
+
+func TestRecoveryProbeTimeoutDefaultsAndOverrides(t *testing.T) {
+	for _, test := range []struct {
+		name              string
+		settings          RecoveryProbeSettings
+		first, subsequent time.Duration
+	}{
+		{"default", nil, 90 * time.Second, 60 * time.Second},
+		{"invalid", &testProbeSettings{first: 0, subsequent: 301}, 90 * time.Second, 60 * time.Second},
+		{"custom", &testProbeSettings{first: 120, subsequent: 25}, 120 * time.Second, 25 * time.Second},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			service := &Service{probeSettings: test.settings}
+			for attempt, want := range []time.Duration{test.first, test.subsequent, test.subsequent} {
+				got, err := service.recoveryProbeTimeout(context.Background(), Route{}, int64(attempt))
+				if err != nil || got != want {
+					t.Fatalf("attempt %d timeout=%s want=%s err=%v", attempt, got, want, err)
+				}
+			}
+		})
+	}
+}
+
+func TestRecoveryProbeDefaultMigrationPreservesCustomSettings(t *testing.T) {
+	repo := memberPauseTestRepository(t)
+	ctx := context.Background()
+	if _, err := repo.db.Exec(ctx, `CREATE TABLE strategy_settings (id text PRIMARY KEY, settings jsonb NOT NULL);
+		INSERT INTO strategy_settings VALUES
+		('old', '{"recoveryProbeFirstTimeoutSeconds":60,"recoveryProbeSubsequentTimeoutSeconds":15,"refreshInterval":120}'),
+		('custom', '{"recoveryProbeFirstTimeoutSeconds":120,"recoveryProbeSubsequentTimeoutSeconds":25}'),
+		('empty', '{}')`); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile("../../database/migrations/000038_update_recovery_probe_defaults.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.db.Exec(ctx, string(body)); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range []struct {
+		id                string
+		first, subsequent int
+	}{{"old", 90, 60}, {"custom", 120, 25}, {"empty", 90, 60}} {
+		var first, subsequent int
+		if err := repo.db.QueryRow(ctx, `SELECT (settings->>'recoveryProbeFirstTimeoutSeconds')::int,
+			(settings->>'recoveryProbeSubsequentTimeoutSeconds')::int FROM strategy_settings WHERE id=$1`, row.id).Scan(&first, &subsequent); err != nil || first != row.first || subsequent != row.subsequent {
+			t.Fatalf("migration %s: %d %d %v", row.id, first, subsequent, err)
+		}
+	}
+	var refresh int
+	if err := repo.db.QueryRow(ctx, `SELECT (settings->>'refreshInterval')::int FROM strategy_settings WHERE id='old'`).Scan(&refresh); err != nil || refresh != 120 {
+		t.Fatalf("migration changed unrelated setting: %d %v", refresh, err)
 	}
 }
 

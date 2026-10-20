@@ -38,8 +38,8 @@ const errorChannels = ref('')
 const enableRefreshInterval = ref(false)
 const refreshInterval = ref('60')
 const minimumRefreshInterval = 60
-const recoveryProbeFirstTimeout = ref('60')
-const recoveryProbeSubsequentTimeout = ref('15')
+const recoveryProbeFirstTimeout = ref('90')
+const recoveryProbeSubsequentTimeout = ref('60')
 
 const enableBalanceWarning = ref(false)
 const defaultBalanceThreshold = ref('10.00')
@@ -175,8 +175,8 @@ const saveStrategy = async () => {
 }
 
 const applyStrategySettings = (settings: StrategySettings) => {
-  recoveryProbeFirstTimeout.value = String(settings.recoveryProbeFirstTimeoutSeconds || 60)
-  recoveryProbeSubsequentTimeout.value = String(settings.recoveryProbeSubsequentTimeoutSeconds || 15)
+  recoveryProbeFirstTimeout.value = String(settings.recoveryProbeFirstTimeoutSeconds || 90)
+  recoveryProbeSubsequentTimeout.value = String(settings.recoveryProbeSubsequentTimeoutSeconds || 60)
   enableRefreshInterval.value = settings.enableRefreshInterval
   refreshInterval.value = String(Math.max(settings.refreshInterval, minimumRefreshInterval))
   enableBalanceWarning.value = settings.enableBalanceWarning
@@ -193,8 +193,8 @@ const applyStrategySettings = (settings: StrategySettings) => {
 }
 
 const currentStrategySettings = (): StrategySettings => ({
-  recoveryProbeFirstTimeoutSeconds: Math.min(300, Math.max(1, Number.parseInt(recoveryProbeFirstTimeout.value, 10) || 60)),
-  recoveryProbeSubsequentTimeoutSeconds: Math.min(300, Math.max(1, Number.parseInt(recoveryProbeSubsequentTimeout.value, 10) || 15)),
+  recoveryProbeFirstTimeoutSeconds: Math.min(300, Math.max(1, Number.parseInt(recoveryProbeFirstTimeout.value, 10) || 90)),
+  recoveryProbeSubsequentTimeoutSeconds: Math.min(300, Math.max(1, Number.parseInt(recoveryProbeSubsequentTimeout.value, 10) || 60)),
   enableRefreshInterval: enableRefreshInterval.value,
   refreshInterval: Math.max(Number.parseInt(refreshInterval.value, 10) || minimumRefreshInterval, minimumRefreshInterval),
   enableBalanceWarning: enableBalanceWarning.value,

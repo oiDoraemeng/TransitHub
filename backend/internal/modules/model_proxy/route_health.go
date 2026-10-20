@@ -25,6 +25,10 @@ var errRoutePaused = errors.New("proxy route is temporarily paused")
 var routeRetryAllowedScript = redis.NewScript(routeHealthLua + `
 local untilMS = resumeExpired(KEYS[1], KEYS[2], ARGV[1], clockMS())
 if redis.call('HGET', KEYS[1], 'deleted') == '1' then return 0 end
+if ARGV[5] == '1' then
+  if ARGV[3] ~= '' and redis.call('HGET', KEYS[3], 'probe_disabled') == '1' then return 0 end
+  return 1
+end
 if untilMS > 0 or tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0') ~= tonumber(ARGV[2]) then return 0 end
 if ARGV[3] ~= '' and (redis.call('HGET', KEYS[3], 'isolated') == '1'
    or tonumber(redis.call('HGET', KEYS[3], 'epoch') or '0') ~= tonumber(ARGV[4])) then return 0 end
@@ -32,7 +36,7 @@ return 1
 `)
 
 func (l *Limiter) routeRetryAllowed(ctx context.Context, lease *Lease) (bool, error) {
-	result, err := routeRetryAllowedScript.Run(ctx, l.redis, []string{healthKey(lease.routeID), probeDueKey(), modelHealthKey(lease.modelHealthID)}, lease.routeID, lease.epoch, lease.modelHealthID, lease.modelEpoch).Int64()
+	result, err := routeRetryAllowedScript.Run(ctx, l.redis, []string{healthKey(lease.routeID), probeDueKey(), modelHealthKey(lease.modelHealthID)}, lease.routeID, lease.epoch, lease.modelHealthID, lease.modelEpoch, boolInt(lease.neverAutoPause)).Int64()
 	return result == 1, err
 }
 
@@ -211,7 +215,7 @@ func (l *Limiter) PopulateRouteRuntime(ctx context.Context, routes []Route) erro
 }
 
 func (l *Limiter) ObserveRouteResult(ctx context.Context, lease *Lease, success bool, spec routeProbeSpec) (bool, error) {
-	if spec.Path == embeddingsPath || spec.Path == compactPath {
+	if spec.Path == embeddingsPath || spec.Path == compactPath || lease.neverAutoPause {
 		return false, nil
 	}
 	encoded, err := json.Marshal(spec)

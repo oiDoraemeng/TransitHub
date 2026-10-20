@@ -23,8 +23,9 @@ local compact = ARGV[7] == '1'
 for index, route in ipairs(routes) do
   local offset = 3 + (index - 1) * 5
   local untilMS = resumeExpired(KEYS[offset + 2], KEYS[2], route.id, now)
-  local isolated = route.modelRemoved or (route.modelHealthID ~= '' and redis.call('HGET', KEYS[offset + 3], 'isolated') == '1')
-  if untilMS > now or route.manualPause or redis.call('HGET', KEYS[offset + 2], 'deleted') == '1' then
+  local isolated = route.modelRemoved or (route.modelHealthID ~= '' and redis.call('HGET', KEYS[offset + 3], 'isolated') == '1'
+    and (not route.neverAutoPause or redis.call('HGET', KEYS[offset + 3], 'probe_disabled') == '1'))
+  if (untilMS > now and not route.neverAutoPause) or route.manualPause or redis.call('HGET', KEYS[offset + 2], 'deleted') == '1' then
     paused = paused + 1
   elseif isolated then
     paused = paused + 1
@@ -127,13 +128,14 @@ return {best.index, tonumber(redis.call('HGET', KEYS[best.offset + 2], 'epoch') 
 func schedulerBalanceKey(routeID string) string { return "proxy:scheduler-balance:{routes}:" + routeID }
 
 type schedulerRoute struct {
-	ID            string `json:"id"`
-	Priority      int    `json:"priority"`
-	Limit         int    `json:"limit"`
-	Provided      bool   `json:"provided"`
-	ManualPause   bool   `json:"manualPause"`
-	ModelHealthID string `json:"modelHealthID"`
-	ModelRemoved  bool   `json:"modelRemoved"`
+	ID             string `json:"id"`
+	Priority       int    `json:"priority"`
+	Limit          int    `json:"limit"`
+	Provided       bool   `json:"provided"`
+	ManualPause    bool   `json:"manualPause"`
+	ModelHealthID  string `json:"modelHealthID"`
+	ModelRemoved   bool   `json:"modelRemoved"`
+	NeverAutoPause bool   `json:"neverAutoPause"`
 }
 
 func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID string, specs ...routeProbeSpec) (*Lease, *Route, error) {
@@ -149,7 +151,7 @@ func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID
 		}
 		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID), healthKey(route.ID), modelHealthKey(modelID), schedulerBalanceKey(route.ID))
 		_, removed := route.RemovedModels[modelID]
-		input = append(input, schedulerRoute{route.ID, route.Priority, route.ConcurrencyLimit, route.UseProvidedKey, route.SchedulingPaused, modelID, removed})
+		input = append(input, schedulerRoute{route.ID, route.Priority, route.ConcurrencyLimit, route.UseProvidedKey, route.SchedulingPaused, modelID, removed, route.NeverAutoPause})
 	}
 	encoded, err := json.Marshal(input)
 	if err != nil {
@@ -178,5 +180,7 @@ func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID
 		return nil, nil, errors.New("invalid selected route index")
 	}
 	route := routes[index]
-	return l.newLease(route.ID, leaseID, values[1], "", modelLeaseState{input[index].ModelHealthID, values[3], ""}), &route, nil
+	lease := l.newLease(route.ID, leaseID, values[1], "", modelLeaseState{input[index].ModelHealthID, values[3], ""})
+	lease.neverAutoPause = route.NeverAutoPause
+	return lease, &route, nil
 }
