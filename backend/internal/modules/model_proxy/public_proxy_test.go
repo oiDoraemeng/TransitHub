@@ -611,8 +611,8 @@ func TestAttemptSmartGroupMemberRetriesAnyStatusOnce(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status=%d want 200", response.StatusCode)
 	}
-	if len(timeouts) != 2 || timeouts[0] != 30*time.Second || timeouts[1] != 10*time.Second {
-		t.Fatalf("timeouts=%v want [30s 10s]", timeouts)
+	if len(timeouts) != 2 || timeouts[0] != 90*time.Second || timeouts[1] != 60*time.Second {
+		t.Fatalf("timeouts=%v want [90s 60s]", timeouts)
 	}
 }
 

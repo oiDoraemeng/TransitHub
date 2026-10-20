@@ -46,8 +46,8 @@ for index, route in ipairs(routes) do
       table.insert(eligible, item)
       local better = best == nil
       if best ~= nil then
-        if item.priority ~= best.priority then better = item.priority > best.priority
-        elseif compact and item.lastSuccess ~= best.lastSuccess then better = item.lastSuccess > best.lastSuccess
+        if compact and item.lastSuccess ~= best.lastSuccess then better = item.lastSuccess > best.lastSuccess
+        elseif not compact and item.priority ~= best.priority then better = item.priority > best.priority
         elseif item.tier ~= best.tier then better = item.tier < best.tier
         elseif tier == 2 then better = remaining > best.remaining
         elseif latency ~= best.latency then better = latency < best.latency
@@ -55,7 +55,7 @@ for index, route in ipairs(routes) do
         else better = item.id < best.id end
       end
       if better then best = item; tied = {item}
-      elseif best.priority == item.priority and best.lastSuccess == item.lastSuccess and best.tier == 2 and tier == 2
+      elseif (compact or best.priority == item.priority) and best.lastSuccess == item.lastSuccess and best.tier == 2 and tier == 2
              and best.remaining == remaining then table.insert(tied, item) end
     end
   end
@@ -63,7 +63,8 @@ end
 if best == nil then return {0, 0, paused, 0, modelPaused} end
 if compact and best.lastSuccess > 0 then
   -- Compact never sends recovery probes. Reuse the most recently successful
-  -- actual model/endpoint, respecting priority, exclusion and hard capacity.
+  -- actual model/endpoint across every priority, respecting exclusions and
+  -- hard capacity. Inference requests retain strict priority boundaries.
 elseif best.tier == 2 then
   table.sort(tied, function(a,b) return a.id < b.id end)
   local cursor = redis.call('INCR', KEYS[1])
@@ -75,7 +76,7 @@ else
   local pool = {}
   local fastest = nil
   for _, item in ipairs(eligible) do
-    if item.priority == best.priority and item.tier == best.tier then
+    if (compact or item.priority == best.priority) and item.tier == best.tier then
       table.insert(pool, item)
       if item.latency > 0 and (fastest == nil or item.latency < fastest) then
         fastest = item.latency

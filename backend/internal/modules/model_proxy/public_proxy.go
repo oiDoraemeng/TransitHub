@@ -22,8 +22,8 @@ const (
 	memoryReplayLimit                     = 1 << 20
 	directMaxAttempts                     = 3
 	smartGroupAttempts                    = 2
-	smartGroupFirstResponseHeaderTimeout  = 30 * time.Second
-	smartGroupSecondResponseHeaderTimeout = 10 * time.Second
+	smartGroupFirstResponseHeaderTimeout  = 90 * time.Second
+	smartGroupSecondResponseHeaderTimeout = 60 * time.Second
 	firstSSEEventLimit                    = 1 << 20
 )
 
@@ -268,11 +268,14 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		writeOpenAIError(w, http.StatusNotFound, "model_not_found", "no enabled smart group member supports this model")
 		return
 	}
+	compact := incoming.URL.Path == compactPath
 	keywordFiltering := false
-	for _, candidate := range candidates {
-		if candidate.KeywordMatchMode != KeywordMatchModeDisabled {
-			keywordFiltering = true
-			break
+	if !compact {
+		for _, candidate := range candidates {
+			if candidate.KeywordMatchMode != KeywordMatchModeDisabled {
+				keywordFiltering = true
+				break
+			}
 		}
 	}
 	var inputText string
@@ -290,10 +293,12 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	}
 	eligible := make([]Route, 0, len(candidates))
 	for _, candidate := range candidates {
-		if candidate.StreamOnly && !streaming {
+		// Compact is a non-streaming maintenance request. Search all enabled
+		// members supporting this model instead of applying inference policies.
+		if !compact && candidate.StreamOnly && !streaming {
 			continue
 		}
-		if candidate.MinInputTokens > 0 && inputTokens < candidate.MinInputTokens {
+		if !compact && candidate.MinInputTokens > 0 && inputTokens < candidate.MinInputTokens {
 			continue
 		}
 		eligible = append(eligible, candidate)
@@ -369,7 +374,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			if response != nil {
 				status = response.StatusCode
 			}
-			log.Printf("[model-proxy] dispatch request_id=%s route=%s model=%s attempt=%d status=%d ready_in=%s failed=%t", requestID, route.Name, modelID, attempts, status, time.Since(started), err != nil || status < 200 || status >= 300 || responseHealth(response).failed)
+			log.Printf("[model-proxy] dispatch request_id=%s route=%s model=%s attempt=%d status=%d ready_in=%s failed=%t path=%s", requestID, route.Name, modelID, attempts, status, time.Since(started), err != nil || status < 200 || status >= 300 || responseHealth(response).failed, incoming.URL.Path)
 			return response, err
 		})
 		if attemptErr != nil {

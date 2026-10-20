@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -170,7 +171,9 @@ func TestCompactSchedulerPrefersLatestActualModelSuccess(t *testing.T) {
 	acquire([]Route{a, b}, spec, a.ID).Release(ctx)
 	held.Release(ctx)
 	a.Priority = 6
-	acquire([]Route{b, a}, spec, a.ID).Release(ctx)
+	acquire([]Route{b, a}, spec, b.ID).Release(ctx)
+	// Inference still uses priority even when Compact ignores it.
+	acquire([]Route{b, a}, routeProbeSpec{ModelID: "alias", Path: "/v1/responses"}, a.ID).Release(ctx)
 	a.Priority = 5
 	// Success from another protocol/model must not influence selection.
 	acquire([]Route{a, b}, routeProbeSpec{ModelID: "alias", Path: "/v1/responses"}, a.ID).Release(ctx)
@@ -253,5 +256,164 @@ func TestCompactRealRequestRecordsSuccessfulDispatch(t *testing.T) {
 	id := modelHealthID(route, routeProbeSpec{ModelID: "model", Path: compactPath})
 	if timestamp, _ := client.HGet(context.Background(), modelHealthKey(id), "last_success_at").Int64(); timestamp == 0 {
 		t.Fatal("successful live Compact request was not remembered")
+	}
+}
+
+func compactGroupTestFixture(t *testing.T, server *httptest.Server) (*Service, Route, Route, SmartGroup) {
+	t.Helper()
+	repo := memberPauseTestRepository(t)
+	limiter, client := redisTestLimiter(t)
+	service, base := preparedProbeService(t, server)
+	service.repository, service.limiter, service.accounts = repo, limiter, proxyTestAccount{}
+	high, low := base, base
+	high.ID, low.ID = healthTestRoute(t, client).ID, healthTestRoute(t, client).ID
+	groupID := "compact-all-members"
+	seedPauseMember(t, repo, high, groupID)
+	seedPauseMember(t, repo, low)
+	ctx := context.Background()
+	if err := repo.AddMember(ctx, "user", "workspace", groupID, low.ID); err != nil {
+		t.Fatal(err)
+	}
+	for i, route := range []Route{high, low} {
+		target := []string{"high-target", "low-target"}[i]
+		if err := repo.ReplaceRouteModels(ctx, route.ID, []Model{{ID: target, Object: "model"}}); err != nil {
+			t.Fatal(err)
+		}
+		priority, enabled := 10*(1-i), true
+		mapping := map[string]string{"model": target}
+		policy := UpdateMemberPolicyRequest{Priority: &priority, ModelMappingEnabled: &enabled, ModelMapping: &mapping}
+		if i == 1 {
+			minimum, mode := 1000000, KeywordMatchModeRequireMatch
+			policy.StreamOnly, policy.MinInputTokens, policy.KeywordMatchMode = &enabled, &minimum, &mode
+		}
+		if err := service.UpdateMemberPolicy(ctx, "user", groupID, route.ID, policy); err != nil {
+			t.Fatal(err)
+		}
+	}
+	group, err := repo.GetSmartGroup(ctx, groupID)
+	if err != nil || group == nil {
+		t.Fatalf("group: %+v %v", group, err)
+	}
+	group.Keywords = []string{"premium"}
+	members, err := repo.ListGroupRoutes(ctx, groupID, true, "model")
+	if err != nil || len(members) != 2 {
+		t.Fatalf("members: %+v %v", members, err)
+	}
+	return service, members[0], members[1], *group
+}
+
+func TestCompactUsesRecentSuccessAcrossPrioritiesAndInferenceFilters(t *testing.T) {
+	for _, mode := range []string{KeywordMatchModeRequireMatch, KeywordMatchModeSkipOnMatch} {
+		t.Run(mode, func(t *testing.T) {
+			var highCalls, lowCalls atomic.Int64
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var payload struct{ Model string }
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					t.Error(err)
+				}
+				if payload.Model == "low-target" {
+					lowCalls.Add(1)
+				} else {
+					highCalls.Add(1)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"output":[]}`)
+			}))
+			defer server.Close()
+			service, _, low, group := compactGroupTestFixture(t, server)
+			if err := service.UpdateMemberPolicy(context.Background(), "user", group.ID, low.ID, UpdateMemberPolicyRequest{KeywordMatchMode: &mode}); err != nil {
+				t.Fatal(err)
+			}
+			spec := routeProbeSpec{ModelID: "model", Path: compactPath}
+			key := modelHealthKey(modelHealthID(low, spec))
+			if err := service.limiter.redis.HSet(context.Background(), key, "last_success_at", 100).Err(); err != nil {
+				t.Fatal(err)
+			}
+			input := "ordinary request"
+			if mode == KeywordMatchModeSkipOnMatch {
+				input = "premium request"
+			}
+			body, _ := json.Marshal(map[string]any{"model": "model", "input": input})
+			for i := 0; i < 2; i++ {
+				w := httptest.NewRecorder()
+				service.proxySmartGroup(w, httptest.NewRequest(http.MethodPost, compactPath, strings.NewReader(string(body))), group)
+				if w.Code != http.StatusOK || lowCalls.Load() != int64(i+1) || highCalls.Load() != 0 {
+					t.Fatalf("Compact did not prefer available lower member: status=%d high=%d low=%d body=%s", w.Code, highCalls.Load(), lowCalls.Load(), w.Body.String())
+				}
+			}
+			// The same request to Responses retains the inference member policies.
+			w := httptest.NewRecorder()
+			service.proxySmartGroup(w, httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(string(body))), group)
+			if w.Code != http.StatusOK || highCalls.Load() != 1 || lowCalls.Load() != 2 {
+				t.Fatalf("inference policy changed: status=%d high=%d low=%d", w.Code, highCalls.Load(), lowCalls.Load())
+			}
+		})
+	}
+}
+
+func TestCompactFindsFallbackAndReusesItAcrossPriorities(t *testing.T) {
+	var highCalls, lowCalls atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct{ Model string }
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Error(err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if payload.Model == "high-target" {
+			highCalls.Add(1)
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = io.WriteString(w, `{"error":{"message":"unavailable"}}`)
+			return
+		}
+		lowCalls.Add(1)
+		_, _ = io.WriteString(w, `{"output":[]}`)
+	}))
+	defer server.Close()
+	service, high, low, group := compactGroupTestFixture(t, server)
+	ctx := context.Background()
+	for _, row := range []struct {
+		route   Route
+		latency time.Duration
+	}{{high, time.Millisecond}, {low, time.Second}} {
+		if err := service.limiter.ObserveResponseHeaderLatency(ctx, row.route.ID, row.latency); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		service.proxySmartGroup(w, httptest.NewRequest(http.MethodPost, compactPath, strings.NewReader(`{"model":"model","input":[]}`)), group)
+		if w.Code != http.StatusOK || highCalls.Load() != 2 || lowCalls.Load() != int64(i+1) {
+			t.Fatalf("fallback not found/reused: status=%d high=%d low=%d body=%s", w.Code, highCalls.Load(), lowCalls.Load(), w.Body.String())
+		}
+	}
+}
+
+func TestCompactWithoutHistorySharesAllPriorities(t *testing.T) {
+	for _, overflow := range []bool{false, true} {
+		t.Run(fmt.Sprintf("overflow=%t", overflow), func(t *testing.T) {
+			limiter, client := redisTestLimiter(t)
+			ctx := context.Background()
+			a, b := healthTestRoute(t, client), healthTestRoute(t, client)
+			a.Priority, b.Priority = 10, 0
+			if overflow {
+				for _, route := range []Route{a, b} {
+					for i := 0; i < temporaryKeySoftConcurrency; i++ {
+						acquireTestLease(t, limiter, route, fmt.Sprintf("held-%d", i))
+					}
+				}
+			}
+			counts := make(map[string]int)
+			for i := 0; i < 20; i++ {
+				lease, selected, err := limiter.AcquireBest(ctx, []Route{a, b}, fmt.Sprint(i), routeProbeSpec{ModelID: "model", Path: compactPath})
+				if err != nil || lease == nil || selected == nil {
+					t.Fatalf("acquire: %v", err)
+				}
+				counts[selected.ID]++
+				lease.Release(ctx)
+			}
+			if counts[a.ID] != 10 || counts[b.ID] != 10 {
+				t.Fatalf("Compact retained priority boundary: %v", counts)
+			}
+		})
 	}
 }
