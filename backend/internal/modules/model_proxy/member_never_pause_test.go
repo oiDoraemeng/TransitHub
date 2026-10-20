@@ -38,11 +38,12 @@ func TestMemberNeverAutoPausePersistsAndIsolatesGroups(t *testing.T) {
 	if err != nil || len(members) != 1 || !members[0].NeverAutoPause || members[0].Priority != priority {
 		t.Fatalf("partial update lost flag: %+v %v", members, err)
 	}
-	// Previously queued probes must not call a member that now ignores circuits.
+	// Previously queued recovery still serves other memberships and the direct
+	// route, even when this membership opts out of automatic isolation.
 	service.repository = reloaded
 	probeRoute, err := service.loadProbeRoute(ctx, &routeProbeClaim{routeID: route.ID, spec: routeProbeSpec{GroupID: "a", ModelID: "model", Path: "/v1/responses"}})
-	if err != nil || probeRoute != nil {
-		t.Fatalf("automatic probe still uses opted-out member: %+v %v", probeRoute, err)
+	if err != nil || probeRoute == nil || !probeRoute.NeverAutoPause {
+		t.Fatalf("opting out blocked shared circuit recovery: %+v %v", probeRoute, err)
 	}
 	never = false
 	if err := service.UpdateMemberPolicy(ctx, "user", "a", route.ID, UpdateMemberPolicyRequest{NeverAutoPause: &never}); err != nil {

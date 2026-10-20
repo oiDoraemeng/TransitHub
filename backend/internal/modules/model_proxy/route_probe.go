@@ -228,9 +228,8 @@ func (s *Service) loadProbeRoute(ctx context.Context, claim *routeProbeClaim) (*
 	}
 	for _, route := range routes {
 		if route.ID == claim.routeID {
-			if route.NeverAutoPause {
-				return nil, nil
-			}
+			// Existing circuits are shared with other memberships and the direct
+			// route. Keep their recovery running when this member opts out.
 			return &route, nil
 		}
 	}
