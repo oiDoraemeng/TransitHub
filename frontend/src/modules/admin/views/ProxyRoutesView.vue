@@ -63,6 +63,8 @@ const smartKeywords = ref('')
 const smartNewCustomKeys = ref('')
 const removedSmartCustomKeyIds = ref<string[]>([])
 const smartEnabled = ref(true)
+const smartLocalReplyEnabled = ref(false)
+const smartLocalReplyMinTokens = ref(100)
 const selectedRouteIds = ref<string[]>([])
 
 const memberModalGroup = ref<ProxySmartGroup | null>(null)
@@ -281,6 +283,8 @@ const openCreateSmart = () => {
   smartNewCustomKeys.value = ''
   removedSmartCustomKeyIds.value = []
   smartEnabled.value = true
+  smartLocalReplyEnabled.value = false
+  smartLocalReplyMinTokens.value = 100
   selectedRouteIds.value = []
   smartModalOpen.value = true
 }
@@ -292,24 +296,30 @@ const openEditSmart = (group: ProxySmartGroup) => {
   smartNewCustomKeys.value = ''
   removedSmartCustomKeyIds.value = []
   smartEnabled.value = group.enabled
+  smartLocalReplyEnabled.value = group.localReplyEnabled ?? false
+  smartLocalReplyMinTokens.value = group.localReplyMinTokens ?? 100
   selectedRouteIds.value = group.members.map(member => member.id)
   smartModalOpen.value = true
 }
 
 const submitSmart = async () => {
+  if (!Number.isInteger(smartLocalReplyMinTokens.value) || smartLocalReplyMinTokens.value < 1 || smartLocalReplyMinTokens.value > 1000000) {
+    errorMessage.value = t('admin.modelProxy.groups.localReplyError')
+    return
+  }
   const keywords = smartKeywords.value.split(/[\r\n,]+/).map(value => value.trim()).filter(Boolean)
   const addKeys = smartNewCustomKeys.value.split(/[\r\n]+/).map(value => value.trim()).filter(Boolean)
   saving.value = true
   errorMessage.value = ''
   try {
     if (editingSmartGroupId.value) {
-      await updateProxySmartGroup(editingSmartGroupId.value, { name: smartName.value.trim(), keywords, enabled: smartEnabled.value })
+      await updateProxySmartGroup(editingSmartGroupId.value, { name: smartName.value.trim(), keywords, enabled: smartEnabled.value, localReplyEnabled: smartLocalReplyEnabled.value, localReplyMinTokens: smartLocalReplyMinTokens.value })
       if (addKeys.length || removedSmartCustomKeyIds.value.length) {
         await updateProxySmartGroupCustomKeys(editingSmartGroupId.value, { addKeys, removeKeyIds: [...removedSmartCustomKeyIds.value] })
       }
       flash(t('admin.modelProxy.notices.groupUpdated'))
     } else {
-      const created = await createProxySmartGroup({ name: smartName.value.trim(), keywords, enabled: smartEnabled.value, routeIds: [...selectedRouteIds.value] })
+      const created = await createProxySmartGroup({ name: smartName.value.trim(), keywords, enabled: smartEnabled.value, routeIds: [...selectedRouteIds.value], localReplyEnabled: smartLocalReplyEnabled.value, localReplyMinTokens: smartLocalReplyMinTokens.value })
       await copyText(created.key)
     }
     smartModalOpen.value = false
@@ -617,7 +627,7 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
               <button class="flex min-w-0 items-center gap-2 text-left" @click="toggleExpanded(group.id)">
                 <ChevronDown v-if="expandedGroups.has(group.id)" class="h-4 w-4 shrink-0" />
                 <ChevronRight v-else class="h-4 w-4 shrink-0" />
-                <div class="min-w-0"><div class="truncate font-medium">{{ group.name }}</div><div class="truncate font-mono text-xs text-muted-foreground">{{ group.keyPreview }}</div></div>
+                <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><span class="truncate font-medium">{{ group.name }}</span><span v-if="group.localReplyEnabled" class="rounded border border-signal/20 bg-signal/10 px-1.5 py-0.5 text-[10px] font-normal text-signal">{{ t('admin.modelProxy.groups.localReplySummary', { count: group.localReplyMinTokens }) }}</span></div><div class="truncate font-mono text-xs text-muted-foreground">{{ group.keyPreview }}</div></div>
               </button>
               <div class="flex items-baseline gap-1.5 text-sm"><span class="text-xs text-muted-foreground">{{ t('admin.modelProxy.table.concurrency') }}</span><span class="font-mono font-medium">{{ group.totalConcurrency }}</span></div>
               <div class="flex flex-wrap items-center gap-3 text-xs"><span><Users class="mr-1 inline h-3.5 w-3.5 text-muted-foreground" />{{ group.members.length }}</span><span><Layers3 class="mr-1 inline h-3.5 w-3.5 text-muted-foreground" />{{ group.models.length }}</span><span>{{ t('admin.modelProxy.groups.keywordCount', { count: group.keywords?.length ?? 0 }) }}</span><span v-if="group.customKeys?.length">{{ t('admin.modelProxy.groups.customKeyCount', { count: group.customKeys.length }) }}</span><button @click="toggleSmart(group)"><span class="mr-1 inline-block h-2 w-2 rounded-full" :class="group.enabled ? 'bg-signal' : 'bg-muted-foreground'" />{{ group.enabled ? t('admin.modelProxy.enabled') : t('admin.modelProxy.disabled') }}</button></div>
@@ -709,6 +719,12 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
           <div class="modal-body space-y-4 p-5">
             <label class="field"><span>{{ t('admin.modelProxy.form.name') }}</span><input v-model="smartName" required /></label>
             <label class="field"><span>{{ t('admin.modelProxy.groups.keywords') }}</span><textarea v-model="smartKeywords" rows="4" :placeholder="t('admin.modelProxy.groups.keywordPlaceholder')" /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.keywordHelp') }}</small></label>
+            <div class="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+              <label class="flex items-center justify-between gap-3 text-sm font-medium"><span>{{ t('admin.modelProxy.groups.localReply') }}</span><input v-model="smartLocalReplyEnabled" type="checkbox" class="h-4 w-4" /></label>
+              <label class="field"><span>{{ t('admin.modelProxy.groups.localReplyMinTokens') }}</span><div class="flex items-center gap-2"><input v-model.number="smartLocalReplyMinTokens" type="number" min="1" max="1000000" step="1" required class="max-w-40" /><span class="text-xs font-normal text-muted-foreground">Token</span></div></label>
+              <p class="text-xs leading-relaxed text-muted-foreground">{{ t('admin.modelProxy.groups.localReplyHelp') }}</p>
+              <p v-if="smartLocalReplyEnabled" class="text-xs font-medium text-signal">{{ t('admin.modelProxy.groups.localReplyPreview', { count: smartLocalReplyMinTokens }) }}</p>
+            </div>
             <fieldset v-if="editingSmartGroupId" class="space-y-2">
               <div class="flex items-center justify-between gap-3"><legend class="text-sm font-medium">{{ t('admin.modelProxy.groups.customKeys') }}</legend><span class="text-xs text-muted-foreground">{{ t('admin.modelProxy.groups.customKeyTotal', { count: visibleSmartCustomKeys.length }) }}</span></div>
               <div v-if="visibleSmartCustomKeys.length" class="divide-y divide-border border border-border">

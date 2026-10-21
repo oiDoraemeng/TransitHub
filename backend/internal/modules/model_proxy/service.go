@@ -403,6 +403,10 @@ func (s *Service) ListSmartGroups(ctx context.Context, userID string) ([]SmartGr
 }
 
 func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input CreateSmartGroupRequest) (SmartGroup, string, error) {
+	minTokens, err := localReplyMinTokens(input.LocalReplyMinTokens)
+	if err != nil {
+		return SmartGroup{}, "", err
+	}
 	accountID, err := s.currentWorkspace(ctx, userID)
 	if err != nil {
 		return SmartGroup{}, "", err
@@ -462,7 +466,7 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 	if err != nil {
 		return SmartGroup{}, "", err
 	}
-	group := SmartGroup{ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, Keywords: keywords, KeyPreview: preview}
+	group := SmartGroup{ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, Keywords: keywords, KeyPreview: preview, LocalReplyEnabled: input.LocalReplyEnabled, LocalReplyMinTokens: minTokens}
 	if err := s.repository.CreateSmartGroup(ctx, group, routeIDs, keyID, hash, ciphertext, preview); err != nil {
 		return SmartGroup{}, "", err
 	}
@@ -477,6 +481,10 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 }
 
 func (s *Service) UpdateSmartGroup(ctx context.Context, userID, groupID string, input UpdateSmartGroupRequest) (SmartGroup, error) {
+	minTokens, err := localReplyMinTokens(input.LocalReplyMinTokens)
+	if err != nil {
+		return SmartGroup{}, err
+	}
 	accountID, err := s.currentWorkspace(ctx, userID)
 	if err != nil {
 		return SmartGroup{}, err
@@ -490,6 +498,12 @@ func (s *Service) UpdateSmartGroup(ctx context.Context, userID, groupID string, 
 	}
 	if input.Enabled != nil {
 		group.Enabled = *input.Enabled
+	}
+	if input.LocalReplyEnabled != nil {
+		group.LocalReplyEnabled = *input.LocalReplyEnabled
+	}
+	if input.LocalReplyMinTokens != nil {
+		group.LocalReplyMinTokens = minTokens
 	}
 	if input.Keywords != nil {
 		keywords, normalizeErr := normalizeKeywords(*input.Keywords)

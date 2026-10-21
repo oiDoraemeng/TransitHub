@@ -255,6 +255,9 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "model is required")
 		return
 	}
+	if s.serveGroupLocalReply(w, incoming, group, replay, modelID) {
+		return
+	}
 	candidates, err := s.smartGroupCandidates(incoming.Context(), group, modelID)
 	if err != nil {
 		writeOpenAIError(w, http.StatusInternalServerError, "proxy_error", "failed to load smart group members")

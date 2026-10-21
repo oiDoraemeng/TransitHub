@@ -154,6 +154,10 @@ export default {
         modelCapacity: 'Effective concurrency {count}', entryKey: 'Regular durable entry key', addMember: 'Add member', keywordCount: '{count} keywords', customKeyCount: '{count} custom keys',
         keywords: 'Group keywords', keywordPlaceholder: 'One keyword per line or comma, for example: pelican\ncandy',
         keywordHelp: 'All members share these keywords. Input is parsed only when at least one member uses a match policy. Matching is case-insensitive.',
+        localReply: 'Return OK locally for small requests', localReplyMinTokens: 'Minimum input tokens (adjustable)',
+        localReplyHelp: 'Off by default, with a default threshold of 100. Input is estimated from all request text at about 4 characters per token. Media, files and history references use normal routing. JSON and streaming replies retain the requested model name.',
+        localReplyPreview: 'Below {count} tokens → local OK; at or above → normal routing',
+        localReplySummary: 'Local OK < {count} tokens', localReplyError: 'Minimum input tokens must be an integer from 1 to 1,000,000.',
         customKeys: 'Custom entry keys', customKeyTotal: '{count} currently', noCustomKeys: 'No custom keys are configured. The system-generated primary key is unchanged.',
         addCustomKeys: 'Add custom keys', customKeyPlaceholder: 'One custom key per line', customKeyHelp: 'Up to 32. After saving, each custom key works alongside the system-generated primary key. Leaving this empty keeps existing custom keys.', removeCustomKey: 'Remove this custom key',
         policy: {

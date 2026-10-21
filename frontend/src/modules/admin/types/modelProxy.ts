@@ -63,6 +63,8 @@ export interface ProxySmartGroup {
   id: string
   name: string
   enabled: boolean
+  localReplyEnabled: boolean
+  localReplyMinTokens: number
   keywords: string[]
   customKeys: ProxyCustomKey[]
   keyPreview: string
@@ -136,6 +138,8 @@ export interface SmartGroupInput {
   routeIds?: string[]
   keywords: string[]
   enabled: boolean
+  localReplyEnabled: boolean
+  localReplyMinTokens: number
 }
 
 export interface SmartGroupMemberPolicyInput {

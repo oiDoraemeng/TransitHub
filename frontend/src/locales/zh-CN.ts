@@ -154,6 +154,10 @@ export default {
         modelCapacity: '有效并发 {count}', entryKey: '普通长期入口 Key', addMember: '添加成员', keywordCount: '{count} 个关键词', customKeyCount: '{count} 个自定义 Key',
         keywords: '分组关键词', keywordPlaceholder: '每行或用逗号填写一个关键词，例如：鹈鹕\n糖果',
         keywordHelp: '所有成员共用这组关键词；仅当至少一个成员启用命中策略时才解析输入，匹配不区分大小写。',
+        localReply: '小请求本地返回 OK', localReplyMinTokens: '最小输入 Token（可调）',
+        localReplyHelp: '默认关闭，默认阈值 100。按本次请求的全部文本估算输入 Token（约 4 个字符为 1 Token）；包含图片、文件或历史引用的请求正常调度。支持普通和流式响应，返回请求中的模型名。',
+        localReplyPreview: '少于 {count} Token → 本地返回 OK；达到阈值 → 正常调度',
+        localReplySummary: '本地 OK < {count} Token', localReplyError: '最小输入 Token 必须是 1 至 1,000,000 的整数。',
         customKeys: '自定义入口 Key', customKeyTotal: '当前 {count} 个', noCustomKeys: '尚未设置自定义 Key，系统生成的主 Key 不受影响。',
         addCustomKeys: '新增自定义 Key', customKeyPlaceholder: '每行填写一个自定义 Key', customKeyHelp: '最多 32 个；保存后与系统生成的主 Key 同时有效。留空不会修改现有自定义 Key。', removeCustomKey: '移除此自定义 Key',
         policy: {
