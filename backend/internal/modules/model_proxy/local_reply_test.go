@@ -134,6 +134,56 @@ func TestGroupLocalReplyStreamsCompleteAndRetainModel(t *testing.T) {
 	}
 }
 
+func TestGroupLocalReplyChatStreamUsageContract(t *testing.T) {
+	// OpenAI's include_usage contract requires null usage on every ordinary
+	// chunk and a final chunk with empty choices and aggregate usage before DONE.
+	for _, includeUsage := range []bool{false, true} {
+		t.Run(fmt.Sprint(includeUsage), func(t *testing.T) {
+			w := httptest.NewRecorder()
+			body := fmt.Sprintf(`{"model":"alias","messages":[{"role":"user","content":"hello"}],"stream":true,"stream_options":{"include_usage":%t}}`, includeUsage)
+			(&Service{maxRequestBytes: 1 << 20}).proxySmartGroup(w, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body)), SmartGroup{LocalReplyEnabled: true, LocalReplyMinTokens: 100})
+			chunks, summaries := 0, 0
+			for _, frame := range strings.Split(strings.TrimSpace(w.Body.String()), "\n\n") {
+				if frame == "data: [DONE]" {
+					continue
+				}
+				if summaries > 0 {
+					t.Fatal("usage summary must be the final chunk before DONE")
+				}
+				var chunk map[string]json.RawMessage
+				if err := json.Unmarshal([]byte(strings.TrimPrefix(frame, "data: ")), &chunk); err != nil {
+					t.Fatal(err)
+				}
+				chunks++
+				usage, hasUsage := chunk["usage"]
+				if hasUsage != includeUsage {
+					t.Fatalf("usage field presence=%t want=%t: %s", hasUsage, includeUsage, frame)
+				}
+				if string(chunk["choices"]) == "[]" {
+					summaries++
+					var counts struct {
+						PromptTokens     int `json:"prompt_tokens"`
+						CompletionTokens int `json:"completion_tokens"`
+						TotalTokens      int `json:"total_tokens"`
+					}
+					if !includeUsage || string(usage) == "null" || json.Unmarshal(usage, &counts) != nil || counts.PromptTokens != 0 || counts.CompletionTokens != 0 || counts.TotalTokens != 0 {
+						t.Fatalf("invalid usage summary: %s", frame)
+					}
+				} else if includeUsage && string(usage) != "null" {
+					t.Fatalf("ordinary chunk must have usage:null: %s", frame)
+				}
+			}
+			wantChunks, wantSummaries := 3, 0
+			if includeUsage {
+				wantChunks, wantSummaries = 4, 1
+			}
+			if chunks != wantChunks || summaries != wantSummaries || !strings.HasSuffix(w.Body.String(), "data: [DONE]\n\n") {
+				t.Fatalf("wrong termination or usage order: %s", w.Body.String())
+			}
+		})
+	}
+}
+
 func TestGroupLocalReplyThresholdAndOpaqueInputs(t *testing.T) {
 	for _, test := range []struct {
 		name, body     string

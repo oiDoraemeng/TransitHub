@@ -184,13 +184,19 @@ func writeLocalChatReply(w http.ResponseWriter, input map[string]any, model, id 
 		return
 	}
 	emit := localReplyStream(w)
+	options, _ := input["stream_options"].(map[string]any)
+	includeUsage := options["include_usage"] == true
 	chunk := func(delta map[string]any, finish any) {
-		emit("", base("chat.completion.chunk", []any{map[string]any{"index": 0, "delta": delta, "finish_reason": finish, "logprobs": nil}}))
+		response := base("chat.completion.chunk", []any{map[string]any{"index": 0, "delta": delta, "finish_reason": finish, "logprobs": nil}})
+		if includeUsage {
+			response["usage"] = nil
+		}
+		emit("", response)
 	}
 	chunk(map[string]any{"role": "assistant", "content": ""}, nil)
 	chunk(map[string]any{"content": "OK"}, nil)
 	chunk(map[string]any{}, "stop")
-	if options, ok := input["stream_options"].(map[string]any); ok && options["include_usage"] == true {
+	if includeUsage {
 		response := base("chat.completion.chunk", []any{})
 		response["usage"] = usage
 		emit("", response)
