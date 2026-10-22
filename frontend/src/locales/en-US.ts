@@ -155,7 +155,7 @@ export default {
         keywords: 'Group keywords', keywordPlaceholder: 'One keyword per line or comma, for example: pelican\ncandy',
         keywordHelp: 'All members share these case-insensitive keywords for member match policies. When local replies are enabled, any keyword match also sends small requests through normal upstream routing.',
         localReply: 'Return OK locally for small requests', localReplyMinTokens: 'Minimum input tokens (adjustable)',
-        localReplyHelp: 'Off by default, with a default threshold of 100. Input is estimated from all request text at about 4 characters per token. Any case-insensitive group keyword match still uses upstream routing. Media, files and history references use normal routing. JSON and streaming replies retain the requested model name.',
+        localReplyHelp: 'Off by default; threshold 100. Estimates the full context, including history and cacheable text, at about 4 characters per token without subtracting cache hits. Keyword matches (case-insensitive), cache settings, cache or history references, media and files use upstream routing. JSON and streaming replies retain the requested model name.',
         localReplyPreview: 'Below {count} tokens with no keyword match → local OK; otherwise → normal routing',
         localReplySummary: 'Local OK < {count} tokens', localReplyError: 'Minimum input tokens must be an integer from 1 to 1,000,000.',
         customKeys: 'Custom entry keys', customKeyTotal: '{count} currently', noCustomKeys: 'No custom keys are configured. The system-generated primary key is unchanged.',

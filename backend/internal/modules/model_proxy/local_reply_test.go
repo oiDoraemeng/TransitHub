@@ -200,6 +200,18 @@ func TestGroupLocalReplyThresholdAndOpaqueInputs(t *testing.T) {
 		{"system", `{"messages":[{"role":"system","content":"1234567890123"},{"role":"user","content":"x"}]}`, 4, true, false},
 		{"history", `{"input":"x","previous_response_id":"resp_history"}`, 100, true, false},
 		{"conversation", `{"input":"x","conversation":{"id":"conv_history"}}`, 100, true, false},
+		{"cache-reference", `{"contents":[{"parts":[{"text":"hi"}]}],"cachedContent":"cachedContents/large-context"}`, 100, true, false},
+		{"cache-reference-snake-case", `{"input":"hi","cached_content":"cachedContents/large-context"}`, 100, true, false},
+		{"openai-cache-key", `{"input":"hi","prompt_cache_key":"session-with-large-context"}`, 100, true, false},
+		{"openai-cache-options", `{"input":"hi","prompt_cache_options":{"mode":"explicit"}}`, 100, true, false},
+		{"openai-cache-retention", `{"input":"hi","prompt_cache_retention":"24h"}`, 100, true, false},
+		{"openai-cache-breakpoint", `{"input":[{"role":"user","content":[{"type":"input_text","text":"hi","prompt_cache_breakpoint":{"mode":"explicit"}}]}]}`, 100, true, false},
+		{"anthropic-cache-top-level", `{"cache_control":{"type":"ephemeral"},"messages":[{"role":"user","content":"hi"}]}`, 100, true, false},
+		{"anthropic-cache-system", `{"system":[{"type":"text","text":"cached context","cache_control":{"type":"ephemeral"}}],"messages":[{"role":"user","content":"hi"}]}`, 100, true, false},
+		{"anthropic-cache-message", `{"messages":[{"role":"user","content":[{"type":"text","text":"hi","cache_control":{"type":"ephemeral"}}]}]}`, 100, true, false},
+		{"anthropic-cache-tools", `{"tools":[{"name":"tool","input_schema":{"type":"object"},"cache_control":{"type":"ephemeral"}}],"messages":[{"role":"user","content":"hi"}]}`, 100, true, false},
+		{"empty-cache-key", `{"input":"hi","prompt_cache_key":""}`, 100, true, true},
+		{"null-cache-control", `{"input":"hi","cache_control":null}`, 100, true, true},
 		{"image", `{"input":[{"type":"input_image","image_url":"https://example.test/img.png"}]}`, 100, true, false},
 		{"gemini-file", `{"contents":[{"parts":[{"inlineData":{"mimeType":"image/png","data":"AA=="}}]}]}`, 100, true, false},
 		{"token-array", `{"prompt":[1,2,3,4]}`, 4, true, false},
@@ -216,6 +228,36 @@ func TestGroupLocalReplyThresholdAndOpaqueInputs(t *testing.T) {
 				t.Fatalf("local=%t want=%t response=%s", local, test.local, w.Body.String())
 			}
 		})
+	}
+}
+
+func TestGroupLocalReplyCountsFullHistoryWithoutSubtractingCache(t *testing.T) {
+	history := strings.Repeat("long previous context ", 100)
+	for _, test := range []struct {
+		name, path string
+		input      map[string]any
+	}{
+		{"chat", "/v1/chat/completions", map[string]any{"messages": []any{map[string]any{"role": "system", "content": history}, map[string]any{"role": "user", "content": "hi"}}}},
+		{"responses", "/v1/responses", map[string]any{"input": []any{map[string]any{"role": "assistant", "content": history}, map[string]any{"role": "user", "content": "hi"}}}},
+		{"messages", "/v1/messages", map[string]any{"system": history, "messages": []any{map[string]any{"role": "user", "content": "hi"}}}},
+		{"gemini", "/v1beta/models/alias:generateContent", map[string]any{"contents": []any{map[string]any{"role": "model", "parts": []any{map[string]any{"text": history}}}, map[string]any{"role": "user", "parts": []any{map[string]any{"text": "hi"}}}}}},
+	} {
+		for _, streaming := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/stream=%t", test.name, streaming), func(t *testing.T) {
+				test.input["stream"] = streaming
+				body, _ := json.Marshal(test.input)
+				replay, err := newReplayBody(io.NopCloser(strings.NewReader(string(body))), 1<<20)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer replay.Close()
+				w := httptest.NewRecorder()
+				local := (&Service{}).serveGroupLocalReply(w, httptest.NewRequest(http.MethodPost, test.path, nil), SmartGroup{LocalReplyEnabled: true, LocalReplyMinTokens: 100}, replay, "alias")
+				if local || w.Body.Len() > 0 {
+					t.Fatalf("short new message masked full history: %s", w.Body.String())
+				}
+			})
+		}
 	}
 }
 

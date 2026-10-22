@@ -102,10 +102,8 @@ func (s *Service) serveGroupLocalReply(w http.ResponseWriter, r *http.Request, g
 // characters per token), not usage reported by a model. Do not treat opaque
 // context or media as zero tokens: their actual input size is unknown locally.
 func estimateLocalReplyTokens(input map[string]any, inputText *strings.Builder) (int, bool) {
-	for _, key := range []string{"previous_response_id", "conversation", "cachedContent", "continuationToken"} {
-		if value := input[key]; value != nil && value != "" {
-			return 0, false
-		}
+	if hasLocalReplyContextHint(input) {
+		return 0, false
 	}
 	characters := 0
 	for _, key := range []string{"input", "messages", "prompt", "instructions", "system", "contents", "systemInstruction", "tools", "functions"} {
@@ -116,6 +114,24 @@ func estimateLocalReplyTokens(input map[string]any, inputText *strings.Builder) 
 		characters += count
 	}
 	return (characters + 3) / 4, true
+}
+
+// Actual cache reads are only known after upstream inference. Preserve requests
+// that explicitly use caching or reference server-side history, even when their
+// visible new text is short. Without these hints we count all supplied history;
+// never subtract cached tokens or use the last user message alone.
+func hasLocalReplyContextHint(input map[string]any) bool {
+	for _, key := range []string{
+		"previous_response_id", "previousResponseId", "conversation",
+		"cachedContent", "cached_content", "continuationToken", "continuation_token",
+		"cache_control", "cacheControl", "prompt_cache_key", "promptCacheKey",
+		"prompt_cache_retention", "prompt_cache_options", "prompt_cache_breakpoint",
+	} {
+		if value := input[key]; value != nil && value != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func localReplyTextSize(value any, inputText *strings.Builder) (int, bool) {
@@ -137,6 +153,9 @@ func localReplyTextSize(value any, inputText *strings.Builder) (int, bool) {
 		}
 		return size, true
 	case map[string]any:
+		if hasLocalReplyContextHint(value) {
+			return 0, false
+		}
 		kind, _ := value["type"].(string)
 		switch kind {
 		case "input_image", "image", "image_url", "input_file", "file", "document", "input_audio", "audio", "video", "item_reference", "compaction":

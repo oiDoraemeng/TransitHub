@@ -155,7 +155,7 @@ export default {
         keywords: '分组关键词', keywordPlaceholder: '每行或用逗号填写一个关键词，例如：鹈鹕\n糖果',
         keywordHelp: '所有成员共用这组关键词，匹配不区分大小写。成员可用其设置命中策略；开启小请求本地返回后，命中任一关键词也会继续请求上游。',
         localReply: '小请求本地返回 OK', localReplyMinTokens: '最小输入 Token（可调）',
-        localReplyHelp: '默认关闭，默认阈值 100。按本次请求的全部文本估算输入 Token（约 4 个字符为 1 Token）；命中任一分组关键词时仍请求上游，匹配不区分大小写。包含图片、文件或历史引用的请求正常调度。支持普通和流式响应，返回请求中的模型名。',
+        localReplyHelp: '默认关闭，默认阈值 100。按完整上下文估算输入 Token，含历史和可缓存文本，不扣除缓存（约 4 个字符为 1 Token）。命中分组关键词（不区分大小写），或带缓存配置、缓存引用、历史引用、图片及文件时，正常请求上游。支持普通和流式响应，返回请求中的模型名。',
         localReplyPreview: '少于 {count} Token 且未命中关键词 → 本地返回 OK；否则正常调度',
         localReplySummary: '本地 OK < {count} Token', localReplyError: '最小输入 Token 必须是 1 至 1,000,000 的整数。',
         customKeys: '自定义入口 Key', customKeyTotal: '当前 {count} 个', noCustomKeys: '尚未设置自定义 Key，系统生成的主 Key 不受影响。',
