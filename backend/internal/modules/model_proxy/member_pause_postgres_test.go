@@ -19,7 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func memberPauseTestRepository(t *testing.T) *Repository {
+func memberPauseTestRepository(t testing.TB) *Repository {
 	t.Helper()
 	url := os.Getenv("MODEL_PROXY_TEST_DATABASE_URL")
 	if url == "" {
@@ -77,7 +77,7 @@ func memberPauseTestRepository(t *testing.T) *Repository {
 	return NewRepository(pool)
 }
 
-func seedPauseMember(t *testing.T, repo *Repository, route Route, groups ...string) {
+func seedPauseMember(t testing.TB, repo *Repository, route Route, groups ...string) {
 	t.Helper()
 	ctx := context.Background()
 	if _, err := repo.db.Exec(ctx, `INSERT INTO proxy_routes (id,user_id,admin_account_id,name,site_id,group_id,group_name,upstream_key_ciphertext,upstream_key_preview)

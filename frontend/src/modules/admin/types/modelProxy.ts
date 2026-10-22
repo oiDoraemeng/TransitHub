@@ -60,11 +60,14 @@ export interface ProxyModel {
 }
 
 export interface ProxySmartGroup {
+  keywordMatchCounts: Record<string, number>
   id: string
   name: string
   enabled: boolean
   localReplyEnabled: boolean
   localReplyMinTokens: number
+  localReplyMaxOutputTokens: number
+  localReplyText: string
   keywords: string[]
   customKeys: ProxyCustomKey[]
   keyPreview: string
@@ -140,6 +143,8 @@ export interface SmartGroupInput {
   enabled: boolean
   localReplyEnabled: boolean
   localReplyMinTokens: number
+  localReplyMaxOutputTokens: number
+  localReplyText: string
 }
 
 export interface SmartGroupMemberPolicyInput {

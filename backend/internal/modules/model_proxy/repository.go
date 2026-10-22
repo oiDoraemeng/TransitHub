@@ -286,7 +286,7 @@ func (r *Repository) CreateSmartGroup(ctx context.Context, group SmartGroup, rou
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, `INSERT INTO proxy_smart_groups (id,user_id,admin_account_id,name,enabled,keywords,local_reply_enabled,local_reply_min_tokens) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled, group.Keywords, group.LocalReplyEnabled, group.LocalReplyMinTokens); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO proxy_smart_groups (id,user_id,admin_account_id,name,enabled,keywords,local_reply_enabled,local_reply_min_tokens,local_reply_max_output_tokens,local_reply_text) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled, group.Keywords, group.LocalReplyEnabled, group.LocalReplyMinTokens, group.LocalReplyMaxOutputTokens, group.LocalReplyText); err != nil {
 		return err
 	}
 	for _, routeID := range routeIDs {
@@ -309,7 +309,7 @@ func (r *Repository) CreateSmartGroup(ctx context.Context, group SmartGroup, rou
 
 func (r *Repository) ListSmartGroups(ctx context.Context, userID, accountID string) ([]SmartGroup, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(g.keywords,ARRAY[]::text[]),COALESCE(k.key_preview,''),g.created_at,g.updated_at,g.local_reply_enabled,g.local_reply_min_tokens
+		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(g.keywords,ARRAY[]::text[]),COALESCE(k.key_preview,''),g.created_at,g.updated_at,g.local_reply_enabled,g.local_reply_min_tokens,g.local_reply_max_output_tokens,g.local_reply_text
 		FROM proxy_smart_groups g
 		LEFT JOIN proxy_access_keys k ON k.owner_type='smart_group' AND k.owner_id=g.id AND k.key_kind='primary'
 		WHERE g.user_id=$1 AND g.admin_account_id=$2 ORDER BY g.created_at ASC,g.id ASC
@@ -321,7 +321,7 @@ func (r *Repository) ListSmartGroups(ctx context.Context, userID, accountID stri
 	groups := make([]SmartGroup, 0)
 	for rows.Next() {
 		var group SmartGroup
-		if err := rows.Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &group.Keywords, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt, &group.LocalReplyEnabled, &group.LocalReplyMinTokens); err != nil {
+		if err := rows.Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &group.Keywords, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt, &group.LocalReplyEnabled, &group.LocalReplyMinTokens, &group.LocalReplyMaxOutputTokens, &group.LocalReplyText); err != nil {
 			return nil, err
 		}
 		groups = append(groups, group)
@@ -354,18 +354,28 @@ func (r *Repository) ListSmartGroups(ctx context.Context, userID, accountID stri
 	return groups, nil
 }
 
-func (r *Repository) GetSmartGroup(ctx context.Context, groupID string) (*SmartGroup, error) {
+// Public requests need live group settings, without loading administration
+// details (members, custom keys and aggregate model lists) on every inference.
+func (r *Repository) GetSmartGroupConfig(ctx context.Context, groupID string) (*SmartGroup, error) {
 	var group SmartGroup
 	err := r.db.QueryRow(ctx, `
-		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(g.keywords,ARRAY[]::text[]),COALESCE(k.key_preview,''),g.created_at,g.updated_at,g.local_reply_enabled,g.local_reply_min_tokens
+		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(g.keywords,ARRAY[]::text[]),COALESCE(k.key_preview,''),g.created_at,g.updated_at,g.local_reply_enabled,g.local_reply_min_tokens,g.local_reply_max_output_tokens,g.local_reply_text
 		FROM proxy_smart_groups g LEFT JOIN proxy_access_keys k ON k.owner_type='smart_group' AND k.owner_id=g.id AND k.key_kind='primary'
 		WHERE g.id=$1
-	`, groupID).Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &group.Keywords, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt, &group.LocalReplyEnabled, &group.LocalReplyMinTokens)
+	`, groupID).Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &group.Keywords, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt, &group.LocalReplyEnabled, &group.LocalReplyMinTokens, &group.LocalReplyMaxOutputTokens, &group.LocalReplyText)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	return &group, nil
+}
+
+func (r *Repository) GetSmartGroup(ctx context.Context, groupID string) (*SmartGroup, error) {
+	group, err := r.GetSmartGroupConfig(ctx, groupID)
+	if err != nil || group == nil {
+		return group, err
 	}
 	group.Members, err = r.ListGroupRoutes(ctx, groupID, false, "")
 	if err != nil {
@@ -381,11 +391,11 @@ func (r *Repository) GetSmartGroup(ctx context.Context, groupID string) (*SmartG
 			group.TotalConcurrency += member.ConcurrencyLimit
 		}
 	}
-	return &group, err
+	return group, err
 }
 
 func (r *Repository) UpdateSmartGroup(ctx context.Context, group SmartGroup) error {
-	result, err := r.db.Exec(ctx, `UPDATE proxy_smart_groups SET name=$4,enabled=$5,keywords=$6,local_reply_enabled=$7,local_reply_min_tokens=$8,updated_at=now() WHERE id=$1 AND user_id=$2 AND admin_account_id=$3`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled, group.Keywords, group.LocalReplyEnabled, group.LocalReplyMinTokens)
+	result, err := r.db.Exec(ctx, `UPDATE proxy_smart_groups SET name=$4,enabled=$5,keywords=$6,local_reply_enabled=$7,local_reply_min_tokens=$8,local_reply_max_output_tokens=$9,local_reply_text=$10,updated_at=now() WHERE id=$1 AND user_id=$2 AND admin_account_id=$3`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled, group.Keywords, group.LocalReplyEnabled, group.LocalReplyMinTokens, group.LocalReplyMaxOutputTokens, group.LocalReplyText)
 	if err != nil {
 		return err
 	}
@@ -590,8 +600,7 @@ func (r *Repository) ResolveRouteKey(ctx context.Context, hash, userID, accountI
 	return routeID, err
 }
 
-func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enabledOnly bool, modelID string) ([]Route, error) {
-	query := `
+const groupRouteSelectQuery = `
 		SELECT r.id,r.user_id,r.admin_account_id,r.name,r.site_id,COALESCE(s.name,''),r.group_id,r.group_name,
 			r.concurrency_limit,r.enabled,COALESCE(r.egress_proxy_id,''),COALESCE(p.name,''),COALESCE(k.key_preview,''),
 			(SELECT count(*) FROM proxy_route_models mc WHERE mc.route_id=r.id),
@@ -611,6 +620,24 @@ func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enable
 		LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id
 		LEFT JOIN proxy_access_keys k ON k.owner_type='route' AND k.owner_id=r.id AND k.key_kind='primary'
 		WHERE gm.smart_group_id=$1`
+
+var groupDispatchSelectQuery = strings.NewReplacer(
+	"COALESCE(s.name,'')", "''::text",
+	"COALESCE(p.name,'')", "''::text",
+	"COALESCE(k.key_preview,'')", "''::text",
+	"(SELECT count(*) FROM proxy_route_models mc WHERE mc.route_id=r.id)", "0::bigint",
+	"(SELECT count(*) FROM proxy_cleanup_jobs j WHERE j.route_id=r.id AND j.status <> 'done')", "0::bigint",
+	"LEFT JOIN upstream_sites s ON s.id=r.site_id", "",
+	"LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id", "",
+	"LEFT JOIN proxy_access_keys k ON k.owner_type='route' AND k.owner_id=r.id AND k.key_kind='primary'", "",
+).Replace(groupRouteSelectQuery)
+
+func (r *Repository) ListGroupRoutes(ctx context.Context, groupID string, enabledOnly bool, modelID string) ([]Route, error) {
+	query := groupRouteSelectQuery
+	if enabledOnly && strings.TrimSpace(modelID) != "" {
+		// Routing reads omit presentation joins and administration counters.
+		query = groupDispatchSelectQuery
+	}
 	args := []any{groupID}
 	if enabledOnly {
 		query += ` AND r.enabled=true AND gm.scheduling_paused=false`

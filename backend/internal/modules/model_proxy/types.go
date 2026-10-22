@@ -79,21 +79,24 @@ type EgressProxy struct {
 }
 
 type SmartGroup struct {
-	ID                  string      `json:"id"`
-	UserID              string      `json:"-"`
-	AdminAccountID      string      `json:"-"`
-	Name                string      `json:"name"`
-	Enabled             bool        `json:"enabled"`
-	LocalReplyEnabled   bool        `json:"localReplyEnabled"`
-	LocalReplyMinTokens int         `json:"localReplyMinTokens"`
-	Keywords            []string    `json:"keywords"`
-	CustomKeys          []CustomKey `json:"customKeys"`
-	KeyPreview          string      `json:"keyPreview"`
-	TotalConcurrency    int         `json:"totalConcurrency"`
-	Members             []Route     `json:"members"`
-	Models              []Model     `json:"models"`
-	CreatedAt           time.Time   `json:"createdAt"`
-	UpdatedAt           time.Time   `json:"updatedAt"`
+	ID                        string           `json:"id"`
+	UserID                    string           `json:"-"`
+	AdminAccountID            string           `json:"-"`
+	Name                      string           `json:"name"`
+	Enabled                   bool             `json:"enabled"`
+	LocalReplyEnabled         bool             `json:"localReplyEnabled"`
+	LocalReplyMinTokens       int              `json:"localReplyMinTokens"`
+	LocalReplyMaxOutputTokens int              `json:"localReplyMaxOutputTokens"`
+	LocalReplyText            string           `json:"localReplyText"`
+	Keywords                  []string         `json:"keywords"`
+	KeywordMatchCounts        map[string]int64 `json:"keywordMatchCounts"`
+	CustomKeys                []CustomKey      `json:"customKeys"`
+	KeyPreview                string           `json:"keyPreview"`
+	TotalConcurrency          int              `json:"totalConcurrency"`
+	Members                   []Route          `json:"members"`
+	Models                    []Model          `json:"models"`
+	CreatedAt                 time.Time        `json:"createdAt"`
+	UpdatedAt                 time.Time        `json:"updatedAt"`
 }
 
 type CustomKey struct {
@@ -174,21 +177,25 @@ type EgressProxyTestResult struct {
 }
 
 type CreateSmartGroupRequest struct {
-	Name                string   `json:"name"`
-	MemberKeys          []string `json:"memberKeys,omitempty"`
-	RouteIDs            []string `json:"routeIds,omitempty"`
-	Keywords            []string `json:"keywords,omitempty"`
-	Enabled             *bool    `json:"enabled,omitempty"`
-	LocalReplyEnabled   bool     `json:"localReplyEnabled,omitempty"`
-	LocalReplyMinTokens *int     `json:"localReplyMinTokens,omitempty"`
+	Name                      string   `json:"name"`
+	MemberKeys                []string `json:"memberKeys,omitempty"`
+	RouteIDs                  []string `json:"routeIds,omitempty"`
+	Keywords                  []string `json:"keywords,omitempty"`
+	Enabled                   *bool    `json:"enabled,omitempty"`
+	LocalReplyEnabled         bool     `json:"localReplyEnabled,omitempty"`
+	LocalReplyMinTokens       *int     `json:"localReplyMinTokens,omitempty"`
+	LocalReplyMaxOutputTokens *int     `json:"localReplyMaxOutputTokens,omitempty"`
+	LocalReplyText            *string  `json:"localReplyText,omitempty"`
 }
 
 type UpdateSmartGroupRequest struct {
-	LocalReplyEnabled   *bool     `json:"localReplyEnabled,omitempty"`
-	LocalReplyMinTokens *int      `json:"localReplyMinTokens,omitempty"`
-	Name                *string   `json:"name,omitempty"`
-	Keywords            *[]string `json:"keywords,omitempty"`
-	Enabled             *bool     `json:"enabled,omitempty"`
+	LocalReplyEnabled         *bool     `json:"localReplyEnabled,omitempty"`
+	LocalReplyMinTokens       *int      `json:"localReplyMinTokens,omitempty"`
+	LocalReplyMaxOutputTokens *int      `json:"localReplyMaxOutputTokens,omitempty"`
+	LocalReplyText            *string   `json:"localReplyText,omitempty"`
+	Name                      *string   `json:"name,omitempty"`
+	Keywords                  *[]string `json:"keywords,omitempty"`
+	Enabled                   *bool     `json:"enabled,omitempty"`
 }
 
 type UpdateSmartGroupCustomKeysRequest struct {

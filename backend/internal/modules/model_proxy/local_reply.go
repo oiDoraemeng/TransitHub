@@ -12,6 +12,26 @@ import (
 
 const defaultLocalReplyMinTokens = 100
 
+const defaultLocalReplyMaxOutputTokens = 20
+const defaultLocalReplyText = "OK"
+
+func localReplyOutputSettings(maxOutput *int, text *string) (int, string, error) {
+	limit, reply := defaultLocalReplyMaxOutputTokens, defaultLocalReplyText
+	if maxOutput != nil {
+		limit = *maxOutput
+	}
+	if limit < 0 || limit > 1000000 {
+		return 0, "", &requestError{Status: http.StatusBadRequest, Message: "local reply maximum output tokens must be an integer between 0 and 1000000"}
+	}
+	if text != nil {
+		reply = *text
+	}
+	if strings.TrimSpace(reply) == "" || utf8.RuneCountInString(reply) > 4000 {
+		return 0, "", &requestError{Status: http.StatusBadRequest, Message: "local reply text must contain 1 to 4000 characters"}
+	}
+	return limit, reply, nil
+}
+
 func localReplyMinTokens(value *int) (int, error) {
 	if value == nil {
 		return defaultLocalReplyMinTokens, nil
@@ -28,39 +48,31 @@ func (s *Service) serveGroupLocalReply(w http.ResponseWriter, r *http.Request, g
 	if !group.LocalReplyEnabled || r.Method != http.MethodPost {
 		return false
 	}
-	reader, err := replay.Open()
+	input, err := replay.Object()
 	if err != nil {
-		writeOpenAIError(w, http.StatusInternalServerError, "proxy_error", "failed to read request body")
-		return true
-	}
-	defer reader.Close()
-	var input map[string]any
-	decoder := json.NewDecoder(reader)
-	if err := decoder.Decode(&input); err != nil || input == nil {
-		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "request body must be a JSON object")
-		return true
-	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "request body must contain one JSON object")
 		return true
 	}
-	var keywordText strings.Builder
-	var inputText *strings.Builder
-	if len(group.Keywords) > 0 {
-		inputText = &keywordText
+	// An explicit small output cap is a separate rule. It intentionally also
+	// applies to large, cached, keyword-matching and opaque inputs.
+	if !matchesLocalReplyOutputLimit(input, r.URL.Path, group.LocalReplyMaxOutputTokens) {
+		var keywordText strings.Builder
+		var inputText *strings.Builder
+		if len(group.Keywords) > 0 {
+			inputText = &keywordText
+		}
+		tokens, known := estimateLocalReplyTokens(input, inputText)
+		threshold := group.LocalReplyMinTokens
+		if threshold <= 0 {
+			threshold = defaultLocalReplyMinTokens
+		}
+		if !known || tokens >= threshold || (inputText != nil && matchesAnyKeyword(keywordText.String(), group.Keywords)) {
+			return false
+		}
 	}
-	tokens, known := estimateLocalReplyTokens(input, inputText)
-	threshold := group.LocalReplyMinTokens
-	if threshold <= 0 {
-		threshold = defaultLocalReplyMinTokens
-	}
-	if !known || tokens >= threshold {
-		return false
-	}
-	// Group keywords exempt even small inputs from the local reply. Continue
-	// through normal member selection and its configured policies.
-	if inputText != nil && matchesAnyKeyword(keywordText.String(), group.Keywords) {
-		return false
+	replyText := group.LocalReplyText
+	if replyText == "" {
+		replyText = defaultLocalReplyText
 	}
 	id, err := randomID("")
 	if err != nil {
@@ -71,9 +83,9 @@ func (s *Service) serveGroupLocalReply(w http.ResponseWriter, r *http.Request, g
 	created := time.Now().Unix()
 	switch r.URL.Path {
 	case "/v1/chat/completions":
-		writeLocalChatReply(w, input, model, id, created, streaming)
+		writeLocalChatReply(w, input, model, id, created, streaming, replyText)
 	case "/v1/responses":
-		writeLocalResponsesReply(w, model, id, created, streaming)
+		writeLocalResponsesReply(w, model, id, created, streaming, replyText)
 	case compactPath:
 		// Compact clients replace their context with output. Retain the original
 		// input when skipping compaction, rather than silently discarding history.
@@ -84,18 +96,50 @@ func (s *Service) serveGroupLocalReply(w http.ResponseWriter, r *http.Request, g
 		case string:
 			output = append(output, map[string]any{"role": "user", "content": value})
 		}
-		output = append(output, localResponseMessage("msg_"+id, "completed", "OK"))
+		output = append(output, localResponseMessage("msg_"+id, "completed", replyText))
 		writeLocalJSON(w, map[string]any{"id": "cmp_" + id, "object": "response.compaction", "created_at": created, "model": model, "output": output, "usage": localResponsesUsage()})
 	case "/v1/messages":
-		writeLocalMessagesReply(w, model, id, streaming)
+		writeLocalMessagesReply(w, model, id, streaming, replyText)
 	default:
 		if _, action, ok := nativeGeminiModelAction(r.URL.Path); ok {
-			writeLocalGeminiReply(w, model, id, action == "streamGenerateContent")
+			writeLocalGeminiReply(w, model, id, action == "streamGenerateContent", replyText)
 		} else {
 			return false
 		}
 	}
 	return true
+}
+
+func matchesLocalReplyOutputLimit(input map[string]any, path string, threshold int) bool {
+	if threshold <= 0 {
+		return false
+	}
+	var value any
+	switch path {
+	case "/v1/chat/completions":
+		value = input["max_completion_tokens"]
+		if value == nil {
+			value = input["max_tokens"]
+		}
+	case "/v1/responses", compactPath:
+		value = input["max_output_tokens"]
+	case "/v1/messages":
+		value = input["max_tokens"]
+	default:
+		if _, _, ok := nativeGeminiModelAction(path); !ok {
+			return false
+		}
+		config, _ := input["generationConfig"].(map[string]any)
+		if config == nil {
+			config, _ = input["generation_config"].(map[string]any)
+		}
+		value = config["maxOutputTokens"]
+		if value == nil {
+			value = config["max_output_tokens"]
+		}
+	}
+	limit, ok := value.(float64)
+	return ok && limit > 0 && limit <= float64(threshold) && limit == float64(int(limit))
 }
 
 // Like member input limits, this is a local text estimate (four Unicode
@@ -206,13 +250,13 @@ func localReplyStream(w http.ResponseWriter) func(string, map[string]any) {
 	}
 }
 
-func writeLocalChatReply(w http.ResponseWriter, input map[string]any, model, id string, created int64, streaming bool) {
+func writeLocalChatReply(w http.ResponseWriter, input map[string]any, model, id string, created int64, streaming bool, text string) {
 	usage := map[string]any{"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 	base := func(object string, choices []any) map[string]any {
 		return map[string]any{"id": "chatcmpl-" + id, "object": object, "created": created, "model": model, "choices": choices}
 	}
 	if !streaming {
-		response := base("chat.completion", []any{map[string]any{"index": 0, "message": map[string]any{"role": "assistant", "content": "OK", "refusal": nil}, "finish_reason": "stop", "logprobs": nil}})
+		response := base("chat.completion", []any{map[string]any{"index": 0, "message": map[string]any{"role": "assistant", "content": text, "refusal": nil}, "finish_reason": "stop", "logprobs": nil}})
 		response["usage"] = usage
 		writeLocalJSON(w, response)
 		return
@@ -228,7 +272,7 @@ func writeLocalChatReply(w http.ResponseWriter, input map[string]any, model, id 
 		emit("", response)
 	}
 	chunk(map[string]any{"role": "assistant", "content": ""}, nil)
-	chunk(map[string]any{"content": "OK"}, nil)
+	chunk(map[string]any{"content": text}, nil)
 	chunk(map[string]any{}, "stop")
 	if includeUsage {
 		response := base("chat.completion.chunk", []any{})
@@ -254,9 +298,9 @@ func localResponseMessage(id, status, text string) map[string]any {
 	return map[string]any{"id": id, "type": "message", "role": "assistant", "status": status, "content": content}
 }
 
-func writeLocalResponsesReply(w http.ResponseWriter, model, id string, created int64, streaming bool) {
+func writeLocalResponsesReply(w http.ResponseWriter, model, id string, created int64, streaming bool, text string) {
 	messageID := "msg_" + id
-	message := localResponseMessage(messageID, "completed", "OK")
+	message := localResponseMessage(messageID, "completed", text)
 	response := func(status string, output []any) map[string]any {
 		var usage, completedAt any
 		if status == "completed" {
@@ -279,15 +323,15 @@ func writeLocalResponsesReply(w http.ResponseWriter, model, id string, created i
 	emit("response.in_progress", map[string]any{"response": response("in_progress", []any{})})
 	emit("response.output_item.added", map[string]any{"output_index": 0, "item": localResponseMessage(messageID, "in_progress", "")})
 	emit("response.content_part.added", map[string]any{"item_id": messageID, "output_index": 0, "content_index": 0, "part": localOutputText("")})
-	emit("response.output_text.delta", map[string]any{"item_id": messageID, "output_index": 0, "content_index": 0, "delta": "OK", "logprobs": []any{}})
-	emit("response.output_text.done", map[string]any{"item_id": messageID, "output_index": 0, "content_index": 0, "text": "OK", "logprobs": []any{}})
-	emit("response.content_part.done", map[string]any{"item_id": messageID, "output_index": 0, "content_index": 0, "part": localOutputText("OK")})
+	emit("response.output_text.delta", map[string]any{"item_id": messageID, "output_index": 0, "content_index": 0, "delta": text, "logprobs": []any{}})
+	emit("response.output_text.done", map[string]any{"item_id": messageID, "output_index": 0, "content_index": 0, "text": text, "logprobs": []any{}})
+	emit("response.content_part.done", map[string]any{"item_id": messageID, "output_index": 0, "content_index": 0, "part": localOutputText(text)})
 	emit("response.output_item.done", map[string]any{"output_index": 0, "item": message})
 	emit("response.completed", map[string]any{"response": response("completed", []any{message})})
 }
 
-func writeLocalMessagesReply(w http.ResponseWriter, model, id string, streaming bool) {
-	message := map[string]any{"id": "msg_" + id, "type": "message", "role": "assistant", "model": model, "content": []any{map[string]any{"type": "text", "text": "OK"}}, "stop_reason": "end_turn", "stop_sequence": nil, "usage": map[string]any{"input_tokens": 0, "output_tokens": 0}}
+func writeLocalMessagesReply(w http.ResponseWriter, model, id string, streaming bool, text string) {
+	message := map[string]any{"id": "msg_" + id, "type": "message", "role": "assistant", "model": model, "content": []any{map[string]any{"type": "text", "text": text}}, "stop_reason": "end_turn", "stop_sequence": nil, "usage": map[string]any{"input_tokens": 0, "output_tokens": 0}}
 	if !streaming {
 		writeLocalJSON(w, message)
 		return
@@ -296,14 +340,14 @@ func writeLocalMessagesReply(w http.ResponseWriter, model, id string, streaming 
 	message["content"], message["stop_reason"] = []any{}, nil
 	emit("message_start", map[string]any{"type": "message_start", "message": message})
 	emit("content_block_start", map[string]any{"type": "content_block_start", "index": 0, "content_block": map[string]any{"type": "text", "text": ""}})
-	emit("content_block_delta", map[string]any{"type": "content_block_delta", "index": 0, "delta": map[string]any{"type": "text_delta", "text": "OK"}})
+	emit("content_block_delta", map[string]any{"type": "content_block_delta", "index": 0, "delta": map[string]any{"type": "text_delta", "text": text}})
 	emit("content_block_stop", map[string]any{"type": "content_block_stop", "index": 0})
 	emit("message_delta", map[string]any{"type": "message_delta", "delta": map[string]any{"stop_reason": "end_turn", "stop_sequence": nil}, "usage": map[string]any{"output_tokens": 0}})
 	emit("message_stop", map[string]any{"type": "message_stop"})
 }
 
-func writeLocalGeminiReply(w http.ResponseWriter, model, id string, streaming bool) {
-	response := map[string]any{"candidates": []any{map[string]any{"index": 0, "content": map[string]any{"role": "model", "parts": []any{map[string]any{"text": "OK"}}}, "finishReason": "STOP"}}, "modelVersion": model, "responseId": id, "usageMetadata": map[string]any{"promptTokenCount": 0, "candidatesTokenCount": 0, "totalTokenCount": 0}}
+func writeLocalGeminiReply(w http.ResponseWriter, model, id string, streaming bool, text string) {
+	response := map[string]any{"candidates": []any{map[string]any{"index": 0, "content": map[string]any{"role": "model", "parts": []any{map[string]any{"text": text}}}, "finishReason": "STOP"}}, "modelVersion": model, "responseId": id, "usageMetadata": map[string]any{"promptTokenCount": 0, "candidatesTokenCount": 0, "totalTokenCount": 0}}
 	if streaming {
 		localReplyStream(w)("", response)
 		return

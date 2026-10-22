@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"transithub/backend/internal/modules/upstream"
 )
@@ -52,10 +53,16 @@ func (s *Service) handlePublic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet && r.URL.Path == "/v1/models" && target.Group != nil {
+		if !s.loadPublicGroupModels(w, r, target.Group) {
+			return
+		}
 		s.writeGroupModels(w, target.Group)
 		return
 	}
 	if r.Method == http.MethodGet && r.URL.Path == "/v1beta/models" && target.Group != nil {
+		if !s.loadPublicGroupModels(w, r, target.Group) {
+			return
+		}
 		s.writeGroupGeminiModels(w, target.Group)
 		return
 	}
@@ -64,6 +71,16 @@ func (s *Service) handlePublic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.proxySmartGroup(w, r, *target.Group)
+}
+
+func (s *Service) loadPublicGroupModels(w http.ResponseWriter, r *http.Request, group *SmartGroup) bool {
+	models, err := s.repository.GroupModels(r.Context(), group.ID)
+	if err != nil {
+		writeOpenAIError(w, http.StatusInternalServerError, "proxy_error", "failed to load smart group models")
+		return false
+	}
+	group.Models = models
+	return true
 }
 
 func supportedPublicEndpoint(method, path string) bool {
@@ -250,10 +267,25 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		return
 	}
 	defer replay.Close()
+	if _, err := replay.Object(); err != nil {
+		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "request body must contain one JSON object")
+		return
+	}
 	modelID, err := requestModelID(incoming, replay)
 	if err != nil || strings.TrimSpace(modelID) == "" {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "model is required")
 		return
+	}
+	var keywordStreaming bool
+	var keywordInputTokens int
+	var keywordInputText string
+	if len(group.Keywords) > 0 {
+		keywordStreaming, keywordInputTokens, keywordInputText, err = requestPolicyFactsWithText(incoming, replay)
+		if err != nil {
+			writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "failed to parse request body")
+			return
+		}
+		s.recordKeywordMatches(incoming.Context(), group, keywordInputText)
 	}
 	if s.serveGroupLocalReply(w, incoming, group, replay, modelID) {
 		return
@@ -286,7 +318,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	var streaming bool
 	var inputTokens int
 	if keywordFiltering && len(group.Keywords) > 0 {
-		streaming, inputTokens, inputText, policyErr = requestPolicyFactsWithText(incoming, replay)
+		streaming, inputTokens, inputText = keywordStreaming, keywordInputTokens, keywordInputText
 	} else {
 		streaming, inputTokens, policyErr = requestPolicyFacts(incoming, replay)
 	}
@@ -353,6 +385,9 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			lease.Release(context.Background())
 			continue
 		}
+		// The parsed context is no longer needed during a potentially long
+		// upstream stream. Keep only the original replayable request bytes.
+		replay.discardObject()
 		s.recordRouteRequest(incoming.Context(), route.ID)
 		attempts := 0
 		var lastResponse *http.Response
@@ -411,6 +446,11 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 }
 
 func (s *Service) recordRouteRequest(ctx context.Context, routeID string) {
+	if s.statistics != nil {
+		key, expiresAt := routeRequestCountKey(time.Now())
+		s.statistics.add(key, expiresAt, []string{routeID})
+		return
+	}
 	if s.limiter == nil {
 		return
 	}
@@ -880,9 +920,41 @@ func writeOpenAIError(w http.ResponseWriter, status int, code, message string) {
 var errBodyTooLarge = errors.New("request body too large")
 
 type replayBody struct {
-	memory []byte
-	file   *os.File
-	size   int64
+	memory     []byte
+	file       *os.File
+	size       int64
+	object     map[string]any
+	objectRead bool
+	objectErr  error
+}
+
+// Request-scoped only: never cache policies, credentials or mutable route
+// state across requests. The original bytes remain intact for forwarding.
+func (r *replayBody) Object() (map[string]any, error) {
+	if r.objectRead {
+		return r.object, r.objectErr
+	}
+	r.objectRead = true
+	reader, err := r.Open()
+	if err != nil {
+		r.objectErr = err
+		return nil, err
+	}
+	defer reader.Close()
+	decoder := json.NewDecoder(reader)
+	err = decoder.Decode(&r.object)
+	if err == nil && r.object == nil {
+		err = errors.New("request body must be a JSON object")
+	}
+	if err == nil && decoder.Decode(new(any)) != io.EOF {
+		err = errors.New("request body must contain one JSON object")
+	}
+	r.objectErr = err
+	return r.object, err
+}
+
+func (r *replayBody) discardObject() {
+	r.object, r.objectRead, r.objectErr = nil, false, nil
 }
 
 func newReplayBody(source io.ReadCloser, maxBytes int64) (*replayBody, error) {
@@ -927,7 +999,9 @@ func newReplayBody(source io.ReadCloser, maxBytes int64) (*replayBody, error) {
 		}
 	}
 	if result.file == nil {
-		result.memory = append([]byte(nil), memory.Bytes()...)
+		// The buffer is no longer mutated; transfer its backing storage instead
+		// of copying the complete request for every concurrent invocation.
+		result.memory = memory.Bytes()
 	}
 	return result, nil
 }
@@ -940,6 +1014,10 @@ func (r *replayBody) Open() (io.ReadCloser, error) {
 }
 
 func (r *replayBody) ModelID() (string, error) {
+	if r.objectRead {
+		model, _ := r.object["model"].(string)
+		return strings.TrimSpace(model), r.objectErr
+	}
 	reader, err := r.Open()
 	if err != nil {
 		return "", err
@@ -968,19 +1046,11 @@ func requestPolicyFactsWithText(incoming *http.Request, replay *replayBody) (boo
 
 func requestPolicyFactsBody(incoming *http.Request, replay *replayBody, collectText bool) (bool, int, string, error) {
 	nativeStreaming := isNativeGeminiStreamingRequest(incoming)
-	reader, err := replay.Open()
+	payload, err := replay.Object()
 	if err != nil {
 		return false, 0, "", err
 	}
-	defer reader.Close()
-	var payload any
-	if err := json.NewDecoder(reader).Decode(&payload); err != nil {
-		return false, 0, "", err
-	}
-	streaming := false
-	if object, ok := payload.(map[string]any); ok {
-		streaming, _ = object["stream"].(bool)
-	}
+	streaming, _ := payload["stream"].(bool)
 	if nativeStreaming {
 		streaming = true
 	}
@@ -1002,7 +1072,7 @@ func collectInputText(value any, key string, characters *int, inputText *strings
 	switch current := value.(type) {
 	case string:
 		if isInputTextKey(key) {
-			*characters += len([]rune(current))
+			*characters += utf8.RuneCountInString(current)
 			if inputText != nil {
 				inputText.WriteString(current)
 				inputText.WriteByte('\n')
@@ -1051,7 +1121,7 @@ func filterRoutesByKeywords(input string, keywords []string, routes []Route) []R
 
 func isInputTextKey(key string) bool {
 	switch strings.ToLower(key) {
-	case "content", "text", "input", "prompt", "parts", "messages", "systeminstruction":
+	case "content", "text", "input", "prompt", "parts", "messages", "systeminstruction", "system", "instructions":
 		return true
 	default:
 		return false

@@ -56,13 +56,8 @@ func newMappedResponseContext(incoming *http.Request, replay *replayBody, source
 	if !context.ResponsesAPI || !context.CompatibilityFields {
 		return context, nil
 	}
-	reader, err := replay.Open()
+	payload, err := replay.Object()
 	if err != nil {
-		return mappedResponseContext{}, err
-	}
-	defer reader.Close()
-	var payload map[string]any
-	if err := json.NewDecoder(reader).Decode(&payload); err != nil {
 		return mappedResponseContext{}, err
 	}
 	reasoning, _ := payload["reasoning"].(map[string]any)

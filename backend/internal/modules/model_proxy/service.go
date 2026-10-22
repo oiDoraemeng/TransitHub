@@ -84,6 +84,7 @@ type Service struct {
 	forceRefreshUntil map[string]time.Time
 	latencySamples    chan routeLatencyObservation
 	probeSettings     RecoveryProbeSettings
+	statistics        *requestStatistics
 }
 
 func NewService(repository *Repository, accounts AccountResolver, sites UpstreamSites, platform *upstream.PlatformService, cipher *KeyCipher, limiter *Limiter, maxRequestBytes int64, refreshInterval time.Duration) *Service {
@@ -103,17 +104,22 @@ func NewService(repository *Repository, accounts AccountResolver, sites Upstream
 		dataClient: dataClient, egressClients: make(map[string]cachedEgressClient),
 		cleanupNext: make(map[string]time.Time), forceRefreshUntil: make(map[string]time.Time),
 		latencySamples: make(chan routeLatencyObservation, latencyObservationBuffer),
+		statistics:     newRequestStatistics(limiter),
 	}
 }
 
 func (s *Service) Start(parent context.Context) {
+	if s.statistics == nil {
+		s.statistics = newRequestStatistics(s.limiter)
+	}
 	ctx, cancel := context.WithCancel(parent)
 	s.cancel = cancel
-	s.wg.Add(4)
+	s.wg.Add(5)
 	go s.cleanupLoop(ctx)
 	go s.modelRefreshLoop(ctx)
 	go s.latencyObservationLoop(ctx)
 	go s.routeProbeLoop(ctx)
+	go s.requestStatisticsLoop(ctx)
 }
 
 func (s *Service) Stop() {
@@ -399,11 +405,17 @@ func (s *Service) ListSmartGroups(ctx context.Context, userID string) ([]SmartGr
 		copy(groups[groupIndex].Members, members[offset:offset+len(groups[groupIndex].Members)])
 		offset += len(groups[groupIndex].Members)
 	}
+	// Display-only counters must not make the management page unavailable.
+	_ = s.limiter.PopulateKeywordMatchCounts(ctx, groups)
 	return groups, nil
 }
 
 func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input CreateSmartGroupRequest) (SmartGroup, string, error) {
 	minTokens, err := localReplyMinTokens(input.LocalReplyMinTokens)
+	if err != nil {
+		return SmartGroup{}, "", err
+	}
+	maxOutputTokens, replyText, err := localReplyOutputSettings(input.LocalReplyMaxOutputTokens, input.LocalReplyText)
 	if err != nil {
 		return SmartGroup{}, "", err
 	}
@@ -466,7 +478,7 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 	if err != nil {
 		return SmartGroup{}, "", err
 	}
-	group := SmartGroup{ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, Keywords: keywords, KeyPreview: preview, LocalReplyEnabled: input.LocalReplyEnabled, LocalReplyMinTokens: minTokens}
+	group := SmartGroup{ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, Keywords: keywords, KeyPreview: preview, LocalReplyEnabled: input.LocalReplyEnabled, LocalReplyMinTokens: minTokens, LocalReplyMaxOutputTokens: maxOutputTokens, LocalReplyText: replyText}
 	if err := s.repository.CreateSmartGroup(ctx, group, routeIDs, keyID, hash, ciphertext, preview); err != nil {
 		return SmartGroup{}, "", err
 	}
@@ -482,6 +494,10 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 
 func (s *Service) UpdateSmartGroup(ctx context.Context, userID, groupID string, input UpdateSmartGroupRequest) (SmartGroup, error) {
 	minTokens, err := localReplyMinTokens(input.LocalReplyMinTokens)
+	if err != nil {
+		return SmartGroup{}, err
+	}
+	maxOutputTokens, replyText, err := localReplyOutputSettings(input.LocalReplyMaxOutputTokens, input.LocalReplyText)
 	if err != nil {
 		return SmartGroup{}, err
 	}
@@ -504,6 +520,12 @@ func (s *Service) UpdateSmartGroup(ctx context.Context, userID, groupID string, 
 	}
 	if input.LocalReplyMinTokens != nil {
 		group.LocalReplyMinTokens = minTokens
+	}
+	if input.LocalReplyMaxOutputTokens != nil {
+		group.LocalReplyMaxOutputTokens = maxOutputTokens
+	}
+	if input.LocalReplyText != nil {
+		group.LocalReplyText = replyText
 	}
 	if input.Keywords != nil {
 		keywords, normalizeErr := normalizeKeywords(*input.Keywords)
@@ -853,7 +875,7 @@ func (s *Service) ResolvePublicTarget(ctx context.Context, entryKey string) (*pu
 		}
 		target.Route = route
 	case OwnerSmartGroup:
-		group, groupErr := s.repository.GetSmartGroup(ctx, credential.OwnerID)
+		group, groupErr := s.repository.GetSmartGroupConfig(ctx, credential.OwnerID)
 		if groupErr != nil || group == nil || !group.Enabled {
 			return nil, &requestError{Status: 403, Message: "smart group is disabled"}
 		}
