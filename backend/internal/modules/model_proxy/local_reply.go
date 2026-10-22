@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
@@ -43,12 +44,22 @@ func (s *Service) serveGroupLocalReply(w http.ResponseWriter, r *http.Request, g
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "request body must contain one JSON object")
 		return true
 	}
-	tokens, known := estimateLocalReplyTokens(input)
+	var keywordText strings.Builder
+	var inputText *strings.Builder
+	if len(group.Keywords) > 0 {
+		inputText = &keywordText
+	}
+	tokens, known := estimateLocalReplyTokens(input, inputText)
 	threshold := group.LocalReplyMinTokens
 	if threshold <= 0 {
 		threshold = defaultLocalReplyMinTokens
 	}
 	if !known || tokens >= threshold {
+		return false
+	}
+	// Group keywords exempt even small inputs from the local reply. Continue
+	// through normal member selection and its configured policies.
+	if inputText != nil && matchesAnyKeyword(keywordText.String(), group.Keywords) {
 		return false
 	}
 	id, err := randomID("")
@@ -90,7 +101,7 @@ func (s *Service) serveGroupLocalReply(w http.ResponseWriter, r *http.Request, g
 // Like member input limits, this is a local text estimate (four Unicode
 // characters per token), not usage reported by a model. Do not treat opaque
 // context or media as zero tokens: their actual input size is unknown locally.
-func estimateLocalReplyTokens(input map[string]any) (int, bool) {
+func estimateLocalReplyTokens(input map[string]any, inputText *strings.Builder) (int, bool) {
 	for _, key := range []string{"previous_response_id", "conversation", "cachedContent", "continuationToken"} {
 		if value := input[key]; value != nil && value != "" {
 			return 0, false
@@ -98,7 +109,7 @@ func estimateLocalReplyTokens(input map[string]any) (int, bool) {
 	}
 	characters := 0
 	for _, key := range []string{"input", "messages", "prompt", "instructions", "system", "contents", "systemInstruction", "tools", "functions"} {
-		count, known := localReplyTextSize(input[key])
+		count, known := localReplyTextSize(input[key], inputText)
 		if !known {
 			return 0, false
 		}
@@ -107,14 +118,18 @@ func estimateLocalReplyTokens(input map[string]any) (int, bool) {
 	return (characters + 3) / 4, true
 }
 
-func localReplyTextSize(value any) (int, bool) {
+func localReplyTextSize(value any, inputText *strings.Builder) (int, bool) {
 	switch value := value.(type) {
 	case string:
+		if inputText != nil {
+			inputText.WriteString(value)
+			inputText.WriteByte('\n')
+		}
 		return utf8.RuneCountInString(value), true
 	case []any:
 		size := 0
 		for _, item := range value {
-			count, known := localReplyTextSize(item)
+			count, known := localReplyTextSize(item, inputText)
 			if !known {
 				return 0, false
 			}
@@ -135,7 +150,7 @@ func localReplyTextSize(value any) (int, bool) {
 			case "role", "type", "id", "call_id", "tool_call_id", "status":
 				continue
 			}
-			count, known := localReplyTextSize(child)
+			count, known := localReplyTextSize(child, inputText)
 			if !known {
 				return 0, false
 			}

@@ -236,6 +236,59 @@ func TestGroupLocalReplyRejectsInvalidSettings(t *testing.T) {
 	}
 }
 
+func TestGroupLocalReplyKeywordsUseUpstreamAcrossProtocols(t *testing.T) {
+	for _, test := range []struct {
+		name, path, body string
+		local            bool
+	}{
+		{"chat-case-insensitive", "/v1/chat/completions", `{"messages":[{"role":"user","content":"Please use PrEmIuM"}]}`, false},
+		{"chat-content-blocks", "/v1/chat/completions", `{"messages":[{"role":"user","content":[{"type":"text","text":"需要认真处理"}]}]}`, false},
+		{"responses", "/v1/responses", `{"input":"premium request"}`, false},
+		{"responses-instructions", "/v1/responses", `{"input":"hi","instructions":"PREMIUM"}`, false},
+		{"compact", compactPath, `{"input":[{"role":"user","content":"认真"}]}`, false},
+		{"messages-system", "/v1/messages", `{"system":"premium","messages":[{"role":"user","content":"hi"}]}`, false},
+		{"messages-blocks", "/v1/messages", `{"messages":[{"role":"user","content":[{"type":"text","text":"认真"}]}]}`, false},
+		{"gemini", "/v1beta/models/alias:generateContent", `{"contents":[{"role":"user","parts":[{"text":"premium"}]}]}`, false},
+		{"gemini-system", "/v1beta/models/alias:streamGenerateContent", `{"systemInstruction":{"parts":[{"text":"认真"}]},"contents":[{"parts":[{"text":"hi"}]}]}`, false},
+		{"nonmatching", "/v1/responses", `{"input":"hello"}`, true},
+		{"model-is-not-input", "/v1/responses", `{"model":"premium","input":"hello"}`, true},
+		{"metadata-is-not-input", "/v1/responses", `{"input":"hello","metadata":{"label":"premium"}}`, true},
+		{"separate-blocks", "/v1/responses", `{"input":[{"role":"user","content":[{"type":"input_text","text":"pre"},{"type":"input_text","text":"mium"}]}]}`, true},
+	} {
+		for _, stream := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/stream=%t", test.name, stream), func(t *testing.T) {
+				var input map[string]any
+				if err := json.Unmarshal([]byte(test.body), &input); err != nil {
+					t.Fatal(err)
+				}
+				input["stream"] = stream
+				body, _ := json.Marshal(input)
+				replay, err := newReplayBody(io.NopCloser(strings.NewReader(string(body))), 1<<20)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer replay.Close()
+				w := httptest.NewRecorder()
+				group := SmartGroup{LocalReplyEnabled: true, LocalReplyMinTokens: 100, Keywords: []string{"", " Premium ", "认真"}}
+				local := (&Service{}).serveGroupLocalReply(w, httptest.NewRequest(http.MethodPost, test.path, nil), group, replay, "alias")
+				if local != test.local || (!local && (w.Body.Len() != 0 || len(w.Header()) != 0)) {
+					t.Fatalf("local=%t want=%t headers=%v body=%s", local, test.local, w.Header(), w.Body.String())
+				}
+				// Keyword inspection must leave the replay body usable by upstream.
+				reader, err := replay.Open()
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer reader.Close()
+				remaining, err := io.ReadAll(reader)
+				if err != nil || string(remaining) != string(body) {
+					t.Fatalf("body changed during keyword inspection: %s %v", remaining, err)
+				}
+			})
+		}
+	}
+}
+
 func TestGroupLocalReplyPersistsPerGroupAndForwardsBoundary(t *testing.T) {
 	ctx := context.Background()
 	repo := memberPauseTestRepository(t)
@@ -266,7 +319,8 @@ func TestGroupLocalReplyPersistsPerGroupAndForwardsBoundary(t *testing.T) {
 		}
 	}
 	enabled, threshold := true, 4
-	if _, err := service.UpdateSmartGroup(ctx, "user", "a", UpdateSmartGroupRequest{LocalReplyEnabled: &enabled, LocalReplyMinTokens: &threshold}); err != nil {
+	keywords := []string{"go", "认真"}
+	if _, err := service.UpdateSmartGroup(ctx, "user", "a", UpdateSmartGroupRequest{LocalReplyEnabled: &enabled, LocalReplyMinTokens: &threshold, Keywords: &keywords}); err != nil {
 		t.Fatal(err)
 	}
 	name := "renamed"
@@ -290,8 +344,10 @@ func TestGroupLocalReplyPersistsPerGroupAndForwardsBoundary(t *testing.T) {
 		wantCalls    int64
 	}{
 		{"a", "123456789", 0},
-		{"a", "1234567890123", 1},
-		{"b", "x", 2},
+		{"a", "GO", 1},
+		{"a", "hello", 1},
+		{"a", "1234567890123", 2},
+		{"b", "x", 3},
 	} {
 		group, err := repo.GetSmartGroup(ctx, test.group)
 		if err != nil {
@@ -307,7 +363,7 @@ func TestGroupLocalReplyPersistsPerGroupAndForwardsBoundary(t *testing.T) {
 	if err := limiter.PopulateRouteRuntime(ctx, runtime); err != nil {
 		t.Fatal(err)
 	}
-	if runtime[0].TodayRequests != 2 {
+	if runtime[0].TodayRequests != 3 {
 		t.Fatalf("local reply counted as upstream traffic: %d", runtime[0].TodayRequests)
 	}
 }
