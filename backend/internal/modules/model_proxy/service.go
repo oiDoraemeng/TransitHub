@@ -358,7 +358,7 @@ func (s *Service) UpdateRoute(ctx context.Context, userID, routeID string, input
 	if err := s.validateEgressProxy(ctx, userID, accountID, route.ProxyID); err != nil {
 		return Route{}, err
 	}
-	if err := s.repository.UpdateRoute(ctx, *route); err != nil {
+	if err := s.repository.UpdateRoute(ctx, *route, input.UpstreamKey != ""); err != nil {
 		return Route{}, err
 	}
 	if refreshModels || route.Enabled {
@@ -697,7 +697,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	if input.NeverAutoPause == nil && input.SchedulingPaused == nil && input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordMatchMode == nil && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
-	var keyCiphertext, keyPreviewValue *string
+	var routeKeyCiphertext, routeKeyPreview *string
 	if input.UpstreamKey != "" {
 		if input.UseProvidedKey != nil && !*input.UseProvidedKey {
 			return &requestError{Status: 400, Message: "useProvidedKey must be enabled when upstreamKey is provided"}
@@ -710,14 +710,14 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 			return encryptErr
 		}
 		preview := keyPreview(input.UpstreamKey)
-		keyCiphertext = &ciphertext
-		keyPreviewValue = &preview
+		routeKeyCiphertext = &ciphertext
+		routeKeyPreview = &preview
 		if input.UseProvidedKey == nil {
 			enabled := true
 			input.UseProvidedKey = &enabled
 		}
 	}
-	if input.UseProvidedKey != nil && *input.UseProvidedKey && keyCiphertext == nil {
+	if input.UseProvidedKey != nil && *input.UseProvidedKey && routeKeyCiphertext == nil {
 		hasKey, lookupErr := s.repository.MemberHasProvidedKey(ctx, userID, accountID, groupID, routeID)
 		if lookupErr != nil {
 			return lookupErr
@@ -726,15 +726,17 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 			return &requestError{Status: 400, Message: "upstreamKey is required when useProvidedKey is enabled"}
 		}
 	}
-	if input.UseProvidedKey != nil && !*input.UseProvidedKey {
-		empty := ""
-		keyCiphertext = &empty
-		keyPreviewValue = &empty
-	}
-	return s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
+	keyUpdated := routeKeyCiphertext != nil
+	if err := s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
 		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
-		input.ModelMappingEnabled, modelMappingJSON, input.UseProvidedKey, keyCiphertext, keyPreviewValue,
-		input.KeywordMatchMode, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS, input.SchedulingPaused, input.NeverAutoPause)
+		input.ModelMappingEnabled, modelMappingJSON, input.UseProvidedKey, routeKeyCiphertext, routeKeyPreview,
+		input.KeywordMatchMode, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS, input.SchedulingPaused, input.NeverAutoPause); err != nil {
+		return err
+	}
+	if keyUpdated {
+		go s.refreshRouteModels(context.Background(), routeID)
+	}
+	return nil
 }
 
 const (

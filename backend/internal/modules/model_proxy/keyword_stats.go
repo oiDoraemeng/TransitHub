@@ -23,15 +23,15 @@ func keywordMatchCountKey(groupID string, now time.Time) (string, int64) {
 	return "proxy:keyword-count:{" + groupID + "}:" + now.In(shanghaiLocation).Format("20060102"), expiresAt
 }
 
-// Count once at request entry, before local replies or route retries. A request
-// may match several keywords, but repeating one keyword does not add hits.
-func (l *Limiter) RecordKeywordMatches(ctx context.Context, group SmartGroup, input string) error {
-	if l == nil || l.redis == nil || group.ID == "" || len(group.Keywords) == 0 {
+// Record the precomputed matches once after a successful request, including
+// successful local replies. Failed attempts and retries do not add hits.
+func (l *Limiter) RecordKeywordMatches(ctx context.Context, groupID string, matches []string) error {
+	if l == nil || l.redis == nil || groupID == "" || len(matches) == 0 {
 		return nil
 	}
-	key, expiresAt := keywordMatchCountKey(group.ID, time.Now())
+	key, expiresAt := keywordMatchCountKey(groupID, time.Now())
 	args := []any{expiresAt}
-	for _, keyword := range matchedGroupKeywords(group.Keywords, input) {
+	for _, keyword := range matches {
 		args = append(args, keyword)
 	}
 	if len(args) == 1 {
@@ -41,6 +41,9 @@ func (l *Limiter) RecordKeywordMatches(ctx context.Context, group SmartGroup, in
 }
 
 func matchedGroupKeywords(keywords []string, input string) []string {
+	if len(keywords) == 0 {
+		return nil
+	}
 	input = strings.ToLower(input)
 	var matched []string
 	seen := make(map[string]bool)
@@ -158,13 +161,16 @@ func (s *Service) requestStatisticsLoop(ctx context.Context) {
 	}
 }
 
-func (s *Service) recordKeywordMatches(ctx context.Context, group SmartGroup, input string) {
-	if s.statistics != nil {
-		key, expiresAt := keywordMatchCountKey(group.ID, time.Now())
-		s.statistics.add(key, expiresAt, matchedGroupKeywords(group.Keywords, input))
+func (s *Service) recordKeywordMatches(ctx context.Context, groupID string, matches []string) {
+	if ctx.Err() != nil || len(matches) == 0 {
 		return
 	}
-	_ = s.limiter.RecordKeywordMatches(ctx, group, input)
+	if s.statistics != nil {
+		key, expiresAt := keywordMatchCountKey(groupID, time.Now())
+		s.statistics.add(key, expiresAt, matches)
+		return
+	}
+	_ = s.limiter.RecordKeywordMatches(ctx, groupID, matches)
 }
 
 func (l *Limiter) PopulateKeywordMatchCounts(ctx context.Context, groups []SmartGroup) error {

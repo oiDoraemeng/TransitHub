@@ -107,6 +107,12 @@ func (s *Service) serveGroupLocalReply(w http.ResponseWriter, r *http.Request, g
 			return false
 		}
 	}
+	if len(group.Keywords) > 0 {
+		_, _, text, err := requestPolicyFactsWithText(r, replay)
+		if err == nil {
+			s.recordKeywordMatches(r.Context(), group.ID, matchedGroupKeywords(group.Keywords, text))
+		}
+	}
 	return true
 }
 

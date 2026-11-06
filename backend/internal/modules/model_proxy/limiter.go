@@ -147,9 +147,9 @@ func routeRequestCountKey(now time.Time) (string, int64) {
 	return "proxy:request-count:{routes}:" + day, nextMidnight.Unix()
 }
 
-// RecordRouteRequest counts one logical upstream dispatch. Callers should
-// invoke it once after a route is selected; retries within that request do
-// not increment the counter again.
+// RecordRouteRequest counts one successful upstream request. Callers invoke it
+// after the response completes without HTTP, JSON/SSE or transport errors;
+// retries within that request do not increment the counter again.
 func (l *Limiter) RecordRouteRequest(ctx context.Context, routeID string) error {
 	if l == nil || l.redis == nil || routeID == "" {
 		return errors.New("route request counter unavailable")

@@ -190,8 +190,13 @@ func (r *Repository) CreateRoute(ctx context.Context, route Route, keyID, keyHas
 	return tx.Commit(ctx)
 }
 
-func (r *Repository) UpdateRoute(ctx context.Context, route Route) error {
-	result, err := r.db.Exec(ctx, `
+func (r *Repository) UpdateRoute(ctx context.Context, route Route, clearMemberKeys bool) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	result, err := tx.Exec(ctx, `
 		UPDATE proxy_routes SET name=$4, site_id=$5, group_id=$6, group_name=$7,
 			concurrency_limit=$8, enabled=$9, egress_proxy_id=NULLIF($10,''),
 			upstream_key_ciphertext=NULLIF($11,''),upstream_key_preview=$12,updated_at=now()
@@ -204,7 +209,16 @@ func (r *Repository) UpdateRoute(ctx context.Context, route Route) error {
 	if result.RowsAffected() == 0 {
 		return pgx.ErrNoRows
 	}
-	return nil
+	if clearMemberKeys {
+		if _, err := tx.Exec(ctx, `
+			UPDATE proxy_smart_group_members
+			SET upstream_key_ciphertext=NULL,upstream_key_preview='',policy_revision=policy_revision+1
+			WHERE route_id=$1 AND (upstream_key_ciphertext IS NOT NULL OR upstream_key_preview <> '')
+		`, route.ID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) DeleteRoute(ctx context.Context, userID, accountID, routeID string) error {
@@ -515,8 +529,44 @@ func (r *Repository) AddMember(ctx context.Context, userID, accountID, groupID, 
 	return nil
 }
 
-func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, modelMappingEnabled *bool, modelMappingJSON *string, useProvidedKey *bool, keyCiphertext, keyPreview *string, keywordMatchMode *string, syncKeyDeleteEnabled *bool, syncKeyDeleteDelayMS *int, schedulingPaused, neverAutoPause *bool) error {
-	result, err := r.db.Exec(ctx, `
+func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, modelMappingEnabled *bool, modelMappingJSON *string, useProvidedKey *bool, routeKeyCiphertext, routeKeyPreview *string, keywordMatchMode *string, syncKeyDeleteEnabled *bool, syncKeyDeleteDelayMS *int, schedulingPaused, neverAutoPause *bool) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var lockedRouteID string
+	if err := tx.QueryRow(ctx, `
+		SELECT r.id
+		FROM proxy_smart_group_members m
+		JOIN proxy_smart_groups g ON g.id=m.smart_group_id
+		JOIN proxy_routes r ON r.id=m.route_id
+		WHERE g.id=$1 AND m.route_id=$2 AND g.user_id=$3 AND g.admin_account_id=$4
+			AND r.user_id=$3 AND r.admin_account_id=$4
+		FOR UPDATE OF r
+	`, groupID, routeID, userID, accountID).Scan(&lockedRouteID); err != nil {
+		return err
+	}
+	if routeKeyCiphertext != nil && *routeKeyCiphertext != "" {
+		preview := ""
+		if routeKeyPreview != nil {
+			preview = *routeKeyPreview
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE proxy_routes SET upstream_key_ciphertext=$4,upstream_key_preview=$5,updated_at=now()
+			WHERE id=$1 AND user_id=$2 AND admin_account_id=$3
+		`, routeID, userID, accountID, *routeKeyCiphertext, preview); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE proxy_smart_group_members
+			SET upstream_key_ciphertext=NULL,upstream_key_preview='',policy_revision=policy_revision+1
+			WHERE route_id=$1 AND (upstream_key_ciphertext IS NOT NULL OR upstream_key_preview <> '')
+		`, routeID); err != nil {
+			return err
+		}
+	}
+	result, err := tx.Exec(ctx, `
 		UPDATE proxy_smart_group_members m
 		SET stream_only=COALESCE($5::boolean,m.stream_only),
 			min_input_tokens=COALESCE($6::integer,m.min_input_tokens),
@@ -525,35 +575,25 @@ func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, 
 			model_mapping_enabled=COALESCE($9::boolean,m.model_mapping_enabled),
 			model_mapping=CASE WHEN $10::jsonb IS NULL THEN m.model_mapping ELSE $10::jsonb END,
 			use_upstream_key=COALESCE($11::boolean,m.use_upstream_key),
-			upstream_key_ciphertext=CASE
-				WHEN $12::text IS NULL THEN m.upstream_key_ciphertext
-				WHEN $12::text='' THEN NULL
-				ELSE $12::text
-			END,
-			upstream_key_preview=CASE
-				WHEN $13::text IS NULL THEN m.upstream_key_preview
-				WHEN $13::text='' THEN ''
-				ELSE $13::text
-			END,
-			keyword_check_enabled=CASE WHEN $14::text IS NULL THEN m.keyword_check_enabled ELSE $14::text <> 'disabled' END,
-			keyword_match_mode=COALESCE($14::text,m.keyword_match_mode),
-			sync_key_delete_enabled=COALESCE($15::boolean,m.sync_key_delete_enabled),
-			sync_key_delete_delay_ms=COALESCE($16::integer,m.sync_key_delete_delay_ms),
-			scheduling_paused=COALESCE($17::boolean,m.scheduling_paused),
-			never_auto_pause=COALESCE($18::boolean,m.never_auto_pause),
+			keyword_check_enabled=CASE WHEN $12::text IS NULL THEN m.keyword_check_enabled ELSE $12::text <> 'disabled' END,
+			keyword_match_mode=COALESCE($12::text,m.keyword_match_mode),
+			sync_key_delete_enabled=COALESCE($13::boolean,m.sync_key_delete_enabled),
+			sync_key_delete_delay_ms=COALESCE($14::integer,m.sync_key_delete_delay_ms),
+			scheduling_paused=COALESCE($15::boolean,m.scheduling_paused),
+			never_auto_pause=COALESCE($16::boolean,m.never_auto_pause),
 			policy_revision=m.policy_revision+1
 		FROM proxy_smart_groups g, proxy_routes r
 		WHERE m.smart_group_id=g.id AND g.id=$1 AND m.route_id=$2 AND r.id=m.route_id
 			AND g.user_id=$3 AND g.admin_account_id=$4
 			AND r.user_id=$3 AND r.admin_account_id=$4
-	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, modelMappingEnabled, modelMappingJSON, useProvidedKey, keyCiphertext, keyPreview, keywordMatchMode, syncKeyDeleteEnabled, syncKeyDeleteDelayMS, schedulingPaused, neverAutoPause)
+	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, modelMappingEnabled, modelMappingJSON, useProvidedKey, keywordMatchMode, syncKeyDeleteEnabled, syncKeyDeleteDelayMS, schedulingPaused, neverAutoPause)
 	if err != nil {
 		return err
 	}
 	if result.RowsAffected() == 0 {
 		return pgx.ErrNoRows
 	}
-	return nil
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) MemberHasProvidedKey(ctx context.Context, userID, accountID, groupID, routeID string) (bool, error) {

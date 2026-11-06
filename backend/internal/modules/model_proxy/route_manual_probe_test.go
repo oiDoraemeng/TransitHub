@@ -96,10 +96,20 @@ func manualProbeFixture(t *testing.T, serve http.HandlerFunc) (*Service, Route, 
 	seedPauseMember(t, repo, route, "a", "b")
 	paused, provided, mapping := true, true, true
 	aliases := map[string]string{"alias": "model"}
+	encodedMapping, err := json.Marshal(aliases)
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstreamKeyCiphertext, err := service.cipher.Encrypt("sk-member-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstreamKeyPreview := keyPreview("sk-member-test")
+	mappingJSON := string(encodedMapping)
 	for _, group := range []string{"a", "b"} {
-		if err := service.UpdateMemberPolicy(context.Background(), "user", group, route.ID, UpdateMemberPolicyRequest{
-			SchedulingPaused: &paused, UseProvidedKey: &provided, UpstreamKey: "sk-member-test", ModelMappingEnabled: &mapping, ModelMapping: &aliases,
-		}); err != nil {
+		if err := repo.UpdateMemberPolicy(context.Background(), "user", "workspace", group, route.ID,
+			nil, nil, nil, nil, &mapping, &mappingJSON, &provided,
+			&upstreamKeyCiphertext, &upstreamKeyPreview, nil, nil, nil, &paused, nil); err != nil {
 			t.Fatal(err)
 		}
 	}

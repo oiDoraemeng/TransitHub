@@ -198,7 +198,6 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 		return
 	}
 	defer lease.Release(context.Background())
-	s.recordRouteRequest(incoming.Context(), route.ID)
 
 	var lastStatus int
 	var lastResponse *http.Response
@@ -216,6 +215,7 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 		lastResponse, lastAttemptErr = response, attemptErr
 		if attemptErr == nil && !retryable {
 			completed, readErr := s.writeUpstreamResponse(w, response)
+			s.recordSuccessfulRouteRequest(incoming.Context(), route.ID, response, completed, readErr)
 			if completed || readErr != nil || response.StatusCode >= 300 {
 				s.observeRouteRequest(incoming.Context(), lease, probeSpec, response, readErr, route)
 			}
@@ -285,11 +285,11 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "failed to parse request body")
 			return
 		}
-		s.recordKeywordMatches(incoming.Context(), group, keywordInputText)
 	}
 	if s.serveGroupLocalReply(w, incoming, group, replay, modelID) {
 		return
 	}
+	keywordMatches := matchedGroupKeywords(group.Keywords, keywordInputText)
 	candidates, err := s.smartGroupCandidates(incoming.Context(), group, modelID)
 	if err != nil {
 		writeOpenAIError(w, http.StatusInternalServerError, "proxy_error", "failed to load smart group members")
@@ -388,7 +388,6 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		// The parsed context is no longer needed during a potentially long
 		// upstream stream. Keep only the original replayable request bytes.
 		replay.discardObject()
-		s.recordRouteRequest(incoming.Context(), route.ID)
 		attempts := 0
 		var lastResponse *http.Response
 		var lastAttemptErr error
@@ -427,6 +426,9 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			continue
 		}
 		completed, readErr := s.writeUpstreamResponse(w, response)
+		if s.recordSuccessfulRouteRequest(incoming.Context(), route.ID, response, completed, readErr) {
+			s.recordKeywordMatches(incoming.Context(), group.ID, keywordMatches)
+		}
 		if completed || readErr != nil {
 			s.observeRouteRequest(incoming.Context(), lease, probeSpec, response, readErr, *route)
 		}
@@ -445,18 +447,25 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	writeOpenAIError(w, http.StatusTooManyRequests, "smart_group_concurrency_exceeded", "all eligible smart group members are at capacity")
 }
 
-func (s *Service) recordRouteRequest(ctx context.Context, routeID string) {
+// Count only after the entire response has been delivered. HTTP 200 bodies can
+// still contain JSON/SSE errors, and a failed member may fall back to another.
+func (s *Service) recordSuccessfulRouteRequest(ctx context.Context, routeID string, response *http.Response, completed bool, readErr error) bool {
+	success, _ := routeRequestResult(ctx, response, readErr)
+	if !completed || !success {
+		return false
+	}
 	if s.statistics != nil {
 		key, expiresAt := routeRequestCountKey(time.Now())
 		s.statistics.add(key, expiresAt, []string{routeID})
-		return
+		return true
 	}
 	if s.limiter == nil {
-		return
+		return true
 	}
 	if err := s.limiter.RecordRouteRequest(ctx, routeID); err != nil {
 		log.Printf("[model-proxy] record route request route_id=%s err=%v", routeID, err)
 	}
+	return true
 }
 
 // attemptSmartGroupMember retries once after the selected member's first failure.
