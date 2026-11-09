@@ -116,19 +116,19 @@ export default {
     },
     menu: {
       dashboard: '仪表盘',
-      leaderboard: '排行榜',
-      lottery: '抽奖活动',
       upstream: '上游管理',
       modelProxy: '模型代理',
       groupManagement: '分组管理',
       groupRates: '分组倍率',
-      groupAssociations: '调价映射',
-      connectionHealth: '分组健康',
-      groupRateCampaigns: '活动调价',
-      sub2apiFeatures: '嵌入功能',
       settings: '系统设置',
-      tickets: '工单',
+      userActivity: '用户分析',
+      sales: '销售分析',
+      vip: '大户关注',
+      profit: '利润分析',
       massEmail: '群发邮件',
+      leads: '线索',
+      tickets: '工单',
+      client: '客户端',
       signOut: '退出登录'
     },
     modelProxy: {
@@ -546,19 +546,13 @@ export default {
       },
       attention: {
         title: '需要关注',
-        subtitle: '健康状态与上游余额异常',
-        healthTitle: '目标健康状态异常',
-        healthDescription: '{attention} 个需观察，{suspended} 个已暂停或禁用',
-        failuresTitle: '近 24 小时探活失败',
-        failuresDescription: '查看失败分类与最近状态变化',
+        subtitle: '上游余额与连接异常',
         upstreamTitle: '上游余额待处理',
         upstreamDescription: '存在余额未知或连接异常的上游站点',
         allClearTitle: '当前没有明确异常',
-        allClearDescription: '健康目标和上游余额暂未发现需要处理的问题。',
+        allClearDescription: '上游余额与连接暂未发现需要处理的问题。',
         unavailableTitle: '运行状态暂时不可用',
-        unavailableDescription: '核心经营数据不受影响，请稍后重试健康与上游状态。',
-        lastProbe: '最近探活：{time}',
-        neverProbed: '尚无记录',
+        unavailableDescription: '核心经营数据不受影响，请稍后重试上游状态。',
         refresh: '刷新运行状态',
         partialLoadError: '部分运行数据加载失败'
       },
@@ -597,9 +591,34 @@ export default {
           asc: '金额从低到高'
         }
       },
+      cost: {
+        syncedAt: '按 {count} 个上游站点计算 · 最早同步于 {time}',
+        staleSites: '{count} 个上游站点今天还没有同步成功，未计入（已在后台重试）'
+      },
+      pricing: {
+        title: '我的站点售价',
+        subtitle: '把营收和站点用户余额换算成人民币',
+        label: '站点余额每 1 美元（1 个单位）售价',
+        unit: '元 / $1',
+        helpRevenue: '今日营收、站点用户总余额 = 站点金额 × 售价；默认 1，即 1 美元按 1 元计。',
+        helpExample: '例如你按 ¥0.8 卖出 $1 额度就填 0.8；按 ¥7.2 卖 $1 就填 7.2。',
+        helpCost: '上游成本按各上游站点的「充值倍率」（每 $1 上游额度的实际进货价）换算，两边都是人民币，净利润与利润率才准确。',
+        helpHistory: '修改后从今天起生效，之前定稿的历史数据不会重算。',
+        cardNote: '按 ¥{price}/$1 换算',
+        basis: '营收与站点余额按售价 ¥{price}/$1 换算，成本按各上游「充值倍率」换算。',
+        edit: '修改售价',
+        save: '保存',
+        cancel: '取消',
+        close: '关闭',
+        errors: {
+          invalid: '请输入大于 0、不超过 10000 的售价。',
+          request: '售价设置保存失败，请稍后重试。'
+        }
+      },
       upstreamKeyUsage: {
         title: '今日成本明细',
         subtitle: '共 {count} 个 key，合计 {total}',
+        liveNote: '明细于 {time} 实时逐个 key 查询；卡片按各上游站点最近一次同步的账号合计计算。两者查询时间不同，且今天已删除的 key 不在明细中，合计可能略有差异。',
         close: '关闭',
         empty: '暂无今日消费的 key。',
         loadError: '加载今日成本明细失败，请检查上游站点连接后重试。',
@@ -703,9 +722,10 @@ export default {
             tokenHelp: 'Access Token 与 Refresh Token 至少填写一个；提供 Refresh Token 时系统会自动刷新临期凭证。',
             sub2apiAdminKeyPlaceholder: 'Sub2API Admin API Key',
             sub2apiAdminKeyHelp: '该 Key 仅通过 x-api-key 发送到 Sub2API 管理接口。',
-            newApiAdminKeyPlaceholder: 'New-API 系统访问令牌',
-            newApiAdminKeyHelp: '填写管理员或 Root 账户在个人设置中生成的系统访问令牌。',
-            userIdPlaceholder: '该令牌所属的用户 ID'
+            newApiAdminKeyPlaceholder: 'New-API 访问令牌（nap_ 开头）或系统访问令牌',
+            newApiAdminKeyHelp: '推荐使用新版 New-API 的个人访问令牌（PAT）：用 Root 账号创建，勾选 profile:read、user:read、log:read、group:read、option:read、option:write、channel:read、channel:write 权限（需要由 TransitHub 自动创建或删除渠道时再加 channel:sensitive_write），并设置较长有效期。旧版系统访问令牌需同时填写用户 ID。',
+            userIdPlaceholder: '用户 ID（可选，旧版系统访问令牌需要）',
+            newApiPasswordHelp: '新版 New-API 的密码登录最长保持 30 天，到期需重新登录；开启两步验证的账号无法自动登录，请改用访问令牌。'
           },
           submit: '登录并校验',
           submitting: '校验中...'
@@ -718,743 +738,10 @@ export default {
           network: '网络或跨域请求失败，请检查站点地址。',
           platformUnsupported: '不支持的平台类型，请选择 Sub2API 或 New-API。',
           unknown: 'admin 登录时发生未知错误。',
-          reloginRequired: '管理员身份校验失败，请重新登录。'
+          reloginRequired: '管理员身份校验失败，请重新登录。',
+          verificationRequired: '该账号开启了两步验证，无法自动登录，请改用访问令牌登录。',
+          tokenRejected: '访问令牌校验失败：旧版 New-API 的系统访问令牌需要同时填写用户 ID；新版请确认令牌有效、未过期且勾选了所需权限。'
         }
-      }
-    },
-    groupAssociations: {
-      title: '调价映射',
-      detailsLabel: '调价映射详情',
-      subtitle: '共 {count} 组 · {associated} 组已配置数据源 · {unassociated} 组未配置',
-      common: {
-        placeholder: '—',
-        multiplier: '{value}x',
-        unknown: '未知平台'
-      },
-      actions: {
-        refresh: '刷新', retry: '重试', cleanup: '清理失效配置', editTargets: '编辑数据源', manage: '管理调价映射', openProfitCalculator: '打开利润预算计算器', customProfitCalculator: '自定义利润计算器'
-      },
-      filters: {
-        searchLabel: '搜索调价映射', searchPlaceholder: '搜索自有分组或上游数据源...',
-        all: '全部', associated: '已配置', unassociated: '未配置', stale: '失效'
-      },
-      listAria: '我的分组列表',
-      targetCount: '{count} 个数据源',
-      detailSubtitle: '当前使用 {count} 个上游分组作为调价数据源',
-      staleOwnGroup: '管理员站点已不再返回此分组。配置仍被保留，请确认后再清理。',
-      staleTarget: '上游已失效',
-      metrics: {
-        ownMultiplier: '我的分组倍率',
-        targets: '调价数据源',
-        budgetMargin: '倍率预算毛利率',
-        marginRange: '{minimum} - {maximum}',
-        autoPricing: '自动调价',
-        effectiveUpstream: '上游生效倍率',
-        effectiveCost: '换算后成本倍率'
-      },
-      profitCalculator: {
-        titleWithGroup: '{group} · 利润预算',
-        customTitle: '自定义利润计算器',
-        close: '关闭利润预算',
-        modeLabel: '利润计算方式',
-        groupMode: '当前分组',
-        customMode: '自定义计算',
-        revenueLabel: '模拟销售额（CNY）',
-        revenuePlaceholder: '请输入模拟销售额',
-        invalidRevenue: '请输入大于或等于 0 的有效金额。',
-        ownMultiplier: '我的售卖倍率',
-        upstreamCostMultiplier: '上游成本倍率（已换算）',
-        saleMultiplier: '我的售卖倍率',
-        multiplierPlaceholder: '请输入倍率',
-        invalidUpstreamMultiplier: '请输入大于或等于 0 的有效倍率。',
-        invalidSaleMultiplier: '请输入大于 0 的有效倍率。',
-        profitRange: '预计毛利区间',
-        profitMargin: '预计利润率',
-        amountRange: '{minimum} - {maximum}',
-        estimatedCost: '预计进货成本',
-        estimatedProfit: '预计毛利',
-        noTargetsTitle: '暂无可计算的上游',
-        noTargetsDescription: '请先为该分组配置有效的调价数据源。'
-      },
-      sections: {
-        targets: '调价数据源', targetsSummary: '共 {count} 个上游数据源', autoPricing: '自动调价策略'
-      },
-      noTargets: {
-        title: '尚未配置调价数据源', description: '添加上游数据源后，可为该分组配置自动调价。'
-      },
-      targetsDrawer: {
-        titleWithGroup: '{group} · 编辑调价数据源', selectedCount: '已选择 {count} 个上游分组',
-        searchLabel: '搜索上游分组', searchPlaceholder: '搜索站点、平台或分组...',
-        emptyTitle: '没有匹配的上游分组', emptyDescription: '请调整搜索条件或先同步上游站点。',
-        unknownMultiplier: '暂无倍率', autoMultiplier: '自动', multiplier: '{value}x', stale: '已失效',
-        close: '关闭数据源编辑', cancel: '取消', save: '保存数据源', saving: '保存中...'
-      },
-      cleanup: {
-        title: '清理失效配置',
-        description: '将删除“{group}”的调价数据源和自动调价配置。此操作不会删除远端分组。',
-        cancel: '取消', confirm: '确认清理'
-      },
-      errors: {
-        primaryTargetRequired: '当前主上游正在用于自动调价。请先修改或关闭自动调价，再移除此关联。'
-      },
-      close: '关闭',
-      empty: '暂无分组映射数据。',
-      loadError: '加载分组列表失败。',
-      runError: '执行自动调价失败，请重试。',
-      unassociatedLabel: '未配置数据源',
-      unassociatedMultiplier: '暂无倍率',
-      columns: {
-        index: '序号',
-        ownGroup: '我的分组',
-        platform: '平台',
-        groupType: '分组类型',
-        status: '状态',
-        ownMultiplier: '我的倍率',
-        upstreamGroup: '对接分组',
-        upstreamMultiplier: '对接倍率',
-        autoPricing: '自动调价'
-      },
-      exclusiveLabels: {
-        public: '公开',
-        exclusive: '专属'
-      },
-      statusLabels: {
-        active: '启用',
-        inactive: '禁用'
-      },
-      autoPricingTip: '开启后，同步倍率时自动在上游倍率基础上加价，支持固定值或百分比两种策略。',
-      autoPricingStatus: {
-        notConfigured: '未配置',
-        enabled: '已开启',
-        savedDisabled: '已保存，未启用'
-      },
-      autoPricingActions: {
-        configure: '配置',
-        edit: '编辑',
-        runNow: '立即执行',
-        runNowFor: '立即执行 {group} 的自动调价'
-      },
-      lastRun: {
-        never: '从未执行',
-        summary: '上次：{status} · {trigger} · {time}',
-        reason: '原因：{reason}',
-        triggerManual: '手动',
-        triggerAfterSync: '同步后',
-        triggerUnknown: '未知触发',
-        reasonUnknown: '暂无详情',
-        status: {
-          applied: '成功',
-          skipped: '跳过',
-          thresholdExceeded: '超过阈值',
-          failed: '失败',
-          unknown: '无记录'
-        },
-        reasons: {
-          primary_upstream_not_affected: '主上游未受本次同步影响。',
-          missing_reference_multiplier: '缺少参考倍率。',
-          unknown_pricing_source: '无法识别定价来源。',
-          status_persist_failed: '执行状态保存失败。',
-          invalid_old_reference_multiplier: '原参考倍率无效。',
-          threshold_exceeded: '变化超过配置阈值。',
-          own_group_not_found_in_admin: '管理员站点中未找到我的分组。',
-          target_unchanged: '目标倍率未变化。',
-          remote_update_failed: '远端倍率更新失败。'
-        }
-      },
-      autoPricingDrawer: {
-        title: '自动调价配置',
-        titleWithGroup: '{group} · 自动调价配置',
-        enableLabel: '启用自动调价',
-        sourceLabel: '定价来源',
-        sourcePrimaryUpstream: '指定主上游',
-        sourceLowestUpstream: '最低倍率上游',
-        sourceHighestUpstream: '最高倍率上游',
-        sourceAverageUpstream: '平均倍率',
-        primaryUpstreamLabel: '主上游',
-        primaryUpstreamPlaceholder: '请选择主上游',
-        strategyLabel: '加价方式',
-        strategyFixed: '固定加价',
-        strategyPercentage: '百分比加价',
-        fixedIncreaseLabel: '固定加价值',
-        percentageIncreaseLabel: '百分比加价值',
-        thresholdLabel: '跟随阈值',
-        thresholdHelp: '上游变化不超过该百分比时才自动跟随',
-        minMultiplierLabel: '最低倍率',
-        maxMultiplierLabel: '最高倍率',
-        estimatedMultiplier: '预估倍率',
-        save: '保存配置',
-        cancel: '取消',
-        noUpstreams: '当前分组未关联任何上游，无法配置自动调价。',
-        noMultiplierData: '暂无可用上游倍率数据，无法计算预估倍率。',
-        tips: {
-          minMultiplier: '自动计算出的倍率不会低于这个值。用于防止价格过低，保护最低利润。留空表示不限制最低倍率。',
-          maxMultiplier: '自动计算出的倍率不会高于这个值。用于防止价格突然过高，影响用户使用。留空表示不限制最高倍率。',
-          threshold: '上游倍率变化在该百分比以内时才自动跟随。超过阈值时应等待人工确认，避免上游价格异常波动导致你的分组价格被带偏。',
-          minMultiplierAria: '查看最低倍率说明',
-          maxMultiplierAria: '查看最高倍率说明',
-          thresholdAria: '查看跟随阈值说明',
-        },
-        guidance: {
-          title: '建议设置',
-          minMultiplier: '最低倍率：你的成本价 + 最低利润',
-          maxMultiplier: '最高倍率：你觉得用户还能接受的最高价',
-          threshold: '跟随阈值：10%',
-          exampleTitle: '计算示例',
-          exampleOld: '上游原倍率：1.00',
-          exampleNew: '上游新倍率：1.08',
-          exampleThreshold: '跟随阈值：10%',
-          exampleMarkup: '加价方式：上游 + 0.10',
-          exampleMin: '最低倍率：1.00',
-          exampleMax: '最高倍率：1.30',
-          exampleResult: '变化幅度为 8%，未超过 10%，因此允许自动跟随；最终倍率为 1.18，并且处于 1.00 到 1.30 的限制范围内。',
-        },
-        notify: {
-          sectionTitle: '自动调价成功通知',
-          enableLabel: '调价成功后发送通知',
-          enableHelp: '当自动调价实际更新了分组倍率后，通过机器人发送通知。',
-          botSelectLabel: '通知机器人',
-          botSelectPlaceholder: '选择要通知的机器人',
-          noBots: '暂无可用机器人，请先在系统设置的通知与渠道中配置机器人。',
-          templateLabel: '通知模板',
-          templateHelp: '留空使用默认模板。支持以下变量：',
-          templatePlaceholder: '留空则使用默认模板',
-          defaultTemplate: '【自动调价】{ownGroup} 已自动从 {oldOwnMultiplier}x 调整为 {newOwnMultiplier}x。参考来源：{upstreamSiteName} / {upstreamGroupName}，参考倍率 {oldReference}x -> {newReference}x。',
-          variablesTitle: '可用变量',
-          varOwnGroup: '我的分组名',
-          varUpstreamSiteName: '上游站点名',
-          varUpstreamGroupName: '上游分组名/参考来源',
-          varOldReference: '旧参考倍率',
-          varNewReference: '新参考倍率',
-          varOldOwnMultiplier: '调整前倍率',
-          varNewOwnMultiplier: '调整后倍率',
-          varStrategy: '加价策略',
-          varFixedIncrease: '固定加价值',
-          varPercentageIncrease: '百分比加价值',
-          varThreshold: '跟随阈值',
-          copied: '已复制',
-        },
-        errors: {
-          primaryRequired: '指定主上游模式下必须选择主上游。',
-          increaseNonNegative: '加价值不能为负数。',
-          thresholdNonNegative: '阈值不能为负数。',
-          multiplierNonNegative: '倍率不能为负数。',
-          minGreaterThanMax: '最低倍率不能大于最高倍率。',
-          invalidConfig: '自动调价配置无效，请检查后重试。',
-          notifyBotsRequired: '开启通知时必须至少选择一个机器人。',
-        }
-      },
-      save: '保存',
-      saveSuccess: '已保存',
-      saving: '保存中...',
-      saveError: '保存失败，请重试。'
-    },
-    connectionHealth: {
-      title: '分组健康',
-      subtitle: '对当前 admin workspace 下分组内的账号/渠道做独立轻量探活，监控健康状态并支持自动降级/恢复。',
-      adminSubtitle: '展示当前 admin workspace 下的全量分组，点击账号数查看分组下账号/渠道及独立探活状态。',
-      simplifiedSubtitle: '以 admin 上游分组为单位配置探活、自动降级与流量优先级，新增账号或渠道会自动继承分组策略。',
-      summaryLabel: '分组健康汇总',
-      groupListLabel: '上游分组列表',
-      refresh: '刷新',
-      empty: '当前 admin workspace 下暂无可探活的账号/渠道。',
-      adminEmpty: '当前 admin workspace 下暂无分组。',
-      notConnected: '未对接',
-      notProbed: '尚未探活',
-      notConfigured: '未配置探活模型',
-      groupTypes: {
-        public: '公开',
-        exclusive: '专属',
-        subscription: '订阅'
-      },
-      groupStatusLabels: {
-        active: '启用',
-        inactive: '禁用'
-      },
-      adminColumns: {
-        name: '名称',
-        platform: '平台',
-        type: '类型',
-        multiplier: '倍率',
-        accounts: '账号数',
-        accountsUnit: '个',
-        status: '分组状态',
-        probeOverview: '探活概览',
-        detail: '详情'
-      },
-      adminOverview: {
-        probeable: '可探活 {probeable}/{total}',
-        noneProbeable: '无可探活目标',
-        noProbe: '{count} 个待探活'
-      },
-      groupList: {
-        monitored: '已监控 {count}/{total}'
-      },
-      groupDetail: {
-        multiplierPriority: '按倍率排序',
-        subtitle: '已监控 {monitored}/{total} 个账号或渠道',
-        enableMonitoring: '配置分组策略',
-        manageMonitoring: '管理分组策略',
-        unmonitored: '未纳入自动监控',
-        policyCount: '{name} 等 {count} 个',
-        unprobeable: '暂不可探活',
-        upstreamStatus: '上游状态：{status}',
-        unknownUpstreamStatus: '未知',
-        priorityConflict: '检测到 {count} 个上游优先级被人工修改。为避免覆盖人工设置，系统已停止管理这些目标的优先级。重新保存分组策略后可重新接管。',
-        priorityConflictShort: '上游优先级已被人工修改，系统已停止自动覆盖',
-        empty: '该分组当前没有账号或渠道。',
-        metrics: {
-          accounts: '账号/渠道',
-          monitored: '自动监控',
-          probeable: '可手动探活',
-          lastProbe: '最近探活'
-        },
-        statusBreakdown: {
-          title: '当前分组探活状态',
-          hint: '健康状态按模型统计；待首次探活和不可探活按账号/渠道统计，不代表上游原始启停状态。',
-          healthy: '健康模型',
-          degraded: '降级模型',
-          suspended: '探活暂停',
-          observing: '恢复观察',
-          recovering: '逐步恢复',
-          disabled: '手动禁用',
-          notProbed: '待首次探活',
-          unprobeable: '不可探活目标'
-        },
-        assignmentSources: {
-          none: '无策略来源',
-          target: '账号单独策略',
-          group: '继承分组策略',
-          mixed: '分组与账号策略合并'
-        },
-        columns: {
-          expand: '展开模型结果',
-          account: '账号/渠道',
-          health: '健康状态',
-          strategy: '生效策略',
-          priority: '上游优先级',
-          multiplier: '有效倍率',
-          strategyMultiplier: '我的分组倍率',
-          upstreamMultiplier: '上游 API Key 倍率',
-          actions: '操作'
-        },
-        upstreamMultiplierPending: '关联后展示倍率',
-        models: {
-          empty: '该目标还没有模型探活结果。',
-          latency: '延迟 {value} ms',
-          lastProbe: '最近 {value}',
-          weight: '健康权重 {value}%'
-        }
-      },
-      setup: {
-        title: '配置分组自动化',
-        stepsLabel: '分组自动化配置步骤',
-        steps: {
-          '1': '生效范围',
-          '2': '运行策略',
-          '3': '确认启用'
-        },
-		generatedPolicyName: '{group} - 分组自动化策略',
-		retry: '重新加载',
-        scope: {
-          title: '选择策略生效目标',
-          description: '默认选择当前分组的全部账号或渠道。取消勾选的目标不会自动探活、自动降级或调整优先级。',
-          modelsUnknown: '上游未返回模型列表',
-          probeable: '可探活',
-          pending: '凭据待完善',
-          futureHint: '以后加入该上游分组的新目标会自动继承本策略；已取消勾选的目标会继续保持排除。'
-        },
-        strategy: {
-          title: '选择运行策略',
-          description: '可以创建探活策略、仅倍率优先级策略，也可以绑定已有高级策略。',
-          options: {
-            multiplier: {
-              title: '倍率优先',
-              description: '健康目标中，倍率越低，上游优先级越高；故障目标仍会优先降级。'
-            },
-            multiplierOnly: {
-              title: '仅倍率优先级',
-              description: '只按分组倍率调整上游优先级，不发起模型探活，也不执行降级或远端动作。'
-            },
-            stable: {
-              title: '稳定优先',
-              description: '自动探活并按平台能力禁用故障目标、恢复健康目标，不修改日常优先级。'
-            },
-            monitor: {
-              title: '仅监控',
-              description: '记录健康状态和事件，不执行任何上游禁用、恢复或优先级调整。'
-            },
-            existing: {
-              title: '使用已有策略',
-              description: '绑定一个或多个高级探活策略，适合需要自定义阈值和预算的场景。'
-            }
-          },
-          modelsLabel: '探活模型',
-          modelsPlaceholder: '每行一个模型名称，例如 gpt-4o-mini',
-          modelsDetected: '当前将探活 {count} 个模型',
-          modelSuggestions: {
-            common: '已根据当前选择，默认推荐 {count} 个所有目标共同可用的模型；未额外请求上游。',
-            discovered: '未找到完整共同模型，已从现有模型信息中默认推荐 {count} 个；可继续修改。'
-          },
-          providerLabel: '模型 Provider',
-          remoteActionLabel: '执行上游动作',
-          remoteActionHelp: '故障和恢复时按平台能力自动禁用或恢复目标',
-          multiplierOnlyTitle: '仅同步倍率优先级',
-          multiplierOnlyHelp: '后台约每 30 秒读取一次最新分组倍率；倍率越低，优先级越高。此模式不需要模型或上游探活凭据。',
-          multiplierMissingTitle: '当前分组没有有效倍率',
-          multiplierMissingHelp: '请先在上游设置该分组倍率后再启用倍率排序。系统不会用 1x 兜底，也不会修改当前优先级。'
-        },
-        confirm: {
-          title: '确认分组配置',
-          description: '保存后会立即建立分组级策略关系，后台调度器将在下一轮扫描时生效。',
-          scope: '生效范围',
-          scopeValue: '选择 {selected} 个，排除 {excluded} 个',
-          strategy: '运行策略',
-          models: '探活模型数',
-          fromPolicy: '由已有策略决定',
-          notApplicable: '不需要',
-          remoteAction: '上游自动动作',
-          enabled: '已启用',
-          disabled: '未启用',
-          multiplierRule: '倍率排序规则：健康状态优先于价格；同一目标属于多个分组时使用最低倍率；倍率越低，写入上游的优先级越高。若检测到人工修改，系统会停止覆盖并提示冲突。',
-          multiplierOnlyRule: '仅倍率规则：不读取健康状态、不发起模型探活；同一目标属于多个分组时使用最低倍率。停用或解绑策略后会恢复接管前的优先级，人工修改仍受冲突保护。'
-        },
-        back: '上一步',
-        next: '下一步',
-        save: '保存分组策略'
-      },
-      probeUnavailableReasons: {
-        credential_unavailable: '无法安全获取上游凭据，暂不可探活',
-        secure_verification_required: '需要上游 root 安全验证后才能读取 channel key',
-        base_url_unavailable: '缺少可用的 Base URL，暂不可探活',
-        model_unavailable: '没有可用的探活模型（请在探活策略中配置）',
-        export_unavailable: '上游账号导出接口不可用，无法获取凭据',
-        credentials_redacted: '上游凭据已脱敏，无法用于探活'
-      },
-      accountsDialog: {
-        multiplier: '倍率',
-        unknownPlatform: '未知平台',
-        unknownStatus: '未知状态',
-        empty: '该分组下暂无账号/渠道。',
-        noProbeData: '无探活数据',
-        unprobeable: '不可探活',
-        unassignedPolicy: '未分配策略',
-        unassignedPolicyHint: '未分配策略，不会自动探活，仍可手动一次性探活。',
-        assignedPolicyCount: '{name} 等 {count} 个',
-        assignPolicy: '分配策略',
-        columns: {
-          name: '名称',
-          platform: '平台',
-          type: '类型',
-          status: '状态',
-          priority: '优先级',
-          concurrency: '并发',
-          weight: '权重',
-          models: '模型',
-          probeStatus: '探活状态',
-          policyAssignment: '策略分配',
-          actions: '操作'
-        }
-      },
-      summary: {
-        total: '探活目标数',
-        unconfigured: '未配置探活',
-        monitoredGroups: '已监控分组',
-        priorityConflicts: '优先级冲突'
-      },
-      stateLabels: {
-        healthy: '健康',
-        degraded: '降级',
-        suspended: '探活暂停',
-        observing: '观察中',
-        recovering: '恢复中',
-        disabled: '已禁用'
-      },
-      providerLabels: {
-        gemini: 'Gemini',
-        anthropic: 'Anthropic',
-        openai: 'OpenAI',
-        custom: '自定义'
-      },
-      filters: {
-        allGroups: '全部我的分组',
-        allSites: '全部上游站点',
-        allStates: '全部状态',
-        allProviders: '全部模型类型',
-        searchGroup: '搜索分组名称...',
-        allPlatforms: '全部平台',
-        allTypes: '全部类型'
-      },
-      columns: {
-        model: '模型',
-        state: '状态',
-        weight: '权重',
-        lastProbe: '最近探活',
-        lastError: '最近错误'
-      },
-      actions: {
-        probe: '手动探活',
-        disable: '禁用',
-        restore: '恢复',
-        viewEvents: '查看事件'
-      },
-      errorKeys: {
-        ok: '正常',
-        network_fluctuation: '网络波动',
-        rate_limited: '触发限流',
-        server_error: '上游服务异常',
-        auth: '鉴权失败',
-        model_not_found: '模型不存在',
-        invalid_response: '响应无法解析',
-        unsupported: '暂不支持',
-        manual_disable: '人工禁用',
-        manual_restore: '人工恢复',
-        policy_unmanaged_restore: '策略已解绑，恢复上游原始状态',
-        credential_unavailable: '无法安全获取上游凭据，暂不可探活',
-        secure_verification_required: '需要完成上游 Root 安全验证后才能读取渠道密钥',
-        base_url_unavailable: '缺少可用的 Base URL，暂不可探活',
-        model_unavailable: '没有可用的探活模型，请先配置模型',
-        export_unavailable: '上游账号导出接口不可用，无法取得探活所需凭据',
-        credentials_redacted: '上游凭据已脱敏，无法用于探活'
-      },
-      topActions: {
-        runFlow: '运行流程',
-        policies: '自动化策略',
-        events: '探活事件'
-      },
-      events: {
-        title: '最近探活与远端动作',
-        empty: '暂无事件记录。',
-        emptyForConnection: '暂无该目标事件记录。',
-        showAll: '查看全部'
-      },
-      eventsDialog: {
-        subtitle: '查看该探活目标（账号/渠道）各模型的探活健康状态。',
-        globalSubtitle: '最近的探活与远端动作事件。',
-        viewingConnection: '正在查看该目标事件',
-        card: {
-          latencyLabel: '对话延迟',
-          pingLabel: '节点 PING',
-          availabilityLabel: '可用率',
-          recentRecordsLabel: '近 60 次记录',
-          past: 'PAST',
-          now: 'NOW',
-          noData: '-',
-          nextProbeIn: '下次探活：{seconds}s 后',
-          nextProbeDue: '下次探活：已到期，等待调度',
-          nextProbeNoPolicy: '下次探活：未配置策略',
-          nextProbeNeverProbed: '下次探活：尚未探活',
-          nextProbeDisabled: '下次探活：已禁用，不自动探活',
-          remoteActionLine: '远端动作：{label}'
-        }
-      },
-      remoteActions: {
-        unsupported: '不支持（未真正调用上游）',
-        skippedIndependentProbe: '未开启自动远端动作，已跳过',
-        skippedTargetConflict: '检测到上游被人工修改，已停止自动覆盖',
-        skippedTargetInitiallyDisabled: '目标原本已在上游暂停，未执行自动启用',
-        sub2apiInactive: 'Sub2API 账号已切换为 inactive',
-        sub2apiActive: 'Sub2API 账号已切换为 active',
-        sub2apiInactiveFailed: 'Sub2API 账号切换 inactive 失败',
-        sub2apiActiveFailed: 'Sub2API 账号切换 active 失败',
-        newapiDisabled: 'NewAPI channel 已禁用',
-        newapiUpdateFailed: 'NewAPI channel 权重或状态更新失败',
-        newapiWeight: 'NewAPI channel 权重已调整为 {weight}',
-        other: '{action}'
-      },
-      policies: {
-        title: '自动化策略',
-        subtitle: '配置模型探活、自动降级或仅倍率优先级行为。',
-        create: '新建策略',
-        empty: '暂无自动化策略，点击"新建策略"开始配置。',
-        enabled: '已启用',
-        disabled: '已停用',
-        enable: '启用',
-        disable: '停用',
-        edit: '编辑',
-        delete: '删除策略',
-        deleteTitle: '删除自动化策略',
-        deleteDescription: '确定删除“{name}”吗？',
-        deleteWarning: '该策略的模型目标及账号、分组分配关系会同时删除，历史探活记录会保留。此操作无法撤销。',
-        cancelDelete: '取消',
-        confirmDelete: '确认删除',
-        remoteActionOn: '远端动作已开启',
-        allGroupsScope: '全部分组',
-        modelTargetCount: '{count} 个模型目标',
-        strategyModes: {
-          health_probe: '健康探活',
-          multiplier_only: '仅倍率优先级'
-        },
-        multiplierOnlySummary: '不执行探活，按倍率同步优先级'
-      },
-      policyDrawer: {
-        createTitle: '新建自动化策略',
-        editTitle: '编辑自动化策略',
-        nameLabel: '策略名称',
-        namePlaceholder: '输入策略名称',
-        enabledLabel: '启用该策略',
-        strategyModeLabel: '运行模式',
-        strategyModes: {
-          health_probe: {
-            title: '健康探活',
-            description: '探活、状态机与可选远端动作'
-          },
-          multiplier_only: {
-            title: '仅倍率优先级',
-            description: '只按倍率调整，不发起探活'
-          }
-        },
-        ownGroupLabel: '策略范围',
-        ownGroupAllOption: '当前 workspace 全部分组',
-        modelTargetsLabel: '模型探活目标',
-        addModelTarget: '添加模型',
-        modelNamePlaceholder: '模型名称，如 gpt-4o-mini',
-        modelEnabledLabel: '启用',
-        maxProbeTokensLabel: '最大 token',
-        probePromptPlaceholder: '探活 prompt（留空使用默认值）',
-        probeIntervalLabel: '探活间隔（秒）',
-        dailyBudgetLabel: '每日探活预算',
-        failureThresholdLabel: '失败阈值',
-        successThresholdLabel: '恢复成功阈值',
-        cooldownLabel: '冷却时间（秒）',
-        observationLabel: '观察时间（秒）',
-        recoveryStepLabel: '恢复步进百分比',
-        autoDegradeLabel: '自动降级',
-        autoDegradeHelp: '探活失败达到阈值时自动降低本地权重或暂停链路。',
-        autoRemoteActionLabel: '自动远端动作',
-        autoRemoteActionHelp: 'NewAPI 会修改 channel 权重/状态，Sub2API 会切换 admin 账号 active/inactive。关闭后只记录健康结果，不调用上游。',
-        priorityModeLabel: '上游流量优先级',
-        priorityModes: {
-          none: '保持上游设置',
-          multiplier: '按分组倍率排序'
-        },
-        priorityModeHelp: '开启倍率排序后，系统会在健康目标中优先使用更低倍率的上游；故障状态始终优先降级。',
-        multiplierOnlySummaryTitle: '倍率越低，优先级越高',
-        multiplierOnlySummary: '系统约每 30 秒读取最新分组倍率并同步上游优先级，不解析探活凭据、不请求模型、不消耗探活预算，也不执行自动降级或远端动作。检测到人工修改时会停止覆盖。',
-        providerLabel: '模型 Provider',
-        providerPlaceholder: '请选择 Provider',
-        providerMismatchWarning: '检测到该策略已有的模型探活目标使用了不同的 provider。请在上方选择一个 provider，保存后所有模型探活目标都会统一为你选择的这个 provider。',
-        cancel: '取消',
-        save: '保存策略',
-        tooltips: {
-          ownGroup: '用于描述这条策略面向的业务分组范围。当前分组健康的独立探活按显式分配关系启用策略，并使用该策略的启用模型目标组成模型池；如果目标自带模型列表，则取"目标模型 ∩ 策略模型池"，否则使用策略模型池。',
-          modelTargets: '这里配置该策略要探活的模型列表，自动调度和手动探活都会按这些模型逐一执行探活请求。',
-          provider: '一个探活策略只能选择一个 provider（openai / anthropic / gemini / custom），下方新增的所有模型探活目标都会自动使用这个 provider，避免同一策略内混用不同厂商的模型。',
-          probeInterval: '自动调度会按"上次探活时间 + 该间隔"判断是否到期；连续探活失败时后端还会额外叠加 2/5/10 分钟的递增退避。',
-          dailyBudget: '限制当前 workspace 每天最多执行多少次真实探活请求；预算耗尽后会跳过真实探活请求，避免消耗过高，不代表系统异常。',
-          failureThreshold: '连续软失败达到该次数后会暂停/降级对应链路；某些硬失败（如鉴权失败）可能不经过降级直接暂停。',
-          successThreshold: '观察期内连续探活成功达到该次数后，才会判定链路真正恢复并回到健康状态。',
-          cooldown: '链路被暂停后，在这段冷却时间结束前，调度器不会对其发起自动探活。',
-          observation: '人工恢复或自动恢复流程触发后会进入观察期，这段时间的连续探活结果用于确认链路是否真的已经稳定。',
-          recoveryStep: '恢复过程中每次探活成功会按该百分比逐步提高本地权重，不是一次性恢复到 100%。',
-          autoDegrade: '开启后，探活结果会推进链路的健康状态机并调整本地转发权重；关闭后只记录探活结果，不会自动改变状态或权重。',
-          autoRemoteAction: '开启后，状态机触发降级/恢复时会执行受支持的上游动作：Sub2API 切换 admin 账号 active/inactive，NewAPI 调整 channel 权重/状态。关闭后只记录探活和状态结果。',
-          priorityMode: '按分组倍率排序会把较低倍率映射为较高的上游优先级。健康等级先于价格排序；同一目标属于多个分组时取最低倍率；检测到人工修改时会停止自动覆盖。'
-        },
-        runFlow: {
-          buttonLabel: '运行流程',
-          title: '探活运行流程说明',
-          subtitle: '面向后台管理员的完整机制说明，帮助理解策略、调度、状态机和手动探活之间的关系。',
-          close: '关闭运行流程说明',
-          steps: {
-            policyScope: {
-              title: '1. 策略如何生效',
-              description: '分组健康使用独立探活：探活目标是当前 admin workspace 下 admin 分组内的账号(Sub2API)/渠道(NewAPI)本身，不依赖 real_connections 对接链路。账号/渠道只有在被显式分配策略后才会自动探活；探活模型来自已分配策略的启用模型目标。如果该目标自带模型列表（如 NewAPI channel 的 models），则取"目标模型 ∩ 策略模型池"的交集，否则直接使用策略模型池。'
-            },
-            modelProvider: {
-              title: '2. 模型目标如何生效',
-              description: '每个探活策略只对应一个 provider（openai / anthropic / gemini / custom），策略下新增的所有模型探活目标都属于这一个 provider，不会出现同一策略内混用多个 provider 的模型。自动调度和手动探活都会按上一步得出的候选模型逐一发起探活请求。'
-            },
-            schedulerCadence: {
-              title: '3. 自动调度规则',
-              description: '后端有一个独立的调度器，大约每 30 秒扫描一次当前 workspace 下所有可探活目标的探活任务。调度的最小粒度是"一个探活目标（账号/渠道）+ 一个模型"，同一个目标下的多个候选模型会被拆成多个独立任务分别判断是否需要探活。'
-            },
-            dueCheck: {
-              title: '4. 到期判断',
-              description: '从未探活过的（目标，模型）组合会被尽快安排一次探活；已经探活过的组合，则按"上次探活时间 + 策略配置的探活间隔"计算下一次到期时间，到期后才会被重新排入探活队列。连续探活失败时，调度器还会引入 2 分钟 / 5 分钟 / 10 分钟的递增退避，避免对持续异常的目标频繁重试。'
-            },
-            budget: {
-              title: '5. 预算规则',
-              description: '每条策略都配置了"每日探活预算"，用于限制当前 workspace 每天最多执行多少次真实探活请求。预算耗尽后，调度器会跳过真实探活请求，也不会写入新的探活事件——即使某个模型已经到期，也可能持续显示"已到期，等待调度"而没有新事件产生，这是预算限制导致的正常现象，不代表系统故障。'
-            },
-            stateTransition: {
-              title: '6. 状态变化',
-              description: '探活成功会清零该模型的连续失败计数；连续软失败（例如网络波动、限流等可恢复错误）在达到失败阈值前会先进入降级状态、按恢复步进百分比逐步降低本地权重，达到失败阈值后会暂停该模型；部分硬失败（例如鉴权失败、模型不存在）可能会跳过降级直接暂停。'
-            },
-            cooldownObservation: {
-              title: '7. 冷却和观察',
-              description: '目标/模型被暂停后会进入策略配置的冷却时间，冷却结束前调度器不会对其发起自动探活。冷却结束、或管理员手动点击"恢复"之后会进入观察阶段：这段时间内的连续探活结果用于判断目标是否真的恢复稳定，只有连续成功次数达到"恢复成功阈值"才会真正回到健康状态。'
-            },
-            autoDegradeVsRemoteAction: {
-              title: '8. 自动降级和自动远端动作的区别',
-              description: '自动降级只影响系统内部的状态机和本地展示权重，不会调用任何上游平台接口，属于低风险开关。自动远端动作只有策略显式开启（自动远端动作=开）且状态机判定需要远端动作时才会真实调用上游：NewAPI 对接链路路径会修改 channel 权重/状态；当前分组健康独立探活路径下，Sub2API target 会切换 admin 账号 active/inactive（不调整 priority），NewAPI target 维度暂未实现远端动作，会记录为 unsupported，不会真正调用上游。策略未开启自动远端动作时，两条路径都只记录 skipped，绝不调用任何上游接口。'
-            },
-            manualProbe: {
-              title: '9. 手动探活',
-              description: '手动探活是一次性即时测试，与策略自动探活完全隔离：打开弹窗后，后端会用该 targetId 重新解析出的凭据临时请求上游 /v1/models 现查可用模型列表，前端不接触 base_url/key。用户选择模型后点击"开始测试"，结果只显示在弹窗内，不写入策略探活状态/事件，不消耗策略预算，不触发自动降级/恢复。自动策略探活只针对已经显式分配了策略的账号/channel；未分配策略的账号/渠道仍可以随时手动一次性探活，只是不会被后台调度器自动探活。'
-            },
-            nextProbeCopy: {
-              title: '10. "下次探活"文案说明',
-              description: '"下次探活：已到期，等待调度"表示按时间计算已经到了应该探活的时间点，但实际执行还需要等待后台调度器的下一轮扫描（约 30 秒一次）、当前并发探活的名额、当日探活预算是否充足，以及该目标是否仍处于失败退避或冷却期内——这几个条件同时满足后才会真正发起一次探活请求。'
-            }
-          }
-        },
-        errors: {
-          nameRequired: '请输入策略名称。',
-          modelTargetRequired: '至少需要一个已填写模型名称的探活目标。',
-          providerRequired: '请选择该策略的 provider。'
-        }
-      },
-      probeDialog: {
-        title: '选择探活模型',
-        cancel: '取消',
-        confirm: '开始探活',
-        emptyTitle: '当前目标没有可探活的模型。',
-        emptyHint: '请先在探活策略中添加并启用模型目标。',
-        fromPolicy: '来自策略「{name}」',
-        maxTokens: '探活上限 {count} token',
-        remoteActionOn: '远端动作已开启',
-        noResults: '探活已执行，但未获取到任何结果，请稍后重试或检查上游站点连通性。'
-      },
-      manualProbeDialog: {
-        title: '手动一次性探活',
-        loadingModels: '正在从上游获取可用模型列表...',
-        retryLoad: '重新加载',
-        empty: '未获取到任何可用模型。',
-        selectHint: '默认选择列表中的第一个模型；需要时可继续多选。',
-        startTest: '开始测试',
-        testing: '测试中...',
-        resultTitle: '测试结果',
-        resultEmpty: '尚未开始测试，选择模型后点击"开始测试"。',
-        latency: '{ms}ms',
-        selectedCount: '已选 {count} 个模型',
-        close: '关闭'
-      },
-      policyAssignment: {
-        title: '分配探活策略',
-        subtitle: '分配后台策略探活关系',
-        save: '保存',
-        cancel: '取消',
-        empty: '当前 workspace 暂无探活策略，请先创建策略。'
-      },
-      errors: {
-        request: '操作失败，请稍后重试。',
-        unknown: '暂时无法读取分组健康数据，请稍后重试。',
-        network: '网络异常，请检查连接后重试。',
-        notFound: '探活目标不存在或无权访问。',
-        noMatchingModels: '所选模型未匹配当前探活策略。',
-        accountsFetch: '该分组账号列表加载失败。',
-        targetNotFound: '探活目标不存在或不属于当前工作区。',
-        credentialUnavailable: '无法安全获取上游凭据，暂不可探活。',
-        secureVerificationRequired: '需要上游 root 安全验证后才能读取 channel key。',
-        baseUrlUnavailable: '缺少可用的 Base URL，暂不可探活。',
-        modelUnavailable: '没有可用的探活模型，请先在探活策略中配置。',
-        exportUnavailable: '上游账号导出接口不可用，无法获取凭据。',
-        credentialsRedacted: '上游凭据已脱敏，无法用于探活。',
-        modelListUnavailable: '无法获取上游模型列表，请稍后重试。',
-        modelListInvalid: '上游模型列表响应格式无法识别。',
-        multiplierRequired: '当前分组没有有效倍率，请先在上游设置倍率后再启用倍率排序。',
-        manualModelsRequired: '请至少选择一个模型再开始测试。',
-        policyNotFound: '所选策略不存在或不属于当前工作区。'
       }
     },
       upstream: {
@@ -1495,8 +782,9 @@ export default {
             passwordHelp: '使用站点账号密码登录，并自动保存会话。',
             token: 'Access Token / Refresh Token',
             tokenHelp: '适用于 Cloudflare 或二次验证导致账号密码无法直连的 Sub2API 站点。',
-            userKey: '用户 Key',
-            userKeyHelp: '使用 New-API 个人设置中生成的系统访问令牌。'
+            userKey: '访问令牌',
+            userKeyHelp: '使用 New-API 个人访问令牌（PAT）或旧版系统访问令牌，适合开启了两步验证或需要长期保持登录的账号。',
+            passwordHelpNewApi: '使用站点账号密码登录。新版 New-API 的登录最长保持 30 天，开启两步验证的账号请改用访问令牌。'
           },
           account: '登录账号',
           accountPlaceholder: '输入账号',
@@ -1511,14 +799,14 @@ export default {
           tokenType: 'Token Type',
           tokenTypePlaceholder: '默认 Bearer',
           tokenHelp: '如果提供 refresh_token，系统会优先调用刷新接口换取新的 access_token 和过期时间。',
-          userId: '用户 ID',
-          userIdPlaceholder: '输入系统访问令牌所属的用户 ID',
-          userKey: '系统访问令牌',
-          userKeyPlaceholder: '粘贴 New-API 系统访问令牌',
-          userKeyHelp: '系统会通过 Authorization Bearer 与 New-Api-User 请求用户余额、分组和使用统计。',
+          userId: '用户 ID（可选）',
+          userIdPlaceholder: '旧版系统访问令牌需要填写所属用户 ID，新版访问令牌可留空',
+          userKey: '访问令牌',
+          userKeyPlaceholder: '粘贴 New-API 访问令牌（nap_ 开头）或系统访问令牌',
+          userKeyHelp: '推荐使用新版个人访问令牌（PAT），勾选 profile:read、usage:read、api_key:read、api_key:reveal 权限（需要由 TransitHub 自动创建上游 Key 时再加 api_key:write），并设置较长有效期。',
           rechargeRate: '充值倍率',
-          rechargeRatePlaceholder: '输入 USD 转 CNY 的倍率，如 7',
-          rechargeRateHelp: '必填。人民币金额 = USD 金额 × 此倍率。',
+          rechargeRatePlaceholder: '每 $1 上游额度的实际进货价（元），如 1 或 0.5',
+          rechargeRateHelp: '必填。填你买 1 美元上游额度实际花了多少元：¥1 买 $1 填 1，打 5 折填 0.5，按美元汇率付费才填汇率（约 7.2）。今日成本 = 上游消费（美元）× 此倍率。',
           remark: '备注',
           remarkPlaceholder: '输入备注信息（可选）'
         }
@@ -1542,9 +830,6 @@ export default {
         dedicatedMultiplierBadge: '专属倍率',
         dedicatedMultiplierTooltip: '该用户命中了 sub2api 专属倍率，业务计算使用右侧倍率。',
         unknownPlatform: '未知类型',
-        isConnected: '是否对接',
-        connected: '已对接',
-        disconnected: '未对接',
         lastUpdated: '更新时间',
         notSynced: '暂未同步'
       },
@@ -1593,13 +878,14 @@ export default {
       },
       errors: {
         invalidUrl: '站点 URL 无效，请检查后重试。',
-        network: '网络或 CORS 请求失败，请检查站点地址与跨域配置。',
+        network: '无法连接上游站点（网络、代理或 TLS 错误）。请检查站点地址，或在「系统设置 - 网络代理」中调整代理。',
         auth: '登录失败，请检查账号或密码。',
         request: '上游接口请求失败，请稍后重试。',
         invalidResponse: '上游返回内容无法解析。',
         tokenMissing: '登录成功但未返回访问令牌。',
         detect: '无法自动识别平台，请手动选择平台后重试。',
-        sub2APIBulkUpdateUnsupported: '当前 Sub2API 版本不支持安全的账号字段更新，请升级 Sub2API 后重试。',
+        verificationRequired: '该账号开启了两步验证，无法自动登录。请改用访问令牌方式添加站点。',
+        newApiTokenRejected: '访问令牌校验失败：旧版 New-API 的系统访问令牌需要同时填写用户 ID；新版请确认令牌有效、未过期且勾选了所需权限。',
         unknown: '连接上游站点时发生未知错误。'
       }
     },
@@ -1634,22 +920,13 @@ export default {
         effectiveMultiplier: '换算后成本倍率',
         multiplierFormula: '上游 {upstream} × 充值系数 {recharge}',
         delta: '涨跌幅',
-        updatedAt: '更新时间',
-        actions: '操作'
+        updatedAt: '更新时间'
       },
       actions: {
         refresh: '刷新数据',
-        createCampaign: '创建活动',
         viewHistory: '查看历史',
         viewHistoryForRate: '查看 {site} · {group} 的涨跌幅历史，当前涨跌幅 {delta}',
-        closeHistory: '关闭历史',
-        editType: '修改',
-        closeEdit: '关闭修改分组类型',
-        connect: '配置对接',
-        closeConnect: '关闭对接窗口',
-        saveConnect: '确认对接',
-        cancel: '取消',
-        saveType: '保存类型'
+        closeHistory: '关闭历史'
       },
       filters: {
         searchLabel: '搜索',
@@ -1666,8 +943,6 @@ export default {
       },
       tabs: {
         all: '全部',
-        mapped: '已对接',
-        unmapped: '未对接',
         deleted: '已删除'
       },
       pagination: {
@@ -1679,9 +954,6 @@ export default {
       },
       status: {
         loading: '正在加载分组倍率...',
-        mapped: '已对接',
-        pricingMapped: '已用于调价',
-        unmapped: '未对接',
         deleted: '已删除'
       },
       empty: {
@@ -1701,72 +973,6 @@ export default {
         delta: '涨跌幅',
         createdAt: '记录时间'
       },
-      edit: {
-        title: '修改分组类型',
-        titleWithGroup: '修改 {site} · {group} 的分组类型',
-        description: '保存后会更新该站点分组的倍率类型，并刷新列表。',
-        typeLabel: '分组类型',
-        typePlaceholder: '请选择分组类型'
-      },
-      connect: {
-        titleWithGroup: '配置 {site} · {group}',
-        description: '选择由系统创建资源，或关联两端已经存在的资源。',
-        ownGroupLabel: '我的站点分组',
-        ownGroupPlaceholder: '请选择我的站点分组',
-        upstreamGroupLabel: '对接分组',
-        upstreamGroupPlaceholder: '请选择对接分组',
-        upstreamSiteLabel: '上游站点',
-        upstreamGroupNameLabel: '上游分组',
-        upstreamMultiplierLabel: '上游倍率',
-        upstreamPlatformLabel: '平台',
-        modeData: '数据统计',
-        modeReal: '自动创建资源',
-        realDescription: '创建上游 Key/Token，并在当前管理端创建账号或渠道。',
-        groupTypeLabel: '分组类型',
-        groupTypePlaceholder: '请选择分组类型',
-        groupTypeOpenai: 'OpenAI',
-        groupTypeAnthropic: 'Anthropic',
-        groupTypeGemini: 'Gemini',
-        groupTypeAntigravity: 'Antigravity',
-        channelTypeLabel: '渠道类型',
-        channelTypePlaceholder: '请选择渠道类型',
-        realNotSupported: '当前平台不支持真实对接',
-        realConnecting: '正在创建对接...',
-        realSuccess: '真实对接创建成功',
-        realFailed: '真实对接创建失败',
-        modeBind: '使用已有资源',
-        bindDescription: '关联已有上游 Key/Token 和管理端账号/渠道，不创建或接管远端资源。',
-        bindSelectKey: '上游 Key / Token',
-        bindKeysLoading: '正在加载当前分组的凭据...',
-        bindKeysEmpty: '当前上游分组没有可用凭据',
-        bindSelectAdminGroup: '管理端分组',
-        bindAdminGroupPlaceholder: '选择已有账号或渠道所在分组',
-        bindSelectAdminResource: '已有账号 / 渠道',
-        adminResourcesLoading: '正在读取管理端资源...',
-        adminResourcesEmpty: '该分组下没有可关联的账号或渠道',
-        adminResourcesFailed: '读取管理端已有资源失败，请刷新后重试。',
-        resourceActive: '启用',
-        resourceInactive: '停用',
-        addToPricingMapping: '同时作为调价数据源',
-        addToPricingMappingHint: '默认开启；取消后只建立流量连接，不加入自动调价映射。',
-        submitManaged: '创建并对接',
-        submitExisting: '保存已有资源关联',
-        bindFailed: '已有资源关联失败'
-      },
-      disconnect: {
-        action: '取消对接',
-        title: '取消对接',
-        description: '确认取消 {site} · {group} 的真实对接？',
-        unlinkOnly: '仅取消关联',
-        unlinkOnlyHint: '仅删除本地绑定记录，保留上游 Key 和 Admin 账号',
-        deleteAll: '删除账号和 Key',
-        deleteAllHint: '同时删除上游 Key 和 Admin 站点的转发账号',
-        removePricingMapping: '同时移除调价数据源',
-        removePricingMappingHint: '取消勾选可保留当前上游分组的调价映射。',
-        confirm: '确定',
-        disconnecting: '正在取消对接...',
-        failed: '取消对接失败'
-      },
       format: {
         multiplier: '{value}x',
         deltaMultiplier: '{value}x'
@@ -1774,300 +980,7 @@ export default {
       errors: {
         network: '网络或 CORS 请求失败，请检查接口地址与跨域配置。',
         request: '分组倍率接口请求失败，请稍后重试。',
-        unknown: '加载分组倍率时发生未知错误。',
-        refreshFailed: '变更已保存，但列表刷新失败。请重新刷新以更新视图。'
-      }
-    },
-    groupRateCampaigns: {
-      title: '活动调价',
-      subtitle: '批量调整自有分组倍率，支持定时开始/结束并自动恢复原倍率。',
-      common: {
-        placeholder: '—'
-      },
-      actions: {
-        create: '新建活动',
-        refresh: '刷新',
-        start: '立即开始',
-        end: '结束活动',
-        cancel: '取消活动',
-        viewDetail: '查看详情',
-        close: '关闭',
-        preview: '预览影响',
-        confirmCreate: '创建活动',
-        cancelEdit: '取消'
-      },
-      tabs: {
-        all: '全部'
-      },
-      status: {
-        draft: '草稿',
-        scheduled: '待开始',
-        running: '进行中',
-        ending: '结束中',
-        ended: '已结束',
-        partial: '部分成功',
-        failed: '失败',
-        cancelled: '已取消',
-        loading: '正在加载活动...'
-      },
-      fields: {
-        name: '活动名称',
-        status: '状态',
-        startAt: '开始时间',
-        endAt: '结束时间',
-        summary: '执行结果',
-        createdBy: '创建人',
-        actions: '操作'
-      },
-      empty: {
-        title: '暂无活动',
-        description: '点击"新建活动"创建第一个批量调价活动。'
-      },
-      pagination: {
-        total: '共 {total} 个',
-        pageSize: '每页 {pageSize} 条',
-        currentPage: '第 {page} / {totalPages} 页',
-        previous: '上一页',
-        next: '下一页'
-      },
-      format: {
-        summary: '{applied}/{total} 已生效'
-      },
-      errors: {
-        network: '网络或 CORS 请求失败，请检查接口地址与跨域配置。',
-        request: '活动调价接口请求失败，请稍后重试。',
-        unknown: '加载活动调价时发生未知错误。',
-        emptySelection: '请至少选择一个分组，且分组必须存在于自有分组中。',
-        invalidName: '活动名称无效，请检查长度是否在 1-80 个字符之间。',
-        invalidAdjustment: '活动倍率无效，请检查每个分组是否填写了有效的固定倍率。',
-        invalidSchedule: '时间计划无效，请检查开始/结束时间设置。',
-        noNotifyBots: '开启通知后请至少选择一个机器人。',
-        notFound: '活动不存在。',
-        invalidState: '当前活动状态不支持该操作。',
-        duplicateGroup: '同一个分组不能重复选择。'
-      },
-      editor: {
-        titleCreate: '新建活动调价',
-        sectionInfo: '活动信息',
-        nameLabel: '活动名称',
-        namePlaceholder: '例如：双十一活动',
-        descriptionLabel: '活动描述',
-        descriptionPlaceholder: '选填，方便自己识别活动用途',
-        sectionSelection: '选择分组',
-        selectionHint: '每个分组单独设置活动倍率',
-        groupsEmpty: '暂无可选分组',
-        groupMultiplierPlaceholder: '活动倍率',
-        sectionSchedule: '时间计划',
-        startModeLabel: '开始方式',
-        startNow: '立即开始',
-        startScheduled: '定时开始',
-        startDraft: '保存为草稿',
-        startAtLabel: '开始时间',
-        endModeLabel: '结束方式',
-        endScheduled: '定时结束',
-        endManual: '手动结束',
-        endAtLabel: '结束时间',
-        sectionNotify: '通知',
-        notifyEnableLabel: '开启机器人通知',
-        notifyBotSelectLabel: '选择机器人',
-        notifyNoBots: '暂无可用机器人，请先在系统设置中配置。',
-        notifyStartTemplateLabel: '开始通知文案',
-        notifyEndTemplateLabel: '结束通知文案',
-        notifyVariablesTitle: '可用变量，点击复制',
-        notifyVarActivityName: '活动名称',
-        notifyVarTotalCount: '目标分组总数',
-        notifyVarAppliedCount: '已生效数量',
-        notifyVarFailedCount: '失败数量',
-        notifyVarStartTime: '开始时间',
-        notifyVarEndTime: '结束时间',
-        copyVarFailed: '复制失败，请手动复制变量。',
-        previewTitle: '预览影响的分组',
-        previewEmpty: '暂无预览结果，点击"预览影响"查看',
-        previewGroupName: '分组名称',
-        previewOriginal: '原倍率',
-        previewCampaign: '活动倍率',
-        previewTotal: '共 {total} 个分组受影响',
-        errors: {
-          nameRequired: '请输入活动名称',
-          selectionEmpty: '请至少选择一个分组',
-          groupMultiplierInvalid: '请为每个分组填写有效活动倍率',
-          scheduleInvalid: '请检查开始/结束时间设置',
-          notifyBotsRequired: '开启通知后请至少选择一个机器人'
-        }
-      },
-      detail: {
-        title: '活动详情',
-        sectionConfig: '活动配置',
-        sectionItems: '分组明细',
-        itemGroupName: '分组名称',
-        itemOriginal: '原倍率',
-        itemCampaign: '活动倍率',
-        itemRestored: '恢复倍率',
-        itemApplyStatus: '开始状态',
-        itemRestoreStatus: '恢复状态',
-        noReason: '—',
-        confirmEnd: '确定要手动结束该活动吗？将立即尝试恢复所有分组的原倍率。',
-        confirmCancel: '确定要取消该活动吗？取消后不会执行任何调价操作。'
-      }
-    },
-    mySites: {
-      errors: {
-        invalidAutoPricingConfig: '自动调价配置无效：主上游不在关联上游中，或最低倍率大于最高倍率。',
-        connectionExists: '该上游分组已经存在真实连接。',
-        managedDeleteOnly: '已有资源关联只能取消本地关联，不能删除远端资源。'
-      }
-    },
-    tickets: {
-      title: '工单',
-      subtitle: '查看并回复通过 iframe 提交的用户工单。',
-      common: {
-        placeholder: '—'
-      },
-      actions: {
-        refresh: '刷新',
-        viewDetail: '查看详情',
-        embedSettings: '嵌入设置'
-      },
-      tabs: {
-        all: '全部'
-      },
-      status: {
-        open: '待处理',
-        pending: '待跟进',
-        replied: '已回复',
-        closed: '已关闭',
-        loading: '正在加载工单...'
-      },
-      fields: {
-        title: '标题',
-        status: '状态',
-        category: '分类',
-        priority: '优先级',
-        manualEmail: '联系邮箱',
-        sub2apiUser: 'Sub2API 用户',
-        sub2apiSrcHost: '来源域名',
-        lastMessageAt: '最后回复时间',
-        actions: '操作'
-      },
-      empty: {
-        title: '暂无工单',
-        description: '当前工作区还没有收到任何工单。'
-      },
-      pagination: {
-        total: '共 {total} 个',
-        pageSize: '每页 {pageSize} 条',
-        currentPage: '第 {page} / {totalPages} 页',
-        previous: '上一页',
-        next: '下一页'
-      },
-      errors: {
-        network: '网络或 CORS 请求失败，请检查接口地址与跨域配置。',
-        request: '工单接口请求失败，请稍后重试。',
-        unknown: '加载工单时发生未知错误。',
-        notFound: '工单不存在。',
-        invalidStatus: '无效的工单状态。',
-        bodyRequired: '回复内容不能为空。',
-        ticketClosed: '工单已关闭，无法继续回复。',
-        noCurrentAccount: '请先选择一个工作区。',
-        invalidTemplate: '不支持的嵌入页面模板。',
-        invalidMaxImages: '每次工单最多上传图片数必须在 0-9 之间。',
-        attachmentLoadFailed: '图片加载失败，请稍后重试。',
-        invalidCategoryOptions: '分类选项无效，请检查是否为空、重复或超出数量/长度限制。',
-        invalidPriorityOptions: '优先级选项无效，请检查是否为空、重复或超出数量/长度限制。'
-      },
-      detail: {
-        title: '工单详情',
-        sectionTicket: '工单信息',
-        sectionMessages: '回复记录',
-        sectionReply: '回复',
-        category: '分类',
-        priority: '优先级',
-        manualEmail: '联系邮箱',
-        lastMessageAt: '最后回复时间',
-        sub2apiUserId: 'Sub2API 用户 ID',
-        sub2apiEmail: 'Sub2API 邮箱',
-        sub2apiRole: 'Sub2API 角色',
-        sub2apiSrcHost: '来源域名',
-        authorAdmin: '客服',
-        authorCustomer: '用户',
-        replyPlaceholder: '输入回复内容...',
-        send: '发送回复',
-        attachmentLoadFailed: '图片加载失败',
-        previewImage: '放大预览',
-        closePreview: '关闭预览'
-      },
-      embedConfig: {
-        title: '嵌入设置',
-        sections: {
-          basic: '基础设置',
-          category: '分类',
-          priority: '优先级'
-        },
-        legacyNotice: '"启用嵌入工单"和"允许来源域名"配置已取消，嵌入地址始终可用，如需限制访问范围请联系管理员评估其它方案。',
-        embedUrl: '嵌入地址',
-        embedUrlHint: '将此地址配置到 Sub2API 自定义 iframe 中，Sub2API 会自动追加用户身份参数。',
-        copy: '复制',
-        copied: '已复制',
-        copyFailed: '复制失败，请手动复制。',
-        openPreview: '打开工单页面',
-        openPreviewHint: '在新标签页预览嵌入页面。非 Sub2API iframe 环境打开时会缺少身份参数，属正常现象。',
-        template: '页面模板',
-        templates: {
-          default: {
-            name: '默认紧凑',
-            description: '标准圆角卡片风格，适合默认使用。'
-          },
-          minimal: {
-            name: '极简轻量',
-            description: '更轻量的视觉密度，适合嵌入已有后台风格。'
-          },
-          support: {
-            name: '客服面板',
-            description: '更突出对话感，适合作为独立客服面板使用。'
-          }
-        },
-        maxImages: '每次工单最多上传图片数',
-        maxImagesHint: '0 表示关闭图片上传，最多允许 9 张。',
-        categoryOptions: '分类选项',
-        priorityOptions: '优先级选项',
-        addOption: '添加选项',
-        addOptionPlaceholder: '输入新选项后点击添加',
-        removeOption: '删除该选项',
-        restoreDefaults: '恢复默认值',
-        optionsHint: '至少保留 1 项，单项最多 40 个字符。客户创建工单时必须从这里选择。',
-        saveTemplate: '保存设置',
-        saving: '保存中...',
-        saveSuccess: '已保存',
-        rotateToken: '轮换嵌入地址',
-        confirmRotate: '确定要轮换嵌入地址吗？旧的嵌入地址将立即失效。'
-      },
-      sub2apiProfile: {
-        title: 'Sub2API 用户资料',
-        sectionIdentity: '身份信息',
-        userId: '用户 ID',
-        email: '邮箱',
-        role: '角色',
-        srcHost: '来源域名',
-        username: '用户名',
-        status: '账号状态',
-        sectionBalance: '余额与充值',
-        balance: '当前余额',
-        totalRecharged: '总充值额度',
-        registeredAt: '注册时间',
-        frozenBalance: '冻结余额',
-        concurrency: '并发数',
-        rpmLimit: 'RPM 限制',
-        lastUsedAt: '最后使用时间',
-        unavailable: '暂不可用',
-        sectionRechargeHistory: '充值记录',
-        rechargeHistoryComingSoon: '暂未提供',
-        historyEmpty: '暂无充值记录',
-        empty: '暂无数据',
-        remoteUnavailable: {
-          noUserId: '该工单未记录 Sub2API 用户 ID，无法查询实时资料。',
-          noAdminSession: '当前工作区尚未登录 Sub2API 管理员账号，以下仅展示工单快照。',
-          userNotFound: '未能从 Sub2API 获取该用户的实时资料，以下仅展示工单快照。'
-        }
+        unknown: '加载分组倍率时发生未知错误。'
       }
     },
     massEmail: {
@@ -2217,10 +1130,1181 @@ export default {
         sendFailed: '邮件发送失败。',
         activeBatchExists: '当前工作区已有一个进行中的群发批次，请取消或等待完成后再创建。',
         recipientLimitReached: '本次选择超过 10,000 个收件人上限，请缩小筛选范围后重试。',
-        itemGeneric: '该收件人发送失败，请稍后查看批次获取最新详情。'
+        itemGeneric: '该收件人发送失败，请稍后查看批次获取最新详情。',
+        segmentUnavailable: '按活跃分群群发不可用。',
+        segmentNotSynced: '还没有同步过用户数据：登录自己站点后会在后台自动同步，也可以在「用户分析」页面马上同步。',
+        invalidPublicUrl: '退订链接地址无效，请填写 http(s) 开头的完整地址。',
+        invalidSuppression: '请输入有效的邮箱地址（单次最多 1000 个）。',
+        suppressed: '收件人已退订，未发送。',
+        recipientRejected: '收件服务器拒收了这个地址（地址不存在等），没有发出。'
+      }
+    },
+    leads: {
+      title: '线索',
+      description: '收集来的潜在用户邮箱：可以一个一个添加并写上来源，也可以批量导入，再批量发邮件。已退订、退信的邮箱不会再收到邮件。',
+      quota: '最近 24 小时已发 {sent} 封，上限 {limit} 封',
+      loading: '正在加载线索…',
+      status: {
+        all: '全部',
+        not_sent: '未发送',
+        sent: '已发送',
+        unsubscribed: '已退订',
+        bounced: '退信'
+      },
+      fields: {
+        email: '邮箱',
+        source: '来源',
+        note: '备注',
+        status: '状态',
+        sentCount: '发送次数',
+        lastSentAt: '最近发送',
+        createdAt: '添加时间',
+        actions: '操作'
+      },
+      filters: {
+        allSources: '全部来源',
+        noSource: '未填来源',
+        search: '搜索线索',
+        searchPlaceholder: '搜索邮箱、来源或备注',
+        clearSearch: '清除搜索',
+        noSearch: '无'
+      },
+      selection: {
+        count: '已选 {count} 个',
+        selectPage: '选择本页全部线索',
+        selectLead: '选择 {email}'
+      },
+      actions: {
+        add: '添加邮箱',
+        import: '批量导入',
+        sendFiltered: '发送邮件',
+        sendSelected: '发送给选中的 {count} 个',
+        deleteSelected: '删除选中的',
+        clearSelection: '取消选择',
+        edit: '编辑',
+        delete: '删除',
+        refresh: '刷新',
+        editLimit: '修改上限',
+        cancel: '取消',
+        save: '保存',
+        close: '关闭',
+        done: '完成'
+      },
+      form: {
+        addTitle: '添加邮箱',
+        editTitle: '编辑线索',
+        sourcePlaceholder: '比如 V2EX、QQ 群、GitHub（可不填）',
+        notePlaceholder: '可不填'
+      },
+      import: {
+        title: '批量导入邮箱',
+        description: '粘贴邮箱，或者上传 TXT、CSV 文件；换行、逗号、空格分隔都可以。',
+        sourcePlaceholder: '这一批的来源（可不填）',
+        emails: '邮箱',
+        chooseFile: '选择文件',
+        placeholder: "alice{'@'}example.com\nbob{'@'}example.com, carol{'@'}example.com",
+        fromFile: '已读取 {name}',
+        found: '找到约 {count} 个邮箱',
+        hint: '请只导入从公开渠道拿到的邮箱，不要用别的站导出、泄露或买来的名单。',
+        submit: '导入',
+        done: '导入完成',
+        added: '新增',
+        duplicates: '已存在或重复',
+        invalid: '格式不对',
+        suppressed: '已退订（跳过）'
+      },
+      send: {
+        title: '给线索发邮件',
+        loading: '正在统计收件人…',
+        summarySelected: '发送给选中的 {count} 个线索',
+        summaryFilter: '发送给当前筛选的全部线索：来源 {source}，状态 {status}，搜索 {search}',
+        sendable: '可发送',
+        skipped: '跳过（已退订、退信）',
+        remaining: '24 小时内还能发',
+        overLimit: '这次要发 {sendable} 封，超过了最近 24 小时剩余的 {remaining} 封。请少选一些，或者在线索页面修改上限。',
+        nothingToSend: '没有可以发送的线索（已退订、退信的不会再发）。',
+        template: '邮件模板',
+        templatePlaceholder: '请选择邮件模板',
+        noTemplates: '还没有邮件模板，请先到「系统设置」里创建。',
+        subject: '标题：',
+        adLabel: '标题前加「【广告】」',
+        adLabelHint: '国内规定营销邮件要在标题前注明「广告」，建议保留。',
+        publicBaseUrl: '退订链接使用的 TransitHub 地址',
+        unsubscribeHint: '每封邮件都会带退订链接（必填）。模板里写 {placeholder} 会替换成链接，没写就附在邮件末尾。',
+        unsubscribePlaceholderFound: '模板里的 {placeholder} 会替换成退订链接。',
+        privateUrlWarning: '这像是本机或内网地址，收件人在外网点不开退订链接。请填写公网能访问的 TransitHub 地址。',
+        submit: '发送 {count} 封'
+      },
+      delete: {
+        title: '删除 {count} 条线索？',
+        description: '只删除线索记录，已经发出的邮件和群发记录不受影响。'
+      },
+      limit: {
+        title: '发送上限',
+        description: '最近 24 小时最多发给线索多少封。发得太猛容易被邮件服务商封号，新域名建议先少量发。',
+        label: '每 24 小时最多（封）'
+      },
+      notices: {
+        added: '已添加。',
+        updated: '已保存。',
+        imported: '导入完成：新增 {added}，已存在或重复 {duplicates}，格式不对 {invalid}，已退订 {suppressed}。',
+        deleted: '已删除 {count} 条线索。',
+        queued: '已排进发送队列：{count} 封，跳过 {skipped} 封。',
+        viewProgress: '查看发送进度'
+      },
+      empty: {
+        title: '还没有线索',
+        description: '点「添加邮箱」一个一个加，或者用「批量导入」一次加一批。',
+        filteredTitle: '没有符合条件的线索',
+        filteredDescription: '换个来源、状态或搜索词试试。'
+      },
+      pagination: {
+        total: '共 {total} 条',
+        page: '第 {page} / {totalPages} 页',
+        previous: '上一页',
+        next: '下一页'
+      },
+      errors: {
+        network: '网络错误，请检查连接后重试。',
+        request: '请求失败，请稍后重试。',
+        invalidRequest: '请求内容不正确。',
+        invalidEmail: '邮箱格式不对。',
+        duplicate: '这个邮箱已经在线索里了。',
+        suppressed: '这个邮箱已经退订，不能再添加。',
+        tooMany: '一次最多导入 5000 个邮箱（文件不超过 1 MB），请分批导入。',
+        notFound: '这条线索不存在，可能已经删除。',
+        noRecipients: '没有可以发送的线索（已退订、退信的不会再发）。',
+        dailyLimit: '超过了最近 24 小时的发送上限，请少选一些，或者修改上限。',
+        unsubscribeRequired: '发给线索的邮件必须带退订链接，请填写 TransitHub 地址。',
+        invalidDailyLimit: '上限要在 1 到 10000 之间。',
+        persistence: '保存失败，请稍后重试。',
+        fileTooLarge: '文件太大了（不能超过 1 MB），请拆开后再导入。',
+        fileRead: '读取文件失败，请确认是文本文件（TXT、CSV）。'
+      }
+    },
+    userActivity: {
+      subtitle: '同步当前工作区站点（sub2api / new-api）的用户与每日用量到本地，分析活跃度、未活跃时长以及日 / 周 / 月环比和同比，并可按筛选结果群发邮件。',
+      common: {
+        placeholder: '—'
+      },
+      platforms: {
+        sub2api: 'sub2api',
+        newapi: 'new-api'
+      },
+      sync: {
+        title: '数据同步',
+        never: '尚未同步',
+        lastSynced: '{time}同步',
+        coverage: '用量覆盖 {range}',
+        users: '{count} 个用户',
+        running: '正在同步用户与用量…',
+        runningBackfill: '正在回补更早的历史用量…',
+        failed: '最近一次同步失败：{reason}'
+      },
+      time: {
+        justNow: '刚刚',
+        minutesAgo: '{count} 分钟前',
+        hoursAgo: '{count} 小时前',
+        daysAgo: '{count} 天前'
+      },
+      actions: {
+        refresh: '刷新',
+        syncNow: '立即同步',
+        startSync: '开始同步',
+        goDashboard: '前往仪表盘登录',
+        sendEmail: '按筛选群发邮件',
+        suppressions: '退订名单（{count}）',
+        search: '搜索',
+        clearSearch: '清除搜索',
+        close: '关闭',
+        cancel: '取消'
+      },
+      status: {
+        loading: '加载中…'
+      },
+      empty: {
+        title: '还没有用户数据',
+        description: '登录自己站点后，系统会在一小时内自动在后台开始同步：用当前工作区的管理员会话读取站点用户列表和每日用量（首次拉取最近 62 天，之后每小时自动增量同步，并逐步回补更早的历史），数据只保存在本地用于分析。也可以点下面的按钮马上开始。',
+        runningTitle: '正在首次同步',
+        runningDescription: '正在读取站点用户和最近 62 天的用量，通常需要 1～3 分钟；完成后页面会自动刷新。'
+      },
+      money: {
+        title: '资金概览',
+        methodRecords: '按站点充值记录统计：在线充值、兑换码、管理员调整、邀请返利',
+        methodSnapshot: '按两次同步之间用户「余额 + 累计消费」的变化统计（自 {time} 起），包含在线充值、兑换码、管理员调整、签到 / 邀请奖励等，无法区分渠道',
+        todayRecharge: '今日入账',
+        deduction: '扣减 {value}',
+        yesterdayFull: '昨日全天 {value}',
+        events: '{count} 笔',
+        noRechargeToday: '今天还没有入账',
+        noRechargeData: '还没有入账数据，同步后显示',
+        notUpToDate: '最近一次同步没能读取入账记录，数据可能不是最新的',
+        todayCost: '今日消耗',
+        totalBalance: '全站用户余额',
+        balanceChange: '较昨日末 {value}',
+        usersWithBalance: '有余额 {count} 人',
+        lifetimeRecharged: '累计充值 {value}（站点字段，不含管理员调整）',
+        rechargeUsers: '今日入账人数',
+        lowBalance: '活跃但余额不足 1 美元',
+        channels: {
+          payment: '在线充值',
+          redeem: '兑换码',
+          admin_add: '管理员加款',
+          admin_deduct: '管理员扣款',
+          affiliate: '邀请返利转入',
+          credit: '余额增加',
+          debit: '余额减少'
+        }
+      },
+      warnings: {
+        rechargeFetch: '同步时没能读取站点的入账记录（可能是管理员密钥没有兑换码记录的查看权限或网络问题），活跃与用量数据不受影响，下次同步会重试。',
+        rechargeUnsupported: '站点版本较旧，不支持按使用时间读取兑换码记录，暂时无法统计入账。升级 sub2api 后即可使用。',
+        rechargeTruncated: '需要读取的入账记录过多，本次没有写入入账数据，下次同步会继续尝试。'
+      },
+      kpi: {
+        totalUsers: '用户总数',
+        totalUsersHint: '有邮箱 {withEmail} · 已禁用 {disabled}',
+        activeToday: '今日活跃用户',
+        todayHint: '请求 {requests} · 消费 {cost}',
+        active7d: '近 7 天活跃用户',
+        vsPrevious7d: '对比前 7 天',
+        active30d: '近 30 天活跃用户',
+        vsPrevious30d: '对比前 30 天',
+        noUsage: '从未使用',
+        noUsageHint: '注册后没有任何用量，点击查看'
+      },
+      inactive: {
+        title: '未活跃分布',
+        hint: '不含已禁用用户（共 {count} 人），点击查看名单',
+        bucket: '超过 {days} 天未使用'
+      },
+      periods: {
+        day: {
+          title: '日环比',
+          description: '昨天 vs 前天'
+        },
+        week: {
+          title: '周环比',
+          description: '近 7 天 vs 前 7 天'
+        },
+        month: {
+          title: '月环比',
+          description: '近 30 天 vs 前 30 天'
+        },
+        metric: '指标',
+        current: '本期',
+        sequential: '环比',
+        yearOverYear: '同比',
+        previousMissing: '本地数据还没有覆盖上一周期，同步回补后显示',
+        lastYearMissing: '本地还没有去年同期的数据（sub2api 只保留 90 天用量，需要本地持续同步满一年）'
+      },
+      metrics: {
+        activeUsers: '活跃用户',
+        requests: '请求数',
+        tokens: 'Token',
+        cost: '消费（美元）',
+        newUsers: '新注册',
+        recharge: '入账（美元）'
+      },
+      retention: {
+        retained: '持续活跃 {count}',
+        churned: '流失 {count}',
+        gained: '新增活跃 {count}'
+      },
+      delta: {
+        fromZero: '新增'
+      },
+      trend: {
+        range: '趋势时间范围',
+        lastDays: '近 {days} 天',
+        completeDays: '截至昨天（完整自然日）',
+        showTable: '表格',
+        showChart: '图表',
+        day: '日期',
+        activeUsersTitle: '每日活跃用户',
+        costTitle: '每日消费（美元）',
+        latest: '{day}：{value}',
+        usersValue: '{count} 人',
+        activeUsersAria: '近 {days} 天每日活跃用户趋势',
+        costAria: '近 {days} 天每日消费趋势',
+        rechargeTitle: '每日入账（美元）',
+        rechargeAria: '近 {days} 天每日入账趋势',
+        noData: '无数据（尚未覆盖）'
+      },
+      users: {
+        title: '用户列表',
+        subtitle: '「近 N 天」均截至昨天；点击用户查看每日用量与环比。',
+        matched: '匹配 {count} 人',
+        empty: '没有符合条件的用户'
+      },
+      filters: {
+        segment: '用户分群',
+        inactiveDays: '未使用天数',
+        status: '状态',
+        role: '角色',
+        search: '搜索',
+        searchPlaceholder: '邮箱、用户名或用户 ID',
+        allStatuses: '全部状态',
+        allRoles: '全部角色',
+        searchSummary: '搜索「{search}」'
+      },
+      segmentGroups: {
+        basic: '全部',
+        active: '活跃',
+        inactive: '未活跃',
+        change: '用量变化',
+        money: '资金'
+      },
+      segments: {
+        all: '全部用户',
+        active_1d: '24 小时内使用过',
+        active_7d: '7 天内使用过',
+        active_30d: '30 天内使用过',
+        inactive_2d: '超过 2 天未使用',
+        inactive_7d: '超过 7 天未使用',
+        inactive_14d: '超过 14 天未使用',
+        inactive_30d: '超过 30 天未使用',
+        inactive_60d: '超过 60 天未使用',
+        inactive_90d: '超过 90 天未使用',
+        inactive: '自定义未使用天数',
+        inactiveCustom: '超过 {days} 天未使用',
+        no_usage: '从未使用',
+        churned_7d: '近 7 天流失（前 7 天用过）',
+        declining: '用量下降（周消费减半）',
+        growing: '用量增长（周消费 ≥1.5 倍）',
+        recharged_today: '今日有入账',
+        low_balance: '活跃但余额不足 1 美元'
+      },
+      userStatus: {
+        active: '正常',
+        disabled: '已禁用'
+      },
+      roles: {
+        user: '普通用户',
+        admin: '管理员',
+        root: '超级管理员'
+      },
+      fields: {
+        user: '用户',
+        status: '状态',
+        lastUsed: '最近使用',
+        costToday: '今日消费',
+        cost7d: '近 7 天消费',
+        change7d: '周环比',
+        cost30d: '近 30 天消费',
+        activeDays30d: '30 天活跃天数',
+        balance: '余额',
+        totalRecharged: '累计充值',
+        totalUsed: '累计消费',
+        createdAt: '注册时间',
+        today: '今日消费',
+        requestsCount: '{count} 次请求',
+        daysValue: '{count} 天',
+        previousValue: '前 7 天 {value}',
+        rechargeToday: '今日入账',
+        recharge30d: '近 30 天入账'
+      },
+      lastUsed: {
+        today: '今天',
+        daysAgo: '{count} 天前',
+        longAgo: '很久未使用',
+        never: '从未使用'
+      },
+      detail: {
+        identity: '用户 ID {id} · 用户名 {username}',
+        trendTitle: '近 90 天每日用量',
+        requestsChartAria: '该用户近 90 天每日请求数趋势',
+        costChartAria: '该用户近 90 天每日消费趋势',
+        rechargeChartAria: '该用户近 90 天每日入账趋势'
+      },
+      email: {
+        title: '按筛选条件群发邮件',
+        loading: '正在统计收件人…',
+        matched: '匹配用户',
+        withEmail: '有邮箱',
+        suppressed: '已退订',
+        sendable: '预计发送',
+        previewHint: '收件人来自本地同步的用户快照；无效或重复的邮箱会在创建批次时跳过，发送进度可在「群发邮件」页面查看。',
+        template: '邮件模板',
+        templatePlaceholder: '请选择模板',
+        noTemplates: '还没有邮件模板，请先在「系统设置 - 邮件模板」中创建。',
+        subject: '主题：',
+        unsubscribe: '附带退订链接',
+        unsubscribeHint: '每封邮件末尾会自动附上该收件人的退订链接；也可以在模板中写入 {placeholder} 指定位置。',
+        unsubscribePlaceholderFound: '模板中的 {placeholder} 会替换为每个收件人自己的退订链接。',
+        publicBaseUrl: 'TransitHub 接口公网地址',
+        publicBaseUrlHint: '收件人点击退订链接时访问该地址下的 /email-unsubscribe，请确认外网可以访问。',
+        privateUrlWarning: '这看起来是本机或内网地址，收件人在外网可能打不开退订链接。',
+        submit: '创建群发批次（{count} 人）',
+        created: '已创建群发批次：{count} 个收件人，跳过 {skipped} 个（无效、重复或已退订）。',
+        viewProgress: '查看发送进度'
+      },
+      suppressions: {
+        title: '退订名单',
+        description: '名单中的邮箱不会再收到群发邮件（对所有群发方式生效）。收件人点击邮件中的退订链接后会自动加入。',
+        addLabel: '手动添加邮箱',
+        addPlaceholder: '每行一个，或用逗号分隔',
+        add: '加入退订名单',
+        searchPlaceholder: '搜索邮箱',
+        email: '邮箱',
+        reason: '来源',
+        createdAt: '加入时间',
+        empty: '退订名单为空',
+        remove: '移出名单',
+        removeAria: '将 {email} 移出退订名单',
+        removeConfirm: '确定将 {email} 移出退订名单？移出后该邮箱会重新收到群发邮件。',
+        added: '已加入 {added} 个邮箱，忽略无效地址 {invalid} 个。',
+        removed: '已将 {email} 移出退订名单。',
+        reasons: {
+          unsubscribe: '收件人退订',
+          manual: '手动添加'
+        }
+      },
+      pagination: {
+        total: '共 {total} 条',
+        previous: '上一页',
+        next: '下一页'
+      },
+      errors: {
+        network: '网络请求失败，请检查 TransitHub 服务是否可用。',
+        request: '用户分析数据请求失败，请稍后重试。',
+        authRequired: '需要当前工作区站点的管理员会话：请先在仪表盘登录 sub2api / new-api 管理员账号。',
+        platformUnsupported: '当前工作区的站点类型不支持用户分析（仅支持 sub2api 和 new-api）。',
+        syncInProgress: '同步正在进行中，请稍后再试。',
+        usersFetch: '读取站点用户列表失败，请确认管理员会话有效。',
+        usageFetch: '读取站点用量数据失败。sub2api 需要管理员会话；new-api 需要管理员权限（访问令牌需包含 log:read），且站点开启了数据看板统计。',
+        interrupted: '上次同步被服务重启或超时打断，会在后台自动继续，无需操作。',
+        invalidFilter: '筛选条件无效。',
+        notFound: '用户不存在或已从站点删除。',
+        tooManyUsers: '站点用户超过 50,000 人，暂不支持同步。',
+        tooManyRecipients: '筛选结果超过 10,000 个收件人，请缩小筛选范围。',
+        notSynced: '还没有同步过用户数据，请先同步。'
+      }
+    },
+    sales: {
+      title: '销售分析',
+      subtitle: '入账结构、付费用户、转化与复购、收入集中度和入账排行。数据来自「用户分析」同步到本地的数据，只读。',
+      common: {
+        placeholder: '—'
+      },
+      source: {
+        lastSynced: '数据来自用户分析同步 · 最近同步 {time}',
+        neverSynced: '尚未同步用户数据',
+        basis: '金额按 ¥{price}/$1 换算（与仪表盘营收口径一致）'
+      },
+      range: {
+        label: '统计区间',
+        lastDays: '近 {days} 天',
+        from: '开始日期',
+        to: '结束日期',
+        apply: '应用',
+        current: '统计区间：{range}（截至昨日的完整自然日，或自定义区间）',
+        previous: '对比上一周期：{range}'
+      },
+      actions: {
+        refresh: '刷新',
+        changePrice: '修改售价',
+        goUserActivity: '去用户分析同步数据',
+        showTable: '表格',
+        showChart: '图表',
+        viewDetail: '查看 {name} 的详情',
+        manageExcluded: '管理',
+        entries: '入账明细'
+      },
+      empty: {
+        title: '还没有可分析的数据',
+        description: '销售分析使用「用户分析」同步到本地的用户、入账和用量数据。登录自己站点后会在后台自动同步，也可以去用户分析页面马上同步。'
+      },
+      coverage: {
+        partial: '入账数据从 {from} 开始覆盖，所选区间不完整，汇总只包含已覆盖的日期。',
+        snapshot: 'new-api 站点的入账按两次同步之间的余额变化统计（从 {from} 开始），无法区分充值来源，也无法识别首次入账用户。',
+        usagePartial: '用量数据只覆盖 {range}，所选区间不完整',
+        previousMissing: '上一周期没有完整的入账数据，无法计算环比'
+      },
+      kpi: {
+        credits: '入账金额',
+        creditsHint: '{count} 笔 · 另有扣减 {deductions}',
+        payers: '入账用户',
+        payersHint: '首次入账 {newPayers} 人 · 复购 {repeat} 人',
+        arppu: '人均入账',
+        arppuHint: '入账金额 ÷ 入账用户',
+        consumption: '用户消耗',
+        consumptionHint: '入账 ÷ 消耗 = {ratio}',
+        consumptionNone: '所选区间没有消耗',
+        balanceChange: '资金沉淀',
+        balanceChangeHint: '期末用户余额 {value}',
+        balanceUnknown: '缺少期初或期末的余额快照',
+        excluded: '另有 {amount} 设为不计入'
+      },
+      trend: {
+        title: '每日入账与消耗',
+        subtitle: '柱：按渠道堆叠的入账；线：用户消耗',
+        total: '入账合计',
+        deductions: '扣减',
+        consumption: '用户消耗',
+        day: '日期',
+        noData: '无数据',
+        aria: '{range} 每日入账（按渠道）与用户消耗'
+      },
+      channels: {
+        title: '入账渠道',
+        subtitle: '取消勾选的渠道不算销售；点渠道名可以逐笔选择不计入。扣减（管理员扣款、余额减少）单独列出，不计入入账合计',
+        counted: '计入',
+        countThis: '计入「{channel}」',
+        viewEntries: '查看「{channel}」的明细，逐笔选择计不计入',
+        excludedPart: '其中 {amount} 不计入',
+        excludedChannel: '整个渠道不计入',
+        channel: '渠道',
+        amount: '金额',
+        share: '占入账',
+        events: '笔数',
+        users: '人数',
+        perEvent: '笔均',
+        notCounted: '不计入',
+        empty: '所选区间没有入账记录。',
+        recordsNote: '在线充值来自站点支付订单；兑换码可能是售卡也可能是赠送；邀请返利转入不是现金收入。'
+      },
+      entries: {
+        title: '入账明细',
+        subtitle: '{range} · 设为「不计入」的入账不算进销售分析和每日报告，只影响这里的统计，不会改站点上的数据。',
+        close: '关闭',
+        channel: '渠道',
+        allChannels: '全部渠道',
+        search: '搜索用户邮箱、用户名或 ID',
+        excludedOnly: '只看不计入的',
+        channelExcluded: '「{channel}」整个渠道都设为不计入了，下面的明细不管怎么选都不计入。要计入的话，在入账渠道里重新勾选它。',
+        empty: '没有符合条件的入账。',
+        emptyExcluded: '还没有设为不计入的入账。',
+        day: '日期',
+        user: '用户',
+        amount: '金额',
+        action: '操作',
+        events: '{count} 笔',
+        partly: '其中 {amount} 不计入',
+        notCounted: '不计入',
+        exclude: '不计入',
+        excludeRest: '全部不计入',
+        restore: '恢复',
+        pageInfo: '第 {page} / {pages} 页 · 共 {total} 条',
+        previous: '上一页',
+        next: '下一页'
+      },
+      conversion: {
+        title: '转化、复购与集中度',
+        registered: '新用户转化',
+        registeredHint: '区间内注册 {registered} 人，已入账 {paid} 人',
+        repeat: '复购率',
+        repeatHint: '{payers} 个入账用户中 {repeat} 人在 2 天及以上有入账',
+        concentration: '前 10 名占比',
+        concentrationHint: '第 1 名占 {top1}',
+        distribution: '人均入账分布',
+        bucket: '{min} ~ {max}',
+        bucketOpen: '{min} 以上',
+        bucketUsers: '{count} 人'
+      },
+      payers: {
+        title: '入账排行',
+        subtitle: '按区间内入账金额排序，前 20 名；点击用户查看详情',
+        user: '用户',
+        credits: '入账',
+        events: '笔数 / 天数',
+        eventsValue: '{events} 笔 / {days} 天',
+        channels: '渠道',
+        consumption: '区间消耗',
+        balance: '当前余额',
+        lastCredit: '最近入账',
+        empty: '所选区间没有入账用户。'
+      },
+      footnote: '入账包含在线充值、兑换码、管理员加款和邀请返利转入（new-api 为余额增加），按「我的站点售价」换算为人民币，不等于实收现金；资金沉淀是期末与期初的用户余额之差。',
+      errors: {
+        network: '网络请求失败，请检查网络后重试。',
+        request: '销售分析数据加载失败，请稍后重试。',
+        invalidRange: '统计区间无效：开始日期不能晚于结束日期，结束日期不能晚于今天，跨度不超过 366 天。',
+        invalidEntry: '这条入账不对，请刷新后再试。',
+        invalidChannel: '这个渠道不能设为不计入。',
+        entryNotFound: '没找到这条入账（数据可能刚重新同步过），请刷新后再试。'
+      }
+    },
+    vip: {
+      title: '大户关注',
+      subtitle: '系统按近 7 天日均消耗和累计消耗推荐站里的大户，也可以自己搜索添加；看余额还能用几天，快用完时提醒你。数据来自「用户分析」，每小时同步一次。',
+      common: {
+        placeholder: '—'
+      },
+      source: {
+        lastSynced: '数据来自用户分析同步 · 最近同步 {time}',
+        neverSynced: '尚未同步用户数据',
+        basis: '金额按 ¥{price}/$1 换算',
+        manual: '手动关注',
+        dailyRank: '日均第 {rank}',
+        lifetimeRank: '累计第 {rank}'
+      },
+      actions: {
+        settings: '提醒设置',
+        refresh: '刷新',
+        add: '添加关注',
+        goUserActivity: '去用户分析同步数据',
+        chooseBots: '选机器人',
+        viewDetail: '查看 {name} 的详情',
+        copyReminder: '复制提醒',
+        copied: '已复制',
+        note: '备注',
+        remove: '移出',
+        removeConfirm: '把 {name} 移出大户关注？移出后系统也不再推荐他，可以在提醒设置里恢复。',
+        close: '关闭',
+        cancel: '取消',
+        save: '保存',
+        watch: '关注'
+      },
+      empty: {
+        title: '还没有可分析的数据',
+        description: '大户关注使用「用户分析」同步到本地的用户、用量和余额。登录自己站点后会在后台自动同步，也可以去用户分析页面马上同步。'
+      },
+      notice: {
+        noBots: '还没选提醒用的机器人：大户快用完、用完了时不会通知你。'
+      },
+      filters: {
+        label: '按状态筛选',
+        all: '全部',
+        low: '快用完',
+        empty: '已用完',
+        declining: '用量下降'
+      },
+      search: '在名单里搜用户或备注',
+      list: {
+        user: '用户',
+        source: '来源',
+        balance: '余额',
+        daily: '日均消耗',
+        daysLeft: '预计可用',
+        trend: '近 7 天',
+        lastUsed: '最近使用',
+        lastCredit: '最近入账',
+        actions: '操作',
+        perDay: '{amount}/天',
+        flat: '持平',
+        emptyAll: '还没有大户：近 7 天和累计都没有消耗记录。可以点「添加关注」手动加。',
+        emptyFilter: '没有符合条件的大户。'
+      },
+      status: {
+        normal: '正常',
+        low: '快用完',
+        empty: '已用完',
+        declining: '用量下降',
+        disabled: '已停用'
+      },
+      days: {
+        underOne: '不到 1 天',
+        about: '约 {days} 天',
+        unknown: '一段时间'
+      },
+      footnote: '预计可用 = 余额 ÷ 近 7 天日均消耗。预计 {days} 天内用完、或者余额低于 {balance} 算快用完（只看最近 7 天用过的人）；近 7 天日均不到前 7 天的一半算用量下降。',
+      watch: {
+        addTitle: '添加关注',
+        editTitle: '备注',
+        search: '搜索用户邮箱、用户名或 ID',
+        noResults: '没找到这个用户。',
+        candidate: '余额 {balance} · 近 7 天日均 {daily}',
+        watched: '已关注',
+        dismissed: '移出过',
+        note: '备注（选填）',
+        notePlaceholder: '例如：XX 公司，微信 abc',
+        pinHint: '写了备注后他会一直留在名单里，不会因为用量排名变化掉出去。'
+      },
+      settings: {
+        title: '提醒设置',
+        recommendTitle: '系统推荐',
+        dailyTop: '近 7 天日均消耗前',
+        lifetimeTop: '累计消耗前',
+        recommendHint: '填 0 表示不按这一项推荐。站点上已停用的用户不推荐。',
+        dismissed: '已移出 {count} 人，不再推荐。',
+        restoreDismissed: '全部恢复推荐',
+        restored: '已恢复 {count} 人。',
+        lowTitle: '快用完',
+        alertDays: '预计几天内用完',
+        alertBalance: '或者余额低于（元）',
+        lowHint: '只看最近 7 天用过的人。填 0 表示不按这一项判断。',
+        alertsEnabled: '快用完、用完了时提醒我',
+        alertsHint: '每 15 分钟检查一次，用下面选的机器人发消息。同一个人一天最多提醒一次；从快用完变成用完了会再提醒一次。',
+        noBots: '还没有机器人，先到「系统设置 → 通知渠道」添加。',
+        reminderTitle: '复制提醒的话术',
+        reminderHint: "点「复制提醒」时复制这段话，可以发微信或 QQ。可以用 {'{'}name{'}'}（称呼）、{'{'}site{'}'}（站点名）、{'{'}balance{'}'}（余额）、{'{'}days{'}'}（还能用多久）；留空用默认的。",
+        reminderLow: '快用完时',
+        reminderEmpty: '用完了时'
+      },
+      reminder: {
+        defaultLow: '您好，您在{site}的余额还剩 {balance}，按最近的用量大约还能用{days}，记得及时充值哦。',
+        defaultEmpty: '您好，您在{site}的余额已经用完了，充值后就能继续使用，有问题随时找我。'
+      },
+      errors: {
+        network: '网络请求失败，请检查网络后重试。',
+        request: '大户关注数据加载失败，请稍后重试。',
+        invalidUser: '这个用户不对，请刷新后再试。',
+        userNotFound: '没找到这个用户（可能还没同步到本地）。',
+        invalidSettings: '设置不对：推荐人数 0～100，天数 0～30，金额不能小于 0。'
+      }
+    },
+    tickets: {
+      title: '工单',
+      subtitle: 'TransitLink 用户提交的问题。新工单和用户追问会推送到「系统设置 → 策略」里选的工单通知机器人。',
+      refresh: '刷新',
+      loading: '正在加载…',
+      disabledHint: '还没有开启工单：在「客户端」页面打开工单后，用户就能在 TransitLink 里给你提交问题。',
+      openClientPage: '去「客户端」页面',
+      tabs: {
+        all: '全部'
+      },
+      status: {
+        open: '待回复',
+        pending: '用户追问',
+        replied: '已回复',
+        closed: '已关闭'
+      },
+      empty: '还没有工单。',
+      emptyFiltered: '没有这个状态的工单。',
+      unknownUser: '未知用户',
+      page: '第 {page} / {pages} 页',
+      previous: '上一页',
+      next: '下一页',
+      badge: '{count} 个工单待处理',
+      detail: {
+        loading: '正在加载…',
+        status: '状态',
+        close: '关闭',
+        user: '用户',
+        userWithId: '{name}（ID {id}）',
+        email: '邮箱',
+        contact: '联系方式',
+        client: '客户端',
+        you: '客服（你）',
+        closedNote: '工单已关闭；回复后会重新打开。',
+        reply: '回复',
+        replyPlaceholder: '输入回复，Ctrl/⌘ + Enter 发送',
+        send: '发送',
+        attachmentLoadFailed: '图片加载失败',
+        closePreview: '关闭预览'
+      },
+      errors: {
+        network: '网络错误，请检查连接。',
+        request: '请求失败，请稍后再试。'
+      }
+    },
+    client: {
+      title: '客户端',
+      subtitle: '给用户发一个专属链接：用 TransitLink 打开就能接入你的站点，界面换成你的品牌，一键配置时用你推荐的分组和模型。',
+      save: '保存',
+      saving: '保存中…',
+      saved: '已保存',
+      cancel: '取消',
+      loading: '正在加载…',
+      link: {
+        title: '专属链接',
+        description: '用户点这个链接会打开 TransitLink，自动接入你的站点并换上你的品牌。',
+        enabled: '开启',
+        enabledHelp: '关掉后链接和配置接口都不能用；已经接入的用户照常使用，只是不再更新品牌和公告。',
+        hubUrl: 'TransitHub 对外地址',
+        hubUrlHelp: '用户的电脑要能访问这个地址。只需要对外开放 /api/client/ 开头的接口，管理后台不用开放。',
+        siteUrl: '用户访问的站点地址',
+        siteUrlHelp: '默认用工作区的站点地址；用户访问的地址不一样时（例如单独的 API 域名）填这里。',
+        minVersion: 'TransitLink 最低版本',
+        minVersionPlaceholder: '例如 0.2.0，留空不限制',
+        minVersionHelp: '用户的 TransitLink 低于这个版本时，会提示他们更新到最新版。',
+        versions: '查看 TransitLink 的版本',
+        link: '专属链接',
+        unsaved: '保存一次就会生成链接。',
+        needHubUrl: '填好 TransitHub 对外地址后就会生成链接。',
+        otherDomain: 'TransitHub 对外地址和站点地址不在同一个域名下：用户第一次打开专属链接时，TransitLink 会提醒他确认链接是站长发的。把 TransitHub 放在站点的同一个域名下（例如 hub.你的域名），用户就不会看到这个提醒。',
+        disabledNote: '还没开启，链接暂时打不开。',
+        copy: '复制',
+        copied: '已复制',
+        reset: '重置链接',
+        resetConfirm: '重置后旧链接马上失效，已经接入的用户下次读取配置也会失败，确定吗？',
+        configUrl: '配置地址',
+        openConfig: '在浏览器里查看'
+      },
+      brand: {
+        title: '品牌',
+        description: '用户接入后，TransitLink 显示你的名称、logo 和主题色。',
+        name: '名称',
+        namePlaceholder: '留空时用站点自己的名称',
+        color: '主题色',
+        logo: 'Logo',
+        upload: '上传图片',
+        remove: '移除',
+        logoUrl: '或者填图片地址（https）',
+        logoHelp: 'PNG、JPG、WebP、GIF，不超过 256 KB，建议用正方形。',
+        uploaded: '已上传图片，保存后生效。',
+        welcome: '欢迎语',
+        welcomePlaceholder: '例如：欢迎使用，遇到问题随时找客服',
+        preview: '预览',
+        previewName: '站点名称',
+        previewHome: '首页',
+        previewTools: '工具'
+      },
+      recommend: {
+        title: '推荐配置',
+        description: '用户一键配置时默认用这里的分组和模型，用户也可以自己改。后加的工具要较新的 TransitLink 才会读取：Gemini CLI、Grok Build、OpenCode、DeepSeek Harness 要 0.5.0，Pi、Oh My Pi、Kimi Code、MiniMax Code、OpenClaw 要 0.6.0。',
+        claudeCode: 'Claude Code',
+        codex: 'Codex',
+        geminiCli: 'Gemini CLI',
+        grokBuild: 'Grok Build',
+        opencode: 'OpenCode',
+        deepseekHarness: 'DeepSeek Harness',
+        pi: 'Pi',
+        ohMyPi: 'Oh My Pi',
+        kimiCode: 'Kimi Code',
+        minimaxCode: 'MiniMax Code',
+        openclaw: 'OpenClaw',
+        group: '分组',
+        model: '模型',
+        groupAuto: '不指定（客户端按分组名自动推荐）',
+        groupManual: '分组名（new-api）或分组 ID（sub2api）',
+        missingGroup: '{group}（站点里已经没有这个分组）',
+        modelPlaceholder: {
+          claudeCode: '不指定（用 Claude Code 的默认模型）',
+          codex: '不指定（自动选最新的 GPT 模型）',
+          geminiCli: '不指定（自动选 Gemini Pro 模型）',
+          grokBuild: '不指定（自动选最新的 Grok 模型）',
+          opencode: '不指定（优先 Claude Sonnet，其次 GPT）',
+          deepseekHarness: '不指定（优先 DeepSeek 模型）',
+          pi: '不指定（优先 Claude Sonnet，其次 GPT）',
+          ohMyPi: '不指定（优先 Claude Sonnet，其次 GPT）',
+          kimiCode: '不指定（优先 Kimi 模型）',
+          minimaxCode: '不指定（优先 MiniMax 模型）',
+          openclaw: '不指定（优先 Claude Sonnet，其次 GPT）'
+        },
+        groupsLoading: '正在读取站点分组…',
+        groupsFailed: '读取站点分组失败：{error}。可以直接填分组。'
+      },
+      notice: {
+        title: '公告与客服',
+        description: '公告和客服方式显示在 TransitLink 的首页。',
+        notice: '公告',
+        noticePlaceholder: '例如：本周六 2:00–4:00 维护',
+        support: '客服方式',
+        supportEmpty: '还没有添加客服方式。',
+        add: '添加',
+        remove: '删除',
+        type: '类型',
+        label: '名称，例如：Telegram 群',
+        value: '链接、号码或邮箱',
+        types: {
+          telegram: 'Telegram',
+          qq: 'QQ',
+          wechat: '微信',
+          discord: 'Discord',
+          email: '邮箱',
+          url: '网页',
+          other: '其他'
+        }
+      },
+      tickets: {
+        title: '工单',
+        description: '开启后，用户可以在 TransitLink 里给你提交问题，你在「工单」页面回复。',
+        enabled: '开启',
+        categories: '问题分类',
+        categoriesHelp: '每行一个，用户提交时从中选择。最多 20 个，每个不超过 40 个字。',
+        notifyHelp: '新工单和用户追问可以推送到通知机器人：在「系统设置 → 策略」里选择。',
+        openTickets: '查看工单'
+      },
+      errors: {
+        invalid: '有内容格式不对，请检查后再保存。',
+        logoTooLarge: 'Logo 太大了，请换一张不超过 256 KB 的图片。',
+        logoType: 'Logo 只支持 PNG、JPG、WebP、GIF。',
+        request: '请求失败，请稍后再试。',
+        network: '网络错误，请检查连接。'
+      }
+    },
+    update: {
+      title: '检查更新',
+      checking: '正在检查…',
+      current: '当前版本',
+      latest: '最新版本',
+      publishedAt: '发布于 {date}',
+      upToDate: '已经是最新版本。',
+      available: '有新版本 {version}',
+      newVersion: '有新版本 {version}，点击查看',
+      badge: '有新版本',
+      notes: '更新说明',
+      howTo: '更新方法（Docker 部署）',
+      step1: '把 docker-compose.prod.yml 里的镜像版本改成 {version}（用 latest 的跳过这一步）。',
+      step2: '在部署目录运行下面的命令，拉取新镜像并重启：',
+      copy: '复制命令',
+      viewRelease: '在 GitHub 上查看这个版本',
+      recheck: '重新检查',
+      close: '关闭',
+      online: {
+        title: '在线更新',
+        description: '服务器会从 GitHub 下载 {version}，校验无误后安装并自动重启。通常一两分钟，重启时页面会暂时打不开，完成后自动刷新。',
+        start: '更新到 {version}',
+        confirm: '确定现在更新到 {version} 吗？重启时正在进行的后台采集会中断，重启后可以重新开始。',
+        confirmButton: '确定更新',
+        cancel: '取消'
+      },
+      progress: {
+        downloading: '正在下载 {version}…',
+        downloadLabel: '下载进度',
+        downloaded: '已下载 {done} / {total} MB（{percent}%）',
+        installing: '下载完成，正在校验并安装…',
+        restarting: '正在重启到 {version}…',
+        reloading: '已更新到 {version}，正在刷新页面…',
+        keepOpen: '请不要关闭这个页面，更新完成后会自动刷新。',
+        stalled: '等了 3 分钟还没连上服务。请稍后刷新页面；如果一直打不开，请查看服务器日志（docker compose logs app）。',
+        reverted: '新版本没能启动，服务已自动退回 {version}。请查看服务器日志（docker compose logs app）找原因，或者用下面的 Docker 方法更新。',
+        reload: '刷新页面'
+      },
+      deployment: {
+        notPersistent: '数据目录没有挂载持久卷：在线更新装的新版本和凭据加密的密钥都保存在这里，重新创建容器后会丢失。请在 docker-compose.prod.yml 的 app 服务里加上 ../data/app:/app/data，然后重新创建容器。',
+        notEncrypted: '保存的登录凭据（站点会话、机器人密钥、代理密码）目前没有加密。挂载上面的数据目录，或者设置环境变量 CREDENTIAL_ENCRYPTION_KEY 后重启，就会自动加密。'
+      },
+      reasons: {
+        notAdmin: '只有系统管理员可以在线更新。',
+        unsupported: '这台服务器不支持在线更新（需要在 Linux 服务器上运行，并且数据目录可写）。',
+        noPackage: '这个版本没有在线更新包。'
+      },
+      errors: {
+        checkFailed: '检查更新失败：连不上 GitHub，或者请求太频繁，请稍后再试。',
+        forbidden: '只有系统管理员可以在线更新。',
+        inProgress: '已经在更新了，请稍候。',
+        unavailable: '现在没有可以安装的新版本，请重新检查。',
+        failed: '更新失败，当前版本不受影响。请稍后重试；一直失败时请查看服务器日志（docker compose logs app）。'
+      }
+    },
+    collections: {
+      running: '后台采集中',
+      runningProfit: '利润分析正在后台采集',
+      runningUsers: '用户分析正在后台同步',
+      separator: '；',
+      view: '查看',
+      goDashboard: '去仪表盘登录',
+      dismiss: '关闭提醒',
+      unknownError: '采集出错，请稍后再看。',
+      profit: {
+        done: '利润分析采集完成',
+        firstDone: '利润分析首次采集完成',
+        resumed: '利润分析已在后台继续并采集完成',
+        doneDetail: '数据已更新到 {date}',
+        failed: '利润分析采集失败'
+      },
+      users: {
+        done: '用户数据同步完成',
+        firstDone: '用户分析首次同步完成',
+        resumed: '用户数据已在后台继续并同步完成',
+        doneDetail: '共 {count} 个用户，销售分析也已更新',
+        failed: '用户数据同步失败',
+        viewSales: '看销售分析'
+      }
+    },
+    profit: {
+      title: '利润分析',
+      subtitle: '按上游和分组看毛利：营收来自自己站点每条路由（sub2api 上游账号 / new-api 渠道）的分组统计，成本来自已登记上游站点的消耗，按上游域名自动对应，不需要手动绑定。只读。',
+      common: {
+        placeholder: '—'
+      },
+      sync: {
+        never: '尚未采集',
+        lastSynced: '{time}采集',
+        coverage: '数据覆盖 {range}',
+        routes: '{count} 条路由',
+        running: '正在采集…',
+        failed: '最近一次采集失败：{reason}'
+      },
+      sources: {
+        sub2api_groups: '营收按账号和分组统计',
+        newapi_flow: '营收来自数据看板（按渠道和分组）',
+        newapi_log_stat: '营收按渠道逐个查询日志'
+      },
+      source: {
+        basis: '营收按 ¥{price}/$1 换算（与仪表盘一致）'
+      },
+      range: {
+        label: '统计区间',
+        lastDays: '近 {days} 天',
+        from: '开始日期',
+        to: '结束日期',
+        apply: '应用',
+        current: '统计区间：{range}（截至昨天的完整自然日）',
+        previous: '对比上一周期：{range}'
+      },
+      actions: {
+        refresh: '刷新',
+        sync: '立即采集',
+        startSync: '开始首次采集',
+        changePrice: '修改售价',
+        goDashboard: '去仪表盘登录',
+        goUpstream: '去登记上游',
+        showTable: '表格',
+        showChart: '图表',
+        expand: '展开 {name} 的站点和路由',
+        collapse: '收起 {name}'
+      },
+      empty: {
+        title: '还没有利润数据',
+        description: '利润分析会读取自己站点每条路由按分组的营收，以及已登记上游站点每天的消耗，按上游域名自动对应。登录自己站点后，系统会在一小时内自动在后台开始首次采集（回补最近 30 天，可能需要几分钟），之后每小时自动补齐；也可以点下面的按钮马上开始。',
+        runningTitle: '正在进行首次采集',
+        runningDescription: '正在回补最近 30 天的营收和上游成本，可能需要几分钟，完成后页面会自动刷新。',
+        requirements: '需要先在仪表盘登录自己站点的管理员账号，并在「上游管理」登记上游站点、设置充值倍率。'
+      },
+      coverage: {
+        partial: '所选区间还没有全部采集或定稿：已采集 {range}，定稿到 {complete}。没有采集的日期不计入合计。',
+        previousMissing: '上一周期没有完整的数据，无法计算环比'
+      },
+      kpi: {
+        revenue: '营收',
+        revenueHint: '自己站点用户的消耗，按售价换算',
+        cost: '上游成本',
+        costHint: '已登记上游站点的消耗 × 充值倍率',
+        costFailedHint: '有 {count} 个站点日的成本查询失败，成本可能偏低',
+        profit: '毛利',
+        profitHint: '毛利率 {margin}',
+        previousMargin: '（上期 {margin}）',
+        profitDelta: '较上期 {value}',
+        attributed: '归因覆盖',
+        attributedHint: '未归因营收 {value}（成本未知）',
+        unmatched: '未匹配成本',
+        unmatchedHint: '有成本，但没有路由指向的上游'
+      },
+      insights: {
+        title: '需要关注',
+        severity: {
+          critical: '严重',
+          warning: '注意',
+          info: '提示'
+        },
+        negativeMargin: '上游 {subject} 在亏损：成本比营收多 {value}。',
+        unmatchedCost: '上游 {subject} 有成本 {value}，但没有路由指向它：可能路由地址和登记地址不是同一个域名，或者 key 在本站以外被使用。',
+        unregistered: '有 {value} 营收来自没有登记的上游 {subject}，成本没有计入。登记后就能算出毛利。',
+        lowRunway: '{subject} 的余额约可用 {days}，建议充值 {topUp}。',
+        costSpike: '上游 {subject} 昨天的成本占营收 {ratio}，明显高于前 7 天的中位数 {baseline}：可能上游涨价，或 key 在本站以外被使用。',
+        noRate: '{subject} 没有设置充值倍率，成本按 0 计算。',
+        costFailed: '{subject} 有 {count} 天成本查询失败，这些天的成本没有计入。',
+        priceIncrease: '{subject} 倍率上调 {change}，按近 7 天消耗估算每天多 {value}。',
+        priceIncreaseUnknown: '{subject} 倍率上调 {change}，暂时无法估算对成本的影响。'
+      },
+      trend: {
+        title: '每日营收、成本与毛利',
+        subtitle: '线：营收和上游成本；柱：毛利（可能为负）',
+        revenue: '营收',
+        cost: '上游成本',
+        profit: '毛利',
+        margin: '毛利率',
+        day: '日期',
+        noData: '未采集',
+        aria: '{range} 每日营收、上游成本与毛利'
+      },
+      upstreams: {
+        title: '按上游',
+        subtitle: '同一个域名下的站点和路由归为一个上游（api.example.com 和 example.com 视为同一个）；点击展开查看站点和路由',
+        upstream: '上游',
+        revenue: '营收',
+        cost: '成本',
+        profit: '毛利',
+        margin: '毛利率',
+        balance: '余额',
+        runway: '续航',
+        topUp: '建议充值',
+        topUpHint: '按近 7 天日均成本，备足 7 天还差的金额',
+        routes: '{count} 条路由',
+        noRoutes: '没有路由',
+        noRoutesHint: '没有路由指向这个上游，它的成本计入「未匹配成本」。',
+        runwayDays: '{days} 天',
+        runwayLong: '很长',
+        sites: '上游站点',
+        site: '站点',
+        rechargeRate: '充值倍率',
+        rangeCost: '区间成本',
+        avgDailyCost: '近 7 天日均成本',
+        deleted: '已删除',
+        noRate: '未设置充值倍率',
+        failedDays: '{count} 天查询失败',
+        routeList: '路由',
+        route: '路由',
+        groups: '分组',
+        routeRevenue: '区间营收',
+        routeDisabled: '已停用',
+        routeError: '异常',
+        routeDeleted: '已删除',
+        empty: '还没有登记上游站点，或所选区间没有成本和营收。'
+      },
+      groups: {
+        title: '按分组',
+        subtitle: '分组成本按该分组在每个上游的营收占比分摊；毛利和毛利率只算已归因的营收',
+        group: '分组',
+        revenue: '营收',
+        cost: '分摊成本',
+        profit: '毛利',
+        margin: '毛利率',
+        unattributed: '未归因营收',
+        none: '（无分组）',
+        empty: '所选区间没有营收。'
+      },
+      unattributed: {
+        title: '未归因营收',
+        subtitle: '这些营收找不到对应的已登记上游，成本未知，不计入毛利率',
+        category: '类别',
+        address: '上游地址',
+        routes: '路由',
+        revenue: '营收',
+        categories: {
+          official: '官方账号 / 没有填地址',
+          unregistered: '没有登记的上游',
+          unknown: '未知路由'
+        },
+        unknownRoute: '已删除或站点没有记录的路由',
+        empty: '所选区间的营收都已归因。'
+      },
+      priceChanges: {
+        title: '上游调价',
+        subtitle: '上游站点同步时检测到的分组倍率变化（最近 30 天），按该分组近 7 天的消耗估算对每天成本的影响；只提示，不会改价',
+        detectedAt: '检测时间',
+        site: '上游站点',
+        group: '分组',
+        multiplier: '倍率',
+        avgDailyCost: '近 7 天日均成本',
+        impact: '每天成本影响',
+        noUsage: '近 7 天未使用',
+        noRate: '未设置充值倍率',
+        failed: '无法估算',
+        empty: '最近 30 天没有检测到上游分组倍率变化。'
+      },
+      footnote: '营收是自己站点用户的消耗（站点额度）按「我的站点售价」换算的人民币；成本是已登记上游站点的消耗 × 充值倍率。路由地址和上游站点按域名对应，分组成本按营收占比分摊。数据是完整自然日（北京时间），每小时 10 分自动采集；续航和建议充值按近 7 天日均成本计算。',
+      warnings: {
+        costFailed: '部分上游站点的成本查询失败，相关日期的成本可能偏低；最近两天会自动重试。',
+        flowFallback: '站点没有开启数据看板（或版本较旧），已改为逐个渠道查询营收，采集会慢一些。',
+        tooManyRoutes: '路由超过 500 条，只统计了前 500 条。'
+      },
+      errors: {
+        authRequired: '自己站点的管理员登录已失效，请先在仪表盘重新登录。',
+        platformUnsupported: '当前站点类型不支持利润分析（只支持 sub2api 和 new-api）。',
+        syncInProgress: '正在采集中，请稍后再试。',
+        routesFetch: '读取站点的账号 / 渠道列表失败，请稍后重试。',
+        revenueFetch: '读取站点的营收统计失败，请稍后重试。',
+        network: '网络请求失败，请检查网络后重试。',
+        interrupted: '上次采集被服务重启打断，会在服务启动约 2 分钟后在后台自动继续，无需操作。',
+        invalidRange: '统计区间无效：开始日期不能晚于结束日期，结束日期不能晚于昨天，跨度不超过 366 天。',
+        request: '利润分析数据加载失败，请稍后重试。'
       }
     },
     settings: {
+      ticketNotify: {
+        title: '工单通知',
+        help: '用户在 TransitLink 里新建工单或追问时，推送给选中的机器人；不选就不推送。'
+      },
+      dailyReport: {
+        title: '经营日报',
+        help: '每天在设定的时间，把昨天的营收、成本、毛利、入账、活跃用户和上游余额汇总发给机器人。数据来自仪表盘与用户分析的本地数据，不会访问站点。',
+        time: '发送时间（北京时间）',
+        timeHelp: '服务在设定时间之后才启动时，当天仍会补发一次',
+        preview: '预览昨日日报',
+        sendTest: '立即测试发送',
+        sent: '已发送给 {count} 个机器人',
+        previewTitle: '日报内容预览',
+        saveHint: '开关、时间和机器人需要点击右上角「保存」后生效；预览和测试发送不需要先保存。',
+        errors: {
+          noBots: '请先选择至少一个接收机器人。',
+          request: '日报生成或发送失败，请稍后重试。'
+        }
+      },
       title: '系统设置',
       subtitle: '管理系统运行参数、通知渠道及自动化策略。',
       save: '保存配置',
@@ -2250,11 +2334,12 @@ export default {
           groupName: '默认分组',
           oldRate: '1.0000',
           newRate: '1.1200',
-          changeDirection: '上升'
+          changeDirection: '上升',
+          costImpact: '按该分组近 7 天日均成本 ¥20.00 估算，每天约多 ¥4.00'
         }
       },
       balanceTemplateVars: '(支持变量: {siteName}, {balance}, {threshold})',
-      multiplierTemplateVars: '(支持变量: {siteName}, {groupName}, {oldRate}, {newRate}, {changeDirection})',
+      multiplierTemplateVars: '(支持变量: {siteName}, {groupName}, {oldRate}, {newRate}, {changeDirection}, {costImpact})',
       unnamedBot: '未命名机器人',
       noBotsConfigured: '请先在"通知与渠道"中配置机器人',
       mustSelectBot: '必须选择至少一个通知机器人',
@@ -2265,7 +2350,7 @@ export default {
       varOldRate: '原倍率',
       varNewRate: '新倍率',
       varChangeDirection: '变更方向',
-      pricingAmount: '调价幅度',
+      varCostImpact: '成本影响',
       botNameLabel: '机器人名称标识',
       botNameDingtalkPlaceholder: '例如：钉钉主群',
       botNameWecomPlaceholder: '例如：企业微信主群',
@@ -2286,7 +2371,61 @@ export default {
         strategy: '自动化与策略',
         channels: '通知与渠道',
         templates: '消息模板',
-        email: '邮件设置'
+        email: '邮件设置',
+        network: '网络代理'
+      },
+      proxy: {
+        title: '网络代理',
+        subtitle: 'TransitHub 访问上游站点（包括你自己的 sub2api / new-api 站点）时使用的代理。修改后立即生效，无需重启。通知机器人不受影响，Telegram 有单独的代理设置。',
+        loading: '正在读取代理设置…',
+        mode: {
+          environment: '当前生效：沿用启动时的环境变量代理 {proxy}',
+          environmentDirect: '当前生效：沿用启动时的环境变量（未设置代理，直连）',
+          proxy: '当前生效：使用代理 {proxy}',
+          direct: '当前生效：不使用代理（直连）'
+        },
+        unconfiguredHint: '还没有在这里保存过代理设置，下方已按启动环境变量预填。保存后以这里的设置为准。',
+        readOnly: '代理设置对整个 TransitHub 生效，只有系统管理员（ADMIN_EMAIL 对应的账号）可以修改。',
+        enable: '启用代理',
+        enableHelp: '关闭后所有上游请求直连。',
+        url: '代理地址',
+        urlPlaceholder: '例如 http://127.0.0.1:7897，支持 http、https、socks5',
+        urlHelp: "需要账号密码时写成 http://用户名:密码{'@'}地址:端口。已保存的密码显示为 ***，不修改会保留原密码。",
+        urlRequired: '启用代理时必须填写代理地址。',
+        bypass: '不走代理的地址',
+        bypassPlaceholder: '例如 milus.one, *.example.com, 10.0.0.0/8',
+        bypassHelp: '用逗号或换行分隔。填写域名会同时匹配它的子域名，也支持 IP 和网段；localhost 与 127.0.0.1 始终直连。',
+        save: '保存代理设置',
+        saved: '已保存，并已立即生效',
+        test: {
+          title: '测试连接',
+          help: '用上面尚未保存的设置访问一个地址，确认能否连通，例如填写你的上游站点地址。',
+          target: '测试地址',
+          targetPlaceholder: 'https://你的上游站点地址',
+          run: '测试连接',
+          running: '测试中…',
+          success: '连接成功（{route}，HTTP {status}，{ms} ms）',
+          failure: '连接失败（{route}，{ms} ms）：{reason}',
+          routes: {
+            proxy: '经代理',
+            direct: '直连'
+          },
+          failures: {
+            dns: '域名无法解析，请检查地址是否正确',
+            proxy: '代理无法连接到目标站点，或代理本身不可用。请检查代理是否在运行、代理规则或节点，或把该地址加入「不走代理的地址」',
+            tls: 'TLS 握手或证书校验失败',
+            timeout: '连接超时',
+            refused: '连接被拒绝，请检查地址和端口',
+            network: '网络连接失败'
+          }
+        },
+        errors: {
+          forbidden: '只有系统管理员（ADMIN_EMAIL 对应的账号）可以修改代理设置。',
+          invalidUrl: '代理地址无效：请填写 http、https 或 socks5 地址，例如 http://127.0.0.1:7897。',
+          invalidTarget: '测试地址无效，请填写 http 或 https 地址。',
+          request: '代理设置请求失败，请稍后重试。',
+          unavailable: '代理设置暂不可用。'
+        }
       },
       sections: {
         basic: {
@@ -2302,18 +2441,7 @@ export default {
           balanceWarning: '余额预警',
           balanceWarningHelp: '当某个上游站点的余额（按充值倍率折合人民币）低于设定金额时，通过机器人发送预警通知。',
           multiplierChangeWarning: '倍率变更预警',
-          multiplierChangeWarningHelp: '当监控的对接分组倍率发生任何变动时，通过机器人发送通知。'
-        },
-        pricing: {
-          title: '分组倍率调价',
-          description: '配置对接后的某个分组在倍率上涨时的自动处理策略。',
-          enableAutoPricing: '自动调价',
-          enableAutoPricingHelp: '当对接的上游分组倍率上涨时，自动调整"我的分组"的倍率。',
-          strategy: '调价策略',
-          strategyFixed: '固定涨幅 (+)',
-          strategyPercentage: '百分比涨幅 (%)',
-          fixedValuePlaceholder: '例如 0.1',
-          percentageValuePlaceholder: '例如 10'
+          multiplierChangeWarningHelp: '上游站点任一分组的倍率发生变动时，通过机器人发送通知。'
         },
         channels: {
           title: '通知渠道配置',
@@ -2348,7 +2476,7 @@ export default {
         },
         templates: {
           balanceDefaultTemplate: '🔴 **余额预警**\n\n🏷️ **站点：** {siteName}\n💰 **当前余额：** ¥{balance}\n⚠️ **预警阈值：** ¥{threshold}\n\n请及时检查并充值，避免服务中断。',
-          multiplierDefaultTemplate: '🟠 **倍率变更预警**\n\n🏷️ **站点：** {siteName}\n📦 **分组：** {groupName}\n📊 **倍率：** {oldRate}x → **{newRate}x**（{changeDirection}）\n\n🔎 请确认成本变化，并检查下游定价策略。',
+          multiplierDefaultTemplate: '🟠 **倍率变更预警**\n\n🏷️ **站点：** {siteName}\n📦 **分组：** {groupName}\n📊 **倍率：** {oldRate}x → **{newRate}x**（{changeDirection}）\n💸 **成本影响：** {costImpact}\n\n🔎 请确认成本变化，并检查下游定价策略。',
           balanceTemplatePlaceholder: '例如：🔴 {siteName} 当前余额 ¥{balance}，已低于 ¥{threshold}。',
           multiplierTemplatePlaceholder: '例如：🟠 {siteName} / {groupName}：{oldRate}x → {newRate}x。'
         }
@@ -2390,7 +2518,7 @@ export default {
           invalidTlsMode: 'TLS 模式无效。',
           invalidEmail: '邮箱地址无效。',
           invalidPort: '端口必须是 1-65535 之间的整数。',
-          encryptionKeyUnavailable: '服务器未配置 SMTP 加密密钥。',
+          encryptionKeyUnavailable: '服务器没有可用的加密密钥，不能保存 SMTP 密码：请把数据目录挂载为持久卷（../data/app:/app/data），或者设置环境变量 SMTP_ENCRYPTION_KEY。',
           decryptFailed: '无法读取已保存的 SMTP 密码。',
           sendFailed: '测试邮件发送失败。',
           persistence: 'SMTP 设置保存失败。'
@@ -2439,7 +2567,6 @@ export default {
     },
     system: {
       version: '版本 {version}',
-      openRelease: '查看发布说明',
       openGithubRepository: '在 GitHub 上查看源码',
       errors: {
         network: '系统信息请求失败，请检查网络连接。',
@@ -2447,327 +2574,12 @@ export default {
       }
     }
   },
-  embed: {
-    tickets: {
-      page: {
-        loading: '正在加载工单系统...'
-      },
-      list: {
-        title: '我的工单',
-        refresh: '刷新',
-        create: '新建工单',
-        loading: '正在加载工单...',
-        emptyTitle: '暂无工单',
-        emptyDescription: '点击"新建工单"提交你的第一个问题。'
-      },
-      createModal: {
-        title: '新建工单'
-      },
-      form: {
-        manualEmail: '联系邮箱',
-        manualEmailPlaceholder: '请输入接收回复的邮箱',
-        title: '标题',
-        titlePlaceholder: '简要描述你的问题',
-        body: '问题详情',
-        bodyPlaceholder: '请详细描述遇到的问题',
-        category: '分类',
-        categoryPlaceholder: '请选择分类',
-        priority: '优先级',
-        priorityPlaceholder: '请选择优先级',
-        submit: '提交工单',
-        cancel: '取消',
-        images: '图片',
-        imagesCount: '{count} / {max} 张',
-        addImage: '添加图片',
-        imagesHint: '仅支持 JPEG/PNG/WEBP/GIF 格式，单张不超过 5MB。'
-      },
-      detail: {
-        back: '返回列表',
-        loading: '正在加载工单详情...',
-        support: '客服',
-        you: '我',
-        replyPlaceholder: '输入回复内容...',
-        send: '发送',
-        closedNotice: '该工单已关闭，无法继续回复。'
-      },
-      attachments: {
-        loadFailed: '图片加载失败'
-      },
-      status: {
-        open: '待处理',
-        pending: '待跟进',
-        replied: '已回复',
-        closed: '已关闭'
-      },
-      errors: {
-        network: '网络或 CORS 请求失败，请检查接口地址与跨域配置。',
-        request: '工单接口请求失败，请稍后重试。',
-        unknown: '发生未知错误，请稍后重试。',
-        missingParams: '当前打开方式缺少必要参数，无法建立会话。如果你是通过"打开工单页面"预览按钮打开的，这是正常现象——请在真实的 Sub2API iframe 环境中打开本页面。',
-        formIncomplete: '请填写联系邮箱、标题、问题详情，并选择分类和优先级。',
-        configNotFound: '嵌入配置不存在。',
-        disabled: '工单功能已被管理员关闭。',
-        invalidSrcHost: '来源地址无效。',
-        srcHostMismatch: '来源域名不受信任。',
-        sub2apiAuth: '身份校验失败，请刷新页面重试。',
-        sub2apiRequest: '获取用户信息失败，请稍后重试。',
-        userMismatch: '用户身份校验失败。',
-        sessionInvalid: '会话已过期，请刷新页面重试。',
-        invalidEmail: '请输入有效的邮箱地址。',
-        titleRequired: '请输入标题。',
-        bodyRequired: '请输入问题详情。',
-        categoryRequired: '请选择分类。',
-        priorityRequired: '请选择优先级。',
-        invalidCategory: '所选分类不属于当前工单系统的配置，请重新选择。',
-        invalidPriority: '所选优先级不属于当前工单系统的配置，请重新选择。',
-        ticketClosed: '工单已关闭，无法继续回复。',
-        tooManyImages: '图片数量超过当前允许的上限。',
-        invalidImageType: '仅支持 JPEG/PNG/WEBP/GIF 格式的图片。',
-        imageTooLarge: '单张图片大小不能超过 5MB。',
-        emptyImage: '图片内容为空，请重新选择。',
-        attachmentLoadFailed: '图片加载失败，请稍后重试。'
-      }
-    },
-    leaderboard: {
-      eyebrow: '用量排行',
-      title: 'Token 排行榜',
-      subtitle: '按实际 Token 使用量查看用户排名。',
-      refresh: '刷新排行榜',
-      errorTitle: '排行榜加载失败',
-      emptyTitle: '当前周期暂无用量',
-      emptyDescription: '切换统计周期或稍后刷新后再查看。',
-      anonymous: '用户 {id}',
-      podiumLabel: '前三名用户',
-      updatedAt: '更新于 {time}',
-      period: { label: '统计周期', today: '今日', '7d': '7 天', '30d': '30 天' },
-      metrics: { tokens: 'Token', requests: '请求数', cost: '实际消费' },
-      table: { title: '完整排名', caption: '共 {count} 位用户', rank: '排名', user: '用户' },
-      errors: {
-        network: '网络请求失败，请稍后重试。',
-        request: '排行榜请求失败，请稍后重试。',
-        missingParams: '当前页面缺少 iframe 会话参数，请从 Sub2API 自定义菜单中打开。',
-        configNotFound: '排行榜嵌入配置不存在或尚未绑定来源站点。',
-        invalidSrcHost: '来源地址无效。',
-        srcHostMismatch: '当前来源站点与嵌入配置不匹配。',
-        sourceBinding: '排行榜嵌入来源已变更，请联系管理员重新保存嵌入设置。',
-        sub2apiAuth: '身份校验失败，请刷新页面重试。',
-        sub2apiRequest: '无法连接来源站点，请稍后重试。',
-        userMismatch: '用户身份校验失败。',
-        sessionInvalid: '会话已过期，请刷新页面重试。',
-        adminSession: '管理员会话不可用，请联系站点管理员重新连接工作区。',
-        upstreamUnsupported: '当前 Sub2API 版本不支持排行榜，请联系管理员升级。',
-        upstreamRequest: '排行榜数据暂时不可用，请稍后重试。'
-      }
-    },
-    lottery: {
-      eyebrow: '抽奖报名',
-      title: '抽奖活动',
-      subtitle: '参与开放中的活动，保存报名凭证哈希，并在开奖后查看结果。',
-      page: {
-        loading: '正在加载抽奖活动...'
-      },
-      common: {
-        empty: '无',
-        noDescription: '暂无描述。'
-      },
-      list: {
-        title: '活动列表',
-        count: '{count} 项',
-        loading: '正在加载活动...',
-        empty: '暂无可公开访问的抽奖活动。'
-      },
-      detail: {
-        loading: '正在加载活动详情...',
-        empty: '请选择一个活动查看详情。'
-      },
-      sections: {
-        schedule: '时间安排',
-        prizes: '奖品',
-        winners: '公开中奖者',
-        integrity: '开奖完整性',
-        myEntry: '我的报名',
-        myResult: '我的结果',
-        entries: '公开报名名册'
-      },
-      metrics: {
-        entries: '{count} 个报名',
-        winners: '{count} 个中奖者',
-        winnersLabel: '中奖者'
-      },
-      actions: {
-        refresh: '刷新',
-        enter: '参与活动',
-        withdraw: '撤回报名',
-        browseCampaigns: '浏览其他活动',
-        returnToDraw: '返回我的开奖场',
-        copyVoucher: '复制兑换券'
-      },
-      transparency: {
-        title: '公开透明开奖场',
-        description: '报名名册、凭证哈希、随机种子承诺和开奖快照均可公开核验。',
-        activeEntries: '{count} 个有效报名',
-        algorithmV2: 'v2 使用公开名册中的报名 ID、脱敏邮箱和凭证哈希生成快照，再以公开种子执行确定性 HMAC-SHA256 洗牌。',
-        algorithmLegacy: '该活动使用兼容旧版的 v1 算法；仍可核验种子承诺和最终结果，但快照包含旧版内部标识。'
-      },
-      countdown: {
-        opensIn: '报名开始倒计时',
-        closesIn: '报名截止倒计时',
-        drawsIn: '开奖倒计时',
-        drawTime: '开奖时间',
-        noTimer: '倒计时',
-        days: '{days} 天 {hours} 小时 {minutes} 分 {seconds} 秒',
-        hours: '{hours} 小时 {minutes} 分 {seconds} 秒',
-        minutes: '{minutes} 分 {seconds} 秒',
-        seconds: '{seconds} 秒'
-      },
-      drawReveal: {
-        ariaLabel: '抽奖结果揭晓',
-        countdown: {
-          eyebrow: '开奖倒计时',
-          description: '报名快照已锁定，准备随机抽取。'
-        },
-        drawing: {
-          eyebrow: '公平开奖',
-          title: '正在抽取幸运用户',
-          description: '正在根据公开算法计算本期结果...'
-        },
-        won: {
-          eyebrow: '恭喜中奖',
-          title: '你抽中了「{prize}」',
-          description: '中奖记录已经确认，奖励发放状态可在结果页查看。'
-        },
-        lost: {
-          eyebrow: '开奖结果',
-          title: '这次没有抽中',
-          description: '感谢参与本期活动，期待下次与你分享好运。'
-        },
-        spectator: {
-          eyebrow: '开奖完成',
-          title: '本期结果已经揭晓',
-          description: '公开中奖名单和开奖完整性信息已经更新。'
-        },
-        viewResult: '查看开奖结果'
-      },
-      status: {
-        draft: '草稿',
-        scheduled: '待开放',
-        open: '报名中',
-        closed: '报名已关闭',
-        drawing: '开奖中',
-        drawn: '已开奖',
-        fulfilling: '发奖中',
-        completed: '已完成',
-        partial: '部分完成',
-        cancelled: '已取消'
-      },
-      drawMode: {
-        manual: '手动开奖',
-        scheduled: '定时开奖'
-      },
-      prizeType: {
-        balance: '余额',
-        subscription: '订阅'
-      },
-      deliveryMode: {
-        sub2api_auto: 'Sub2API 自动发放',
-        voucher: '中奖后领取兑换券',
-        manual: '联系管理员人工兑换'
-      },
-      entryStatus: {
-        active: '有效',
-        withdrawn: '已撤回'
-      },
-      rewardStatus: {
-        pending: '待处理',
-        processing: '处理中',
-        fulfilled: '已发放',
-        retryable_failed: '可重试失败',
-        manual_attention: '需人工处理',
-        failed: '失败'
-      },
-      fields: {
-        algorithmVersion: '算法版本',
-        drawAt: '开奖时间',
-        deliveryMode: '领取方式',
-        enteredAt: '报名时间',
-        entrySnapshotHash: '报名快照哈希',
-        entryId: '报名 ID',
-        entryStatus: '报名状态',
-        prize: '奖品',
-        prizeSlot: '奖品序号',
-        receiptHash: '报名凭证哈希',
-        registrationEnd: '报名结束',
-        registrationStart: '报名开始',
-        revealedSeed: '公开种子',
-        rewardMessage: '奖励消息',
-        rewardStatus: '奖励状态',
-        seedCommitment: '种子承诺',
-        voucherCode: '我的兑换券',
-        manualContact: '兑换联系方式'
-      },
-      prizes: {
-        empty: '该活动尚未公开奖品。',
-        quantity: 'x {count}',
-        balanceValue: '余额金额：{amount}',
-        subscriptionValue: '分组：{group}，奖励倍率：{multiplier}，有效期 {days} 天'
-      },
-      winners: {
-        private: '中奖者展示由活动发起方控制。',
-        empty: '暂无公开中奖者。',
-        count: '{count} 个公开中奖者',
-        row: '{email} 获得 {prize} #{slot}'
-      },
-      entries: {
-        description: '邮箱已脱敏；每条凭证哈希可用于核对报名与开奖快照。',
-        count: '{active} 个有效 / {total} 个记录',
-        empty: '当前还没有报名记录。'
-      },
-      entry: {
-        none: '你尚未参与此活动。'
-      },
-      result: {
-        none: {
-          title: '尚未报名',
-          description: '在报名开放期间参与活动即可获得报名凭证哈希。'
-        },
-        pending: {
-          title: '结果待开奖',
-          description: '你的报名仍然有效，开奖后刷新即可查看结果。'
-        },
-        won: {
-          title: '你已中奖',
-          description: '中奖奖品和奖励发放状态显示在下方。'
-        },
-        lost: {
-          title: '未被抽中',
-          description: '本次开奖已完成，你的报名未被选中。'
-        },
-        withdrawn: {
-          title: '报名已撤回',
-          description: '当前活动中，撤回后的报名结果不可重新参与。'
-        }
-      },
-      errors: {
-        title: '抽奖加载失败',
-        network: '网络请求失败，请检查连接后重试。',
-        request: '抽奖接口请求失败，请稍后重试。',
-        missingParams: '当前页面缺少 iframe 会话参数，请从 Sub2API 自定义菜单中打开。',
-        configNotFound: '抽奖嵌入配置不存在或尚未绑定来源站点。',
-        invalidSrcHost: '来源地址无效。',
-        srcHostMismatch: '当前来源站点与嵌入配置不匹配。',
-        sub2apiAuth: '身份校验失败，请刷新页面重试。',
-        sub2apiRequest: '无法连接来源站点，请稍后重试。',
-        userMismatch: '用户身份校验失败。',
-        userInactive: '来源账号已停用。',
-        sessionInvalid: '会话已过期，请刷新页面重试。',
-        adminSession: '管理员会话不可用，请联系站点管理员重新连接工作区。',
-        sourceBinding: '抽奖嵌入来源已变更，请联系管理员重新保存嵌入设置。',
-        campaignNotOpen: '该活动当前未开放报名。',
-        entryNotFound: '未找到此活动的有效报名。',
-        upstreamRequest: '来源站点数据暂时不可用，请稍后重试。',
-        alreadyEntered: '你已经参与过此活动。',
-        copy: '复制失败，请手动选择兑换券。'
-      }
+  tickets: {
+    errors: {
+      invalid: '内容不合法，请检查后再试。',
+      notFound: '工单不存在或已删除。',
+      noCurrentAccount: '请先选择一个工作区。',
+      request: '请求失败，请稍后再试。'
     }
   }
 }

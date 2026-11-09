@@ -8,10 +8,23 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"transithub/backend/internal/shared/secretbox"
 )
 
 type Repository struct {
-	db *pgxpool.Pool
+	db      *pgxpool.Pool
+	secrets *secretbox.Box
+}
+
+// SetSecretBox 设置加密通知机器人配置（webhook、密钥、token）用的密钥（nil 表示不加密）。要在读写之前设置。
+func (r *Repository) SetSecretBox(box *secretbox.Box) {
+	r.secrets = box
+}
+
+// channelsAAD 把密文绑定到所属用户。不绑定工作区：旧版本的行在补齐工作区时会改 admin_account_id。
+func channelsAAD(userID string) string {
+	return "notification_channel_settings/" + userID
 }
 
 const createEmailTemplateSQL = `
@@ -85,22 +98,27 @@ func (r *Repository) EnsureSchema(ctx context.Context) error {
 	return nil
 }
 
-// GetFirstStrategy 返回任意一条策略设置（不指定用户）。
-// 启动时用于初始化上游定时同步配置，在单管理员场景下等同于获取唯一的设置记录。
-func (r *Repository) GetFirstStrategy(ctx context.Context) (StrategySettings, error) {
-	settings := DefaultStrategySettings()
-	row := r.db.QueryRow(ctx, `SELECT settings FROM strategy_settings LIMIT 1`)
-	var settingsJSON []byte
-	if err := row.Scan(&settingsJSON); err != nil {
-		if err == pgx.ErrNoRows {
-			return settings, nil
+// ListStrategies 返回所有工作区已保存的策略设置，启动时用于按工作区恢复定时同步配置。
+// 尚未归属工作区的旧行（admin_account_id 为空）不参与。
+func (r *Repository) ListStrategies(ctx context.Context) ([]WorkspaceStrategy, error) {
+	rows, err := r.db.Query(ctx, `SELECT user_id, admin_account_id, settings FROM strategy_settings WHERE admin_account_id <> '' ORDER BY user_id, admin_account_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	strategies := make([]WorkspaceStrategy, 0)
+	for rows.Next() {
+		strategy := WorkspaceStrategy{Settings: DefaultStrategySettings()}
+		var settingsJSON []byte
+		if err := rows.Scan(&strategy.UserID, &strategy.AdminAccountID, &settingsJSON); err != nil {
+			return nil, err
 		}
-		return settings, err
+		if err := json.Unmarshal(settingsJSON, &strategy.Settings); err != nil {
+			return nil, err
+		}
+		strategies = append(strategies, strategy)
 	}
-	if err := json.Unmarshal(settingsJSON, &settings); err != nil {
-		return settings, err
-	}
-	return settings, nil
+	return strategies, rows.Err()
 }
 
 func (r *Repository) GetStrategy(ctx context.Context, userID string, adminAccountID string) (StrategySettings, error) {
@@ -144,6 +162,12 @@ func (r *Repository) GetNotificationChannels(ctx context.Context, userID string,
 		}
 		return settings, err
 	}
+	settingsJSON, err := r.secrets.OpenJSON(settingsJSON, channelsAAD(userID))
+	if err != nil {
+		// 读不出来（例如密钥丢了）：当作没有配置机器人，需要重新填写。
+		secretbox.LogUnreadable(channelsAAD(userID)+"/"+adminAccountID, err)
+		return settings, nil
+	}
 	if err := unmarshalNotificationChannelSettings(settingsJSON, &settings); err != nil {
 		return settings, err
 	}
@@ -177,6 +201,10 @@ func unmarshalNotificationChannelSettings(data []byte, settings *NotificationCha
 
 func (r *Repository) SaveNotificationChannels(ctx context.Context, userID string, adminAccountID string, settings NotificationChannelSettings) error {
 	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return err
+	}
+	settingsJSON, err = r.secrets.SealJSON(settingsJSON, channelsAAD(userID))
 	if err != nil {
 		return err
 	}
@@ -355,4 +383,48 @@ func scanEmailTemplate(scanner emailTemplateScanner) (EmailTemplate, error) {
 	template.CreatedAt = &createdAt
 	template.UpdatedAt = &updatedAt
 	return template, nil
+}
+
+// EncryptLegacyNotificationChannels 把加密之前保存的明文机器人配置改成加密保存，返回改了几行。
+// 只改仍是明文、且期间没被改过的行。
+func (r *Repository) EncryptLegacyNotificationChannels(ctx context.Context) (int, error) {
+	if r.secrets == nil {
+		return 0, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT user_id, admin_account_id, settings::text FROM notification_channel_settings WHERE jsonb_typeof(settings) = 'object'
+	`)
+	if err != nil {
+		return 0, err
+	}
+	type legacyRow struct{ userID, adminAccountID, settings string }
+	var legacy []legacyRow
+	for rows.Next() {
+		var row legacyRow
+		if err := rows.Scan(&row.userID, &row.adminAccountID, &row.settings); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		legacy = append(legacy, row)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	changed := 0
+	for _, row := range legacy {
+		sealed, err := r.secrets.SealJSON([]byte(row.settings), channelsAAD(row.userID))
+		if err != nil {
+			return changed, err
+		}
+		tag, err := r.db.Exec(ctx, `
+			UPDATE notification_channel_settings SET settings = $1::jsonb
+			WHERE user_id = $2 AND admin_account_id = $3 AND settings = $4::jsonb
+		`, string(sealed), row.userID, row.adminAccountID, row.settings)
+		if err != nil {
+			return changed, err
+		}
+		changed += int(tag.RowsAffected())
+	}
+	return changed, nil
 }

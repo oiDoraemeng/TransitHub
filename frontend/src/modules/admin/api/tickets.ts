@@ -1,12 +1,4 @@
-import type {
-  AdminTicketDetail,
-  AdminTicketListResponse,
-  Sub2apiUserProfile,
-  TicketEmbedConfig,
-  TicketStatus,
-  TicketsQuery,
-  UpdateTicketEmbedConfigRequest,
-} from '../types/tickets'
+import type { AdminTicketDetail, AdminTicketList, TicketStatus, TicketStatusCounts } from '../types/tickets'
 import {
   authUnauthorizedErrorKey,
   getAccessToken,
@@ -24,110 +16,77 @@ const authHeaders = (): HeadersInit => {
   return { Authorization: `Bearer ${token}` }
 }
 
-type AdminErrorPayload = {
+type ErrorPayload = {
   message?: string
 }
 
-const requestJson = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
+const send = async (path: string, options: RequestInit = {}): Promise<Response> => {
   let response: Response
   try {
     response = await fetch(endpoint(path), {
       ...options,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        ...authHeaders(),
-        ...(options.headers ?? {}),
-      },
+      headers: { Accept: 'application/json', ...authHeaders(), ...(options.headers ?? {}) },
     })
-  } catch (error) {
+  } catch {
     throw new Error('admin.tickets.errors.network')
   }
-
-  const text = await response.text()
-  const payload = text ? JSON.parse(text) as T & AdminErrorPayload : ({} as T & AdminErrorPayload)
-
   if (!response.ok) {
+    let payload: ErrorPayload = {}
+    try {
+      payload = await response.json() as ErrorPayload
+    } catch {
+      // 不是 JSON（例如反向代理的错误页）：用通用提示。
+    }
     if (isUnauthorizedApiResponse(response.status, payload)) {
       handleAuthExpired()
       throw new Error(authUnauthorizedErrorKey)
     }
-
-    throw new Error(payload.message ?? 'admin.tickets.errors.unknown')
+    throw new Error(payload.message ?? 'admin.tickets.errors.request')
   }
-
-  return payload
+  return response
 }
 
-export const listTickets = async (query: TicketsQuery): Promise<AdminTicketListResponse> => {
-  const params = new URLSearchParams({
-    page: query.page.toString(),
-    pageSize: query.pageSize.toString(),
-  })
-  if (query.status) params.set('status', query.status)
-
-  return requestJson<AdminTicketListResponse>(`/tickets?${params.toString()}`)
-}
-
-export const getTicket = async (id: string): Promise<AdminTicketDetail> => (
-  requestJson<AdminTicketDetail>(`/tickets/${encodeURIComponent(id)}`)
-)
-
-export const replyTicket = async (id: string, body: string): Promise<AdminTicketDetail> => (
-  requestJson<AdminTicketDetail>(`/tickets/${encodeURIComponent(id)}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({ body }),
-  })
-)
-
-export const updateTicketStatus = async (id: string, status: TicketStatus): Promise<AdminTicketDetail> => (
-  requestJson<AdminTicketDetail>(`/tickets/${encodeURIComponent(id)}/status`, {
-    method: 'PUT',
-    body: JSON.stringify({ status }),
-  })
-)
-
-export const getEmbedConfig = async (): Promise<TicketEmbedConfig> => (
-  requestJson<TicketEmbedConfig>('/tickets/embed-config')
-)
-
-export const updateEmbedConfig = async (
-  request: UpdateTicketEmbedConfigRequest,
-): Promise<TicketEmbedConfig> => (
-  requestJson<TicketEmbedConfig>('/tickets/embed-config', {
-    method: 'PUT',
-    body: JSON.stringify(request),
-  })
-)
-
-export const rotateEmbedToken = async (): Promise<TicketEmbedConfig> => (
-  requestJson<TicketEmbedConfig>('/tickets/embed-config/rotate-token', {
-    method: 'POST',
-  })
-)
-
-export const getSub2apiUserProfile = async (ticketId: string): Promise<Sub2apiUserProfile> => (
-  requestJson<Sub2apiUserProfile>(`/tickets/${encodeURIComponent(ticketId)}/sub2api-user-profile`)
-)
-
-// fetchAttachmentBlob 用当前后台登录态拉取附件二进制内容。<img> 标签无法附带 Authorization
-// 请求头，所以图片必须先用 fetch 取回 blob，再由调用方通过 URL.createObjectURL 转成可以赋给
-// <img src> 的临时地址（并在不再需要时 revokeObjectURL 释放）。
-export const fetchAttachmentBlob = async (id: string): Promise<Blob> => {
-  let response: Response
+const requestJson = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
+  const response = await send(path, options)
   try {
-    response = await fetch(endpoint(`/tickets/attachments/${encodeURIComponent(id)}`), {
-      headers: authHeaders(),
-    })
-  } catch (error) {
-    throw new Error('admin.tickets.errors.network')
+    return await response.json() as T
+  } catch {
+    throw new Error('admin.tickets.errors.request')
   }
-  if (!response.ok) {
-    if (isUnauthorizedApiResponse(response.status, {})) {
-      handleAuthExpired()
-      throw new Error(authUnauthorizedErrorKey)
-    }
-    throw new Error('admin.tickets.errors.attachmentLoadFailed')
-  }
+}
+
+const jsonBody = (value: unknown): RequestInit => ({
+  body: JSON.stringify(value),
+  headers: { 'Content-Type': 'application/json' },
+})
+
+export interface TicketListQuery {
+  status: TicketStatus | ''
+  page: number
+  pageSize: number
+}
+
+export const listTickets = async (query: TicketListQuery): Promise<AdminTicketList> => {
+  const params = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize) })
+  if (query.status) params.set('status', query.status)
+  return requestJson<AdminTicketList>(`/tickets?${params.toString()}`)
+}
+
+/** 各状态的工单数（菜单上的提醒用）。 */
+export const getTicketCounts = async (): Promise<TicketStatusCounts> => requestJson<TicketStatusCounts>('/tickets/counts')
+
+export const getTicket = async (id: string): Promise<AdminTicketDetail> =>
+  requestJson<AdminTicketDetail>(`/tickets/${encodeURIComponent(id)}`)
+
+export const replyTicket = async (id: string, body: string): Promise<AdminTicketDetail> =>
+  requestJson<AdminTicketDetail>(`/tickets/${encodeURIComponent(id)}/messages`, { method: 'POST', ...jsonBody({ body }) })
+
+export const setTicketStatus = async (id: string, status: TicketStatus): Promise<AdminTicketDetail> =>
+  requestJson<AdminTicketDetail>(`/tickets/${encodeURIComponent(id)}/status`, { method: 'PUT', ...jsonBody({ status }) })
+
+/** 下载附件图片（需要登录，不能直接用图片地址）。thumb 时下载缩略图（小的 JPEG）。 */
+export const fetchTicketAttachment = async (id: string, thumb = false): Promise<Blob> => {
+  const query = thumb ? '?size=thumb' : ''
+  const response = await send(`/tickets/attachments/${encodeURIComponent(id)}${query}`, { headers: { Accept: 'image/*' } })
   return response.blob()
 }

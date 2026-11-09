@@ -1,303 +1,189 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertCircle, Loader2, MessageSquare, Send, X } from 'lucide-vue-next'
-import { getTicket, replyTicket, updateTicketStatus } from '../../api/tickets'
-import AdminAttachmentThumbnail from './AdminAttachmentThumbnail.vue'
-import AdminAttachmentPreviewModal from './AdminAttachmentPreviewModal.vue'
-import type { AdminTicketDetail, TicketStatus } from '../../types/tickets'
+import { Loader2, Send, X } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { getTicket, replyTicket, setTicketStatus } from '../../api/tickets'
+import { ticketStatuses, type AdminTicketDetail, type TicketStatus } from '../../types/tickets'
+import TicketAttachmentThumb from './TicketAttachmentThumb.vue'
+import TicketImagePreview from './TicketImagePreview.vue'
 
-const props = defineProps<{
-  open: boolean
-  ticketId: string | null
-}>()
-
-const emit = defineEmits<{
-  (event: 'close'): void
-  (event: 'updated'): void
-}>()
-
+// 工单详情：用户信息、来往消息（含图片）、回复和修改状态。回复后工单变成「已回复」。
+const props = defineProps<{ ticketId: string }>()
+const emit = defineEmits<{ close: []; updated: [] }>()
 const { t, locale } = useI18n()
-const prefix = 'admin.tickets.detail'
 
-const detail = ref<AdminTicketDetail | null>(null)
-const isLoading = ref(false)
-const errorKey = ref<string | null>(null)
-const replyBody = ref('')
-const isReplying = ref(false)
-const replyErrorKey = ref<string | null>(null)
-const isStatusUpdating = ref(false)
-const previewImage = ref<{ url: string; name: string } | null>(null)
+const ticket = ref<AdminTicketDetail | null>(null)
+const loading = ref(false)
+const error = ref('')
+const reply = ref('')
+const sending = ref(false)
+const changingStatus = ref(false)
+const preview = ref<{ url: string; name: string } | null>(null)
+const thread = ref<HTMLElement | null>(null)
 
-const statusOptions: TicketStatus[] = ['open', 'pending', 'replied', 'closed']
-
-const openAttachmentPreview = (payload: { url: string; name: string }) => {
-  previewImage.value = payload
-}
-
-const closeAttachmentPreview = () => {
-  previewImage.value = null
+const scrollToEnd = async () => {
+  await nextTick()
+  thread.value?.scrollTo({ top: thread.value.scrollHeight })
 }
 
 const load = async () => {
-  if (!props.ticketId) return
-  isLoading.value = true
-  errorKey.value = null
+  loading.value = true
+  error.value = ''
   try {
-    detail.value = await getTicket(props.ticketId)
-  } catch (error) {
-    errorKey.value = error instanceof Error ? error.message : 'admin.tickets.errors.unknown'
+    ticket.value = await getTicket(props.ticketId)
+    await scrollToEnd()
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : 'admin.tickets.errors.request'
   } finally {
-    isLoading.value = false
+    loading.value = false
   }
 }
 
-watch(() => [props.open, props.ticketId], ([isOpen]) => {
-  // 抽屉关闭或切换到另一张工单时，一并关闭可能还打开着的图片预览层，避免展示一个即将被
-  // AdminAttachmentThumbnail 卸载/revoke 掉的 object URL。
-  previewImage.value = null
-  if (isOpen) {
-    detail.value = null
-    replyBody.value = ''
-    replyErrorKey.value = null
-    void load()
+const send = async () => {
+  const body = reply.value.trim()
+  if (!body || sending.value || !ticket.value) return
+  sending.value = true
+  error.value = ''
+  try {
+    ticket.value = await replyTicket(ticket.value.id, body)
+    reply.value = ''
+    emit('updated')
+    await scrollToEnd()
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : 'admin.tickets.errors.request'
+  } finally {
+    sending.value = false
   }
+}
+
+const changeStatus = async (event: Event) => {
+  const status = (event.target as HTMLSelectElement).value as TicketStatus
+  if (!ticket.value || status === ticket.value.status) return
+  changingStatus.value = true
+  error.value = ''
+  try {
+    ticket.value = await setTicketStatus(ticket.value.id, status)
+    emit('updated')
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : 'admin.tickets.errors.request'
+    ;(event.target as HTMLSelectElement).value = ticket.value.status
+  } finally {
+    changingStatus.value = false
+  }
+}
+
+const onKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && !preview.value) emit('close')
+}
+
+const onReplyKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+    event.preventDefault()
+    void send()
+  }
+}
+
+const formatTime = (value: string) =>
+  new Intl.DateTimeFormat(locale.value, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+
+const userLine = computed(() => {
+  if (!ticket.value) return ''
+  const name = ticket.value.siteUsername || ticket.value.siteEmail || t('admin.tickets.unknownUser')
+  return ticket.value.siteUserId ? t('admin.tickets.detail.userWithId', { name, id: ticket.value.siteUserId }) : name
 })
 
-const submitReply = async () => {
-  if (!props.ticketId || !replyBody.value.trim()) return
-  isReplying.value = true
-  replyErrorKey.value = null
-  try {
-    detail.value = await replyTicket(props.ticketId, replyBody.value.trim())
-    replyBody.value = ''
-    emit('updated')
-  } catch (error) {
-    replyErrorKey.value = error instanceof Error ? error.message : 'admin.tickets.errors.unknown'
-  } finally {
-    isReplying.value = false
-  }
-}
-
-const handleStatusChange = async (event: Event) => {
-  if (!props.ticketId) return
-  const target = event.target as HTMLSelectElement
-  const nextStatus = target.value as TicketStatus
-  isStatusUpdating.value = true
-  errorKey.value = null
-  try {
-    detail.value = await updateTicketStatus(props.ticketId, nextStatus)
-    emit('updated')
-  } catch (error) {
-    errorKey.value = error instanceof Error ? error.message : 'admin.tickets.errors.unknown'
-    // 恢复下拉框到失败前的状态，避免界面显示和实际状态不一致。
-    if (detail.value) target.value = detail.value.status
-  } finally {
-    isStatusUpdating.value = false
-  }
-}
-
-const formatDateTime = (value: string | null): string => {
-  if (!value) return t('admin.tickets.common.placeholder')
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return t('admin.tickets.common.placeholder')
-  return new Intl.DateTimeFormat(locale.value, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
-
-const statusBadgeClass = (status: string): string => {
-  switch (status) {
-    case 'open':
-      return 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
-    case 'pending':
-      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-    case 'replied':
-      return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-    case 'closed':
-      return 'bg-surface-elevated text-muted-foreground'
-    default:
-      return 'bg-surface-elevated text-muted-foreground'
-  }
-}
+watch(() => props.ticketId, () => { void load() })
+onMounted(() => {
+  void load()
+  document.addEventListener('keydown', onKeydown)
+})
+onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition duration-150 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div v-if="open" class="fixed inset-0 z-[150]">
-        <div class="absolute inset-0 bg-background/60 backdrop-blur-sm" @click="emit('close')" />
-
-        <Transition
-          enter-active-class="transition duration-250 ease-out"
-          enter-from-class="translate-x-full"
-          enter-to-class="translate-x-0"
-          leave-active-class="transition duration-200 ease-in"
-          leave-from-class="translate-x-0"
-          leave-to-class="translate-x-full"
+  <div class="fixed inset-0 z-50 flex justify-end bg-background/60 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="ticket-detail-title" @click.self="emit('close')">
+    <div class="flex h-full w-full max-w-2xl flex-col border-l border-border/60 bg-card shadow-2xl">
+      <div class="flex shrink-0 items-start gap-3 border-b border-border/50 p-4">
+        <div class="min-w-0 flex-1">
+          <h2 id="ticket-detail-title" class="truncate text-lg font-semibold text-foreground">{{ ticket?.title ?? t('admin.tickets.detail.loading') }}</h2>
+          <p v-if="ticket" class="mt-0.5 text-xs text-muted-foreground">{{ ticket.category }} · {{ formatTime(ticket.createdAt) }}</p>
+        </div>
+        <select
+          v-if="ticket"
+          :value="ticket.status"
+          :disabled="changingStatus"
+          :aria-label="t('admin.tickets.detail.status')"
+          class="h-9 rounded-lg border border-border/60 bg-surface px-2 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+          @change="changeStatus"
         >
-          <div
-            v-if="open"
-            role="dialog"
-            aria-modal="true"
-            :aria-label="t(`${prefix}.title`)"
-            class="absolute bottom-0 right-0 top-0 w-full max-w-xl overflow-y-auto overscroll-contain border-l border-border/60 bg-card shadow-2xl"
-          >
-            <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border/60 bg-card/95 backdrop-blur px-5 py-4">
-              <div class="flex items-center gap-2.5">
-                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <MessageSquare class="h-4 w-4" />
-                </div>
-                <h3 class="text-sm font-semibold text-foreground">{{ t(`${prefix}.title`) }}</h3>
-              </div>
-              <button
-                type="button"
-                class="rounded-md p-1 text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground"
-                @click="emit('close')"
-              >
-                <X class="h-4 w-4" />
-              </button>
-            </div>
+          <option v-for="status in ticketStatuses" :key="status" :value="status">{{ t(`admin.tickets.status.${status}`) }}</option>
+        </select>
+        <button type="button" class="rounded-lg p-2 text-muted-foreground outline-none hover:bg-surface focus-visible:ring-2 focus-visible:ring-primary" :aria-label="t('admin.tickets.detail.close')" @click="emit('close')">
+          <X class="h-4 w-4" />
+        </button>
+      </div>
 
-            <div v-if="isLoading" class="flex items-center justify-center py-16">
-              <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
+      <p v-if="error" class="mx-4 mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{{ t(error) }}</p>
+      <p v-if="loading && !ticket" class="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 class="h-4 w-4 animate-spin" />{{ t('admin.tickets.detail.loading') }}</p>
 
-            <div v-else-if="errorKey && !detail" class="px-5 py-5">
-              <div class="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-600 dark:text-red-400">
-                {{ t(errorKey) }}
-              </div>
-            </div>
+      <template v-if="ticket">
+        <dl class="grid shrink-0 grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 border-b border-border/50 px-4 py-3 text-sm">
+          <dt class="text-muted-foreground">{{ t('admin.tickets.detail.user') }}</dt>
+          <dd class="min-w-0 truncate text-foreground">{{ userLine }} <span class="text-xs text-muted-foreground">{{ ticket.platform }}</span></dd>
+          <template v-if="ticket.siteEmail && ticket.siteEmail !== ticket.siteUsername">
+            <dt class="text-muted-foreground">{{ t('admin.tickets.detail.email') }}</dt>
+            <dd class="min-w-0 truncate text-foreground">{{ ticket.siteEmail }}</dd>
+          </template>
+          <template v-if="ticket.contact">
+            <dt class="text-muted-foreground">{{ t('admin.tickets.detail.contact') }}</dt>
+            <dd class="min-w-0 truncate text-foreground">{{ ticket.contact }}</dd>
+          </template>
+          <template v-if="ticket.clientInfo">
+            <dt class="text-muted-foreground">{{ t('admin.tickets.detail.client') }}</dt>
+            <dd class="min-w-0 truncate text-foreground">{{ ticket.clientInfo }}</dd>
+          </template>
+        </dl>
 
-            <div v-else-if="detail" class="space-y-5 px-5 py-5">
-              <div class="space-y-3">
-                <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t(`${prefix}.sectionTicket`) }}</p>
-                <div class="rounded-xl border border-border/40 bg-surface/30 p-4 space-y-3">
-                  <div class="flex items-start justify-between gap-3">
-                    <p class="text-sm font-semibold text-foreground">{{ detail.title }}</p>
-                    <div class="flex shrink-0 items-center gap-2">
-                      <span class="rounded-full px-2.5 py-1 text-xs font-medium" :class="statusBadgeClass(detail.status)">
-                        {{ t(`admin.tickets.status.${detail.status}`) }}
-                      </span>
-                      <select
-                        :value="detail.status"
-                        class="h-7 rounded-md border border-border/50 bg-surface px-1.5 text-xs text-foreground outline-none focus:border-primary"
-                        :disabled="isStatusUpdating"
-                        @change="handleStatusChange"
-                      >
-                        <option v-for="status in statusOptions" :key="status" :value="status">
-                          {{ t(`admin.tickets.status.${status}`) }}
-                        </option>
-                      </select>
-                    </div>
-                  </div>
-                  <div class="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <p class="text-muted-foreground">{{ t(`${prefix}.category`) }}</p>
-                      <p class="mt-0.5 text-foreground">{{ detail.category }}</p>
-                    </div>
-                    <div>
-                      <p class="text-muted-foreground">{{ t(`${prefix}.priority`) }}</p>
-                      <p class="mt-0.5 text-foreground">{{ detail.priority }}</p>
-                    </div>
-                    <div>
-                      <p class="text-muted-foreground">{{ t(`${prefix}.manualEmail`) }}</p>
-                      <p class="mt-0.5 text-foreground">{{ detail.manualEmail }}</p>
-                    </div>
-                    <div>
-                      <p class="text-muted-foreground">{{ t(`${prefix}.lastMessageAt`) }}</p>
-                      <p class="mt-0.5 text-foreground">{{ formatDateTime(detail.lastMessageAt) }}</p>
-                    </div>
-                    <div>
-                      <p class="text-muted-foreground">{{ t(`${prefix}.sub2apiUserId`) }}</p>
-                      <p class="mt-0.5 text-foreground">{{ detail.sub2apiUserId || t('admin.tickets.common.placeholder') }}</p>
-                    </div>
-                    <div>
-                      <p class="text-muted-foreground">{{ t(`${prefix}.sub2apiEmail`) }}</p>
-                      <p class="mt-0.5 text-foreground">{{ detail.sub2apiEmail || t('admin.tickets.common.placeholder') }}</p>
-                    </div>
-                    <div>
-                      <p class="text-muted-foreground">{{ t(`${prefix}.sub2apiRole`) }}</p>
-                      <p class="mt-0.5 text-foreground">{{ detail.sub2apiRole || t('admin.tickets.common.placeholder') }}</p>
-                    </div>
-                    <div>
-                      <p class="text-muted-foreground">{{ t(`${prefix}.sub2apiSrcHost`) }}</p>
-                      <p class="mt-0.5 truncate text-foreground" :title="detail.sub2apiSrcHost">{{ detail.sub2apiSrcHost || t('admin.tickets.common.placeholder') }}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="space-y-3 border-t border-border/40 pt-5">
-                <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t(`${prefix}.sectionMessages`) }}</p>
-                <div class="max-h-80 space-y-3 overflow-y-auto rounded-lg border border-border/40 p-3">
-                  <div v-for="message in detail.messages" :key="message.id" class="space-y-1">
-                    <div class="flex items-center justify-between text-xs text-muted-foreground">
-                      <span class="font-medium text-foreground">
-                        {{ message.authorType === 'admin' ? t(`${prefix}.authorAdmin`) : (message.authorName || t(`${prefix}.authorCustomer`)) }}
-                      </span>
-                      <span>{{ formatDateTime(message.createdAt) }}</span>
-                    </div>
-                    <p class="whitespace-pre-wrap rounded-lg bg-surface/50 p-3 text-sm text-foreground">{{ message.body }}</p>
-                    <div v-if="message.attachments.length > 0" class="flex flex-wrap gap-2">
-                      <AdminAttachmentThumbnail
-                        v-for="attachment in message.attachments"
-                        :key="attachment.id"
-                        :attachment="attachment"
-                        @preview="openAttachmentPreview"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="space-y-2 border-t border-border/40 pt-5">
-                <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t(`${prefix}.sectionReply`) }}</p>
-                <textarea
-                  v-model="replyBody"
-                  rows="3"
-                  class="w-full rounded-lg border border-border/50 bg-surface px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                  :placeholder="t(`${prefix}.replyPlaceholder`)"
-                />
-                <div v-if="replyErrorKey" class="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-600 dark:text-red-400">
-                  <AlertCircle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <span>{{ t(replyErrorKey) }}</span>
-                </div>
-                <div class="flex justify-end">
-                  <button
-                    type="button"
-                    class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-                    :disabled="isReplying || !replyBody.trim()"
-                    @click="submitReply"
-                  >
-                    <Loader2 v-if="isReplying" class="h-3.5 w-3.5 animate-spin" />
-                    <Send v-else class="h-3.5 w-3.5" />
-                    {{ t(`${prefix}.send`) }}
-                  </button>
-                </div>
+        <div ref="thread" class="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+          <div v-for="message in ticket.messages" :key="message.id" class="flex" :class="message.authorType === 'admin' ? 'justify-end' : 'justify-start'">
+            <div class="max-w-[85%] space-y-1.5">
+              <p class="text-xs text-muted-foreground" :class="message.authorType === 'admin' ? 'text-right' : ''">
+                {{ message.authorType === 'admin' ? t('admin.tickets.detail.you') : (message.authorName || t('admin.tickets.unknownUser')) }} · {{ formatTime(message.createdAt) }}
+              </p>
+              <div
+                v-if="message.body"
+                class="whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-sm"
+                :class="message.authorType === 'admin' ? 'rounded-tr-sm bg-primary text-primary-foreground' : 'rounded-tl-sm bg-surface text-foreground'"
+              >{{ message.body }}</div>
+              <div v-if="message.attachments.length" class="flex flex-wrap gap-2" :class="message.authorType === 'admin' ? 'justify-end' : ''">
+                <TicketAttachmentThumb v-for="attachment in message.attachments" :key="attachment.id" :attachment="attachment" @preview="preview = $event" />
               </div>
             </div>
           </div>
-        </Transition>
-      </div>
-    </Transition>
-  </Teleport>
+        </div>
 
-  <AdminAttachmentPreviewModal
-    :open="!!previewImage"
-    :url="previewImage?.url ?? null"
-    :name="previewImage?.name ?? null"
-    @close="closeAttachmentPreview"
-  />
+        <div class="shrink-0 border-t border-border/50 p-3">
+          <p v-if="ticket.status === 'closed'" class="mb-2 text-xs text-muted-foreground">{{ t('admin.tickets.detail.closedNote') }}</p>
+          <div class="flex items-end gap-2">
+            <textarea
+              v-model="reply"
+              rows="3"
+              maxlength="5000"
+              :placeholder="t('admin.tickets.detail.replyPlaceholder')"
+              :aria-label="t('admin.tickets.detail.reply')"
+              class="min-h-[4.5rem] flex-1 resize-y rounded-lg border border-border/60 bg-surface px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              @keydown="onReplyKeydown"
+            />
+            <Button :disabled="!reply.trim() || sending" @click="send">
+              <Loader2 v-if="sending" class="h-4 w-4 animate-spin" />
+              <Send v-else class="h-4 w-4" />
+              {{ t('admin.tickets.detail.send') }}
+            </Button>
+          </div>
+        </div>
+      </template>
+    </div>
+    <TicketImagePreview v-if="preview" :url="preview.url" :name="preview.name" @close="preview = null" />
+  </div>
 </template>

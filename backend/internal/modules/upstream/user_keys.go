@@ -2,6 +2,8 @@ package upstream
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -32,6 +34,18 @@ func (s *PlatformService) DeleteUserKey(session Session, keyID string) error {
 	default:
 		return newRequestError(ErrorRequest, session.Platform)
 	}
+}
+
+func (s *PlatformService) DeleteSub2APIKey(session Session, keyID string) error {
+	if session.Platform != PlatformSub2API || strings.TrimSpace(session.AccessToken) == "" {
+		return newRequestError(ErrorAuth, PlatformSub2API)
+	}
+	_, err := s.httpClient.requestJSON(session.BaseURL+"/api/v1/keys/"+url.PathEscape(keyID), requestOptions{
+		AccessToken: session.AccessToken,
+		TokenType:   session.TokenType,
+		Method:      http.MethodDelete,
+	})
+	return err
 }
 
 func (s *PlatformService) FindUserKeyByName(session Session, name string) (*Sub2APIKeyItem, error) {

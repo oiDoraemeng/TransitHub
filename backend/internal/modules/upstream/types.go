@@ -35,6 +35,12 @@ const (
 	// ErrorSub2APIBulkUpdateUnsupported 表示当前 Sub2API 站点没有字段级批量更新能力。
 	// 调度优先级/状态更新遇到该能力缺失时必须要求升级，绝不回退到整对象回写。
 	ErrorSub2APIBulkUpdateUnsupported = "admin.upstream.errors.sub2APIBulkUpdateUnsupported"
+	// ErrorVerificationRequired 表示账号密码登录要求二次验证（2FA / Passkey 等），无法无人值守地完成，
+	// 需要改用访问令牌接入。
+	ErrorVerificationRequired = "admin.upstream.errors.verificationRequired"
+	// ErrorNewAPITokenRejected 表示未填写用户 ID 时 new-api 访问令牌校验失败：旧版 new-api 的系统访问令牌
+	// 必须同时提供用户 ID（New-Api-User）；新版 PAT 则可能是令牌无效、过期或缺少所需 scope。
+	ErrorNewAPITokenRejected = "admin.upstream.errors.newApiTokenRejected"
 )
 
 // SSE 同步流事件类型。
@@ -197,11 +203,14 @@ type Session struct {
 	AccessToken string
 	// AdminAPIKey 是 Sub2API 管理路由使用的 Admin API Key，通过 x-api-key 发送。
 	// 它与用户 JWT/AccessToken 分开保存，避免被误发到普通用户路由。
-	AdminAPIKey  string `json:",omitempty"`
+	AdminAPIKey string `json:",omitempty"`
+	// RefreshToken：sub2api 为登录返回的 refresh_token；新版 new-api 密码登录时为 HttpOnly refresh
+	// cookie（new_api_refresh）的值。两者每次刷新都会轮换，刷新后必须持久化新值——new-api 会把
+	// 30 秒容错窗口之后重新出现的上一代 refresh token 视为重放并吊销整个登录会话。
 	RefreshToken string
 	TokenType    string
-	// ExpiresAt 是 access token 过期的毫秒时间戳，来自登录/刷新响应的 expires_in。
-	// 临期时由 refreshIfNeeded 用 refresh token 自动换新（refresh token 本身无过期时间）。
+	// ExpiresAt 是 access token 过期的毫秒时间戳：sub2api 来自登录/刷新响应的 expires_in，新版 new-api
+	// 来自 access_expires_at（只有 15 分钟）。临期时由 RefreshSession 用 refresh 凭据自动换新。
 	ExpiresAt *int64
 	// QuotaPerUnit 是 new-api 的 quota 换算单位（来自 /api/status 的 quota_per_unit 字段）。
 	// sub2api 不使用此字段。为 0 时回退到默认值 500000。
@@ -209,13 +218,14 @@ type Session struct {
 }
 
 // IsAuthenticated 按平台判断会话是否有效（已持有登录凭证）。
-// sub2api 支持用户 AccessToken 或 Admin API Key；new-api 需要 UserID，
-// 并支持 Cookie 会话或“个人设置 -> 系统访问令牌”生成的 Access Token。
+// sub2api 支持用户 AccessToken 或 Admin API Key。new-api 的 Bearer 访问令牌本身就是凭据——
+// 新版密码登录得到的 JWT、PAT（nap_ 开头）或旧版系统访问令牌都属于这一类；只有旧版 Cookie 会话
+// 还必须配合 UserID（New-Api-User）。
 func (s Session) IsAuthenticated() bool {
 	switch s.Platform {
 	case PlatformNewAPI:
-		return strings.TrimSpace(s.UserID) != "" &&
-			(strings.TrimSpace(s.Cookie) != "" || strings.TrimSpace(s.AccessToken) != "")
+		return strings.TrimSpace(s.AccessToken) != "" ||
+			(strings.TrimSpace(s.Cookie) != "" && strings.TrimSpace(s.UserID) != "")
 	case PlatformSub2API:
 		return strings.TrimSpace(s.AccessToken) != "" || strings.TrimSpace(s.AdminAPIKey) != ""
 	default:
@@ -224,8 +234,20 @@ func (s Session) IsAuthenticated() bool {
 	}
 }
 
-// Sub2APIKeyItem 表示从上游 Sub2API 站点获取的单个 API Key 信息。
-// 用于手动绑定时展示 key 列表供用户选择。
+// sameCredentials 判断两个会话携带的凭据是否完全一致。刷新后只在凭据确实变化时写回，
+// 避免把调用方手里较旧的会话副本覆盖到其他流程刚轮换出的新会话上。
+func (s Session) sameCredentials(other Session) bool {
+	if s.Platform != other.Platform || s.BaseURL != other.BaseURL || s.Cookie != other.Cookie || s.UserID != other.UserID ||
+		s.AccessToken != other.AccessToken || s.AdminAPIKey != other.AdminAPIKey || s.RefreshToken != other.RefreshToken ||
+		s.TokenType != other.TokenType || s.QuotaPerUnit != other.QuotaPerUnit {
+		return false
+	}
+	if (s.ExpiresAt == nil) != (other.ExpiresAt == nil) {
+		return false
+	}
+	return s.ExpiresAt == nil || *s.ExpiresAt == *other.ExpiresAt
+}
+
 type Sub2APIKeyItem struct {
 	ID        string `json:"id"`
 	Key       string `json:"key"`
@@ -257,9 +279,8 @@ type BalanceFilter struct {
 	ExcludeBalances []float64 // 需要排除的精确余额值（如 0、0.1、1 等）
 }
 
-// Sub2APIAdminUser 是 GET /api/v1/admin/users/:id 返回的用户详情中，工单模块"Sub2API 用户
-// 资料"弹窗需要展示的只读字段。字段在远端响应中不存在或类型不匹配时保持零值/nil，
-// 由调用方（tickets.Service）按需降级展示，不在这里伪造数据。
+// Sub2APIAdminUser 是 Sub2API admin 用户接口（详情 / 列表）返回的只读字段。
+// 字段在远端响应中不存在或类型不匹配时保持零值/nil，由调用方按需降级，不在这里伪造数据。
 type Sub2APIAdminUser struct {
 	ID            string
 	Email         string
@@ -272,6 +293,8 @@ type Sub2APIAdminUser struct {
 	RPMLimit      *int
 	CreatedAt     *time.Time
 	LastUsedAt    *time.Time
+	// TotalRecharged 是用户累计充值金额（sub2api total_recharged），旧版本没有该字段时为 nil。
+	TotalRecharged *float64
 }
 
 // Sub2APIAdminUsersQuery 是 Sub2API admin 用户分页列表的安全查询对象。
@@ -298,53 +321,6 @@ type Sub2APIAdminUsersPage struct {
 	// unknown-length user stream.
 	TotalKnown bool
 	PagesKnown bool
-}
-
-// Sub2APIUserBreakdownQuery is the explicit contract for the Sub2API admin
-// leaderboard source endpoint. The upstream end_date is exclusive.
-type Sub2APIUserBreakdownQuery struct {
-	StartDate string
-	EndDate   string
-	SortBy    string
-	Limit     int
-	Timezone  string
-}
-
-// Sub2APIUserBreakdownItem is one user row from
-// /api/v1/admin/dashboard/user-breakdown. Optional token/cost fields stay at
-// zero when older Sub2API deployments omit them.
-type Sub2APIUserBreakdownItem struct {
-	UserID       string
-	Email        string
-	Requests     int
-	InputTokens  int64
-	OutputTokens int64
-	CacheTokens  int64
-	TotalTokens  int64
-	Cost         float64
-	ActualCost   float64
-}
-
-type Sub2APIUserBreakdown struct {
-	Users     []Sub2APIUserBreakdownItem
-	StartDate string
-	EndDate   string
-}
-
-// Sub2APIBalanceHistoryItem 是 Sub2API 用户余额/充值历史中的单条记录。
-type Sub2APIBalanceHistoryItem struct {
-	ID        string
-	Type      string
-	Amount    *float64
-	Note      string
-	CreatedAt *time.Time
-}
-
-// Sub2APIUserBalanceHistory 是 GET /api/v1/admin/users/:id/balance-history 的解析结果。
-type Sub2APIUserBalanceHistory struct {
-	Items          []Sub2APIBalanceHistoryItem
-	Total          int
-	TotalRecharged *float64
 }
 
 // KeyUsageTodayStat 是平台层返回的单个 key 今日消费统计（上游平台原始金额，未乘以站点 rechargeRate）。

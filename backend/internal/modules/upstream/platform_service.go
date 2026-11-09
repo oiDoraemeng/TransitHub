@@ -13,27 +13,21 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"transithub/backend/internal/shared/bizclock"
 )
-
-// jsonUnmarshalString 将 JSON 字符串解析到目标结构。
-func jsonUnmarshalString(s string, v any) error {
-	return json.Unmarshal([]byte(s), v)
-}
-
-// jsonMarshal 将值序列化为 JSON 字节。
-func jsonMarshal(v any) ([]byte, error) {
-	return json.Marshal(v)
-}
 
 const refreshSkewMS int64 = 60_000
 
 type PlatformService struct {
 	httpClient                    *HTTPClient
 	sub2APIKeyIdempotencyRequired sync.Map
+	// refresher 保证同一个 refresh token 在进程内只兑换一次（见 sessionRefresher）。
+	refresher *sessionRefresher
 }
 
 func NewPlatformService(httpClient *HTTPClient) *PlatformService {
-	return &PlatformService{httpClient: httpClient}
+	return &PlatformService{httpClient: httpClient, refresher: newSessionRefresher()}
 }
 
 // WithHTTPClient returns a platform service sharing all behavior with the
@@ -42,7 +36,7 @@ func (s *PlatformService) WithHTTPClient(httpClient *HTTPClient) *PlatformServic
 	if httpClient == nil {
 		return s
 	}
-	return &PlatformService{httpClient: httpClient}
+	return &PlatformService{httpClient: httpClient, refresher: s.refresher}
 }
 
 // newAPIAuthOptions supports both legacy cookie sessions and system access tokens.
@@ -103,6 +97,10 @@ func (s *PlatformService) Login(baseURL string, platform Platform, account strin
 		if err == nil {
 			return result, nil
 		}
+		// 自动识别平台时，new-api 已明确要求二次验证就说明平台识别成功，不要再用 sub2api 登录掩盖该提示。
+		if errorKey(err) == ErrorVerificationRequired {
+			return LoginResult{}, err
+		}
 		return s.loginSub2API(normalizedURL, account, password)
 	}
 }
@@ -126,7 +124,7 @@ func (s *PlatformService) LoginWithToken(baseURL string, platform Platform, acco
 		session.ExpiresAt = expiresAt
 	}
 	if strings.TrimSpace(session.AccessToken) == "" && session.RefreshToken != "" {
-		refreshedSession, err := s.refreshSub2APISession(session)
+		refreshedSession, err := s.ForceRefreshSession(session)
 		if err != nil {
 			return LoginResult{}, err
 		}
@@ -140,7 +138,7 @@ func (s *PlatformService) LoginWithToken(baseURL string, platform Platform, acco
 	// token and consume the refresh token only after the access token is rejected;
 	// an old refresh token must not make an otherwise valid login fail.
 	if err != nil && session.RefreshToken != "" && isSub2APIAuthError(err) {
-		refreshedSession, refreshErr := s.refreshSub2APISession(session)
+		refreshedSession, refreshErr := s.ForceRefreshSession(session)
 		if refreshErr != nil {
 			return LoginResult{}, refreshErr
 		}
@@ -191,7 +189,7 @@ func (s *PlatformService) LoginWithUserKey(baseURL string, userID string, access
 	}
 	userID = strings.TrimSpace(userID)
 	accessToken = strings.TrimSpace(accessToken)
-	if userID == "" || accessToken == "" {
+	if accessToken == "" {
 		return LoginResult{}, newRequestError(ErrorAuth, PlatformNewAPI)
 	}
 	session := Session{
@@ -201,6 +199,13 @@ func (s *PlatformService) LoginWithUserKey(baseURL string, userID string, access
 		AccessToken: accessToken,
 		TokenType:   "Bearer",
 	}
+	if session.UserID == "" {
+		discovered, err := s.discoverNewAPIUserID(session)
+		if err != nil {
+			return LoginResult{}, err
+		}
+		session.UserID = discovered
+	}
 	session.QuotaPerUnit = s.fetchNewAPIQuotaPerUnit(session)
 	metrics, err := s.fetchNewAPIMetrics(session, nil)
 	if err != nil {
@@ -209,13 +214,36 @@ func (s *PlatformService) LoginWithUserKey(baseURL string, userID string, access
 	return LoginResult{Platform: PlatformNewAPI, Session: session, Metrics: metrics}, nil
 }
 
+// RefreshSession 在 access token 临期时用 refresh 凭据换新；没有 refresh 凭据（旧版 new-api Cookie 会话、
+// 访问令牌、Admin Key）或尚未临期时原样返回。refresh token 每次刷新都会轮换，调用方必须持久化返回值。
 func (s *PlatformService) RefreshSession(session Session) (Session, error) {
-	if session.Platform == PlatformNewAPI {
+	if !sessionNeedsRefresh(session, time.Now().UnixMilli()) {
 		return session, nil
 	}
-	now := time.Now().UnixMilli()
-	if session.RefreshToken == "" || (session.ExpiresAt != nil && *session.ExpiresAt-now > refreshSkewMS) {
-		return session, nil
+	if s.refresher == nil {
+		return s.exchangeRefreshToken(session)
+	}
+	return s.refresher.refresh(session, func(candidate Session) bool {
+		return sessionNeedsRefresh(candidate, time.Now().UnixMilli())
+	}, s.exchangeRefreshToken)
+}
+
+// sessionNeedsRefresh 判断会话是否需要用 refresh 凭据换新：没有 refresh 凭据时永不刷新；
+// 否则在 access token 剩余有效期不足提前量、或过期时间未知时刷新。
+func sessionNeedsRefresh(session Session, nowMS int64) bool {
+	if strings.TrimSpace(session.RefreshToken) == "" {
+		return false
+	}
+	skew := refreshSkewMS
+	if session.Platform == PlatformNewAPI {
+		skew = newAPIRefreshSkewMS
+	}
+	return session.ExpiresAt == nil || *session.ExpiresAt-nowMS <= skew
+}
+
+func (s *PlatformService) exchangeRefreshToken(session Session) (Session, error) {
+	if session.Platform == PlatformNewAPI {
+		return s.refreshNewAPISession(session)
 	}
 	return s.refreshSub2APISession(session)
 }
@@ -226,7 +254,12 @@ func (s *PlatformService) ForceRefreshSession(session Session) (Session, error) 
 	if session.Platform != PlatformSub2API || strings.TrimSpace(session.RefreshToken) == "" {
 		return Session{}, newRequestError(ErrorAuth, session.Platform)
 	}
-	return s.refreshSub2APISession(session)
+	if s.refresher == nil {
+		return s.refreshSub2APISession(session)
+	}
+	return s.refresher.refresh(session, func(candidate Session) bool {
+		return candidate.AccessToken == session.AccessToken || sessionNeedsRefresh(candidate, time.Now().UnixMilli())
+	}, s.refreshSub2APISession)
 }
 
 func (s *PlatformService) refreshSub2APISession(session Session) (Session, error) {
@@ -279,8 +312,10 @@ func (s *PlatformService) LoginAdmin(baseURL string, platform Platform, account 
 }
 
 // LoginAdminWithKey validates a platform management key without converting it
-// into a refreshable login session. Sub2API uses x-api-key; new-api uses its
-// system access token together with New-Api-User.
+// into a refreshable login session. Sub2API uses x-api-key; new-api accepts a
+// personal access token (PAT) or a legacy system access token. The new-api user
+// ID is optional: when omitted it is discovered via /api/user/self, which only
+// works for PATs on current new-api (legacy tokens still require New-Api-User).
 func (s *PlatformService) LoginAdminWithKey(baseURL string, platform Platform, key string, userID string) (Session, error) {
 	normalizedURL, err := s.NormalizeURL(baseURL)
 	if err != nil {
@@ -288,7 +323,7 @@ func (s *PlatformService) LoginAdminWithKey(baseURL string, platform Platform, k
 	}
 	key = strings.TrimSpace(key)
 	userID = strings.TrimSpace(userID)
-	if key == "" || (platform == PlatformNewAPI && userID == "") {
+	if key == "" {
 		return Session{}, newRequestError(ErrorAuth, platform)
 	}
 
@@ -300,6 +335,13 @@ func (s *PlatformService) LoginAdminWithKey(baseURL string, platform Platform, k
 		session.AccessToken = key
 		session.TokenType = "Bearer"
 		session.UserID = userID
+		if session.UserID == "" {
+			discovered, err := s.discoverNewAPIUserID(session)
+			if err != nil {
+				return Session{}, err
+			}
+			session.UserID = discovered
+		}
 		session.QuotaPerUnit = s.fetchNewAPIQuotaPerUnit(session)
 	default:
 		return Session{}, newRequestError(ErrorAuth, platform)
@@ -458,8 +500,8 @@ func (s *PlatformService) FetchSub2APIGroupDailyStats(session Session, groups ..
 	if err := s.VerifySub2APIAdmin(session); err != nil {
 		return nil, err
 	}
-	today := time.Now().Format("2006-01-02")
-	statsURL := session.BaseURL + "/api/v1/admin/dashboard/groups?start_date=" + today + "&end_date=" + today
+	today := bizclock.Today()
+	statsURL := session.BaseURL + "/api/v1/admin/dashboard/groups?start_date=" + today + "&end_date=" + today + "&timezone=" + url.QueryEscape(bizclock.Name)
 	response, err := s.httpClient.requestJSON(statsURL, adminAuthOptions(session))
 	if err != nil {
 		return nil, err
@@ -488,7 +530,7 @@ func (s *PlatformService) FetchSub2APIAdminUsageStats(session Session, startDate
 	if session.Platform != PlatformSub2API || !session.IsAuthenticated() {
 		return 0, newRequestError(ErrorAuth, PlatformSub2API)
 	}
-	statsURL := session.BaseURL + "/api/v1/admin/usage/stats?start_date=" + startDate + "&end_date=" + endDate
+	statsURL := session.BaseURL + "/api/v1/admin/usage/stats?start_date=" + startDate + "&end_date=" + endDate + "&timezone=" + url.QueryEscape(bizclock.Name)
 	response, err := s.httpClient.requestJSON(statsURL, adminAuthOptions(session))
 	if err != nil {
 		return 0, err
@@ -901,7 +943,7 @@ func (s *PlatformService) fetchSub2APIKeyGroupDailyStats(session Session) ([]Gro
 	if len(keys) == 0 {
 		return nil, newRequestError(ErrorInvalidResponse, PlatformSub2API)
 	}
-	today := time.Now().Format("2006-01-02")
+	today := bizclock.Today()
 	totals := map[string]float64{}
 	for _, item := range keys {
 		keyID := firstNumber(item, []string{"id"})
@@ -913,7 +955,7 @@ func (s *PlatformService) fetchSub2APIKeyGroupDailyStats(session Session) ([]Gro
 		// key carries its group object from /keys, so summing every key's actual cost
 		// by group gives a group-level total even when the admin dashboard endpoint is
 		// unavailable for ordinary upstream tokens.
-		statsURL := session.BaseURL + "/api/v1/usage/stats?start_date=" + today + "&end_date=" + today + "&api_key_id=" + strconvInt(int64(*keyID)) + "&timezone=Asia%2FShanghai"
+		statsURL := session.BaseURL + "/api/v1/usage/stats?start_date=" + today + "&end_date=" + today + "&api_key_id=" + strconvInt(int64(*keyID)) + "&timezone=" + url.QueryEscape(bizclock.Name)
 		statsResponse, err := s.httpClient.requestJSON(statsURL, authOptions)
 		if err != nil {
 			return nil, err
@@ -959,25 +1001,61 @@ func sub2APIGroupDailyCost(item any) float64 {
 	return *cost
 }
 
+// FetchNewAPIGroupDailyStats 统计「当前登录用户自己」今日在各分组的消费（/api/log/self/stat）。
+// 只适用于上游站点的普通用户会话（我在上游各分组花了多少）；本站（admin 工作区）的分组用量
+// 必须走 FetchAdminGroupDailyStats 的全站口径，否则只会统计到管理员本人的调用。
 func (s *PlatformService) FetchNewAPIGroupDailyStats(session Session, groups []GroupInfo) ([]GroupDailyStat, error) {
+	return s.fetchNewAPIGroupDailyStats(session, groups, newAPISelfLogStatPath)
+}
+
+// fetchNewAPIGroupDailyStats 按分组逐个查询 statPath 在今日窗口内的消费额度。
+// 整个循环共用同一个时间窗口，避免跨零点时不同分组落在不同的「今天」。
+func (s *PlatformService) fetchNewAPIGroupDailyStats(session Session, groups []GroupInfo, statPath string) ([]GroupDailyStat, error) {
 	if session.Platform != PlatformNewAPI || !session.IsAuthenticated() {
 		return nil, newRequestError(ErrorAuth, PlatformNewAPI)
 	}
-	cookieOptions := newAPIAuthOptions(session)
+	startTS, endTS := todayStart(), todayEnd()
 	stats := make([]GroupDailyStat, 0, len(groups))
 	for _, group := range groups {
 		name := strings.TrimSpace(group.Name)
 		if name == "" || name == defaultDisplay {
 			continue
 		}
-		statURL := session.BaseURL + "/api/log/self/stat?type=2&start_timestamp=" + strconvInt(todayStart()) + "&end_timestamp=" + strconvInt(todayEnd()) + "&group=" + url.QueryEscape(name)
-		payload, err := s.httpClient.requestJSON(statURL, cookieOptions)
+		amount, err := s.fetchNewAPIConsumeUSD(session, statPath, startTS, endTS, url.Values{"group": []string{name}})
 		if err != nil {
 			return nil, err
 		}
-		stats = append(stats, GroupDailyStat{GroupName: name, TodayActualCost: quotaToUSDValueWithUnit(firstNumber(dataRecord(payload.Payload), []string{"quota"}), session.QuotaPerUnit)})
+		stats = append(stats, GroupDailyStat{GroupName: name, TodayActualCost: amount})
 	}
 	return stats, nil
+}
+
+const (
+	// newAPISiteLogStatPath 是 new-api 管理员的全站日志统计接口（AdminAuth / PAT scope log:read），
+	// 汇总所有用户的消费，支持 group / channel / username 等过滤。本站营收与分组用量必须使用它。
+	newAPISiteLogStatPath = "/api/log/stat"
+	// newAPISelfLogStatPath 只统计当前登录用户自己的消费（new-api controller GetLogsSelfStat 固定按
+	// 当前用户名过滤）。适用于上游站点的普通用户会话，绝不能用来计算本站营收。
+	newAPISelfLogStatPath = "/api/log/self/stat"
+)
+
+// fetchNewAPIConsumeUSD 查询 new-api 日志统计接口在 [startTS, endTS] 内的消费额度（type=2），
+// 并按 quotaPerUnit 换算为美元口径额度。filters 为可选过滤条件（例如 group）。
+func (s *PlatformService) fetchNewAPIConsumeUSD(session Session, statPath string, startTS int64, endTS int64, filters url.Values) (float64, error) {
+	query := url.Values{}
+	query.Set("type", "2")
+	query.Set("start_timestamp", strconvInt(startTS))
+	query.Set("end_timestamp", strconvInt(endTS))
+	for key, values := range filters {
+		for _, value := range values {
+			query.Add(key, value)
+		}
+	}
+	response, err := s.httpClient.requestJSON(session.BaseURL+statPath+"?"+query.Encode(), newAPIAuthOptions(session))
+	if err != nil {
+		return 0, err
+	}
+	return quotaToUSDValueWithUnit(firstNumber(dataRecord(response.Payload), []string{"quota"}), session.QuotaPerUnit), nil
 }
 
 // FetchKeyUsageToday 按平台分发获取上游站点今天各 key 的消费统计。
@@ -1048,7 +1126,7 @@ func (s *PlatformService) fetchSub2APIKeyUsageToday(session Session) ([]KeyUsage
 		return nil, nil
 	}
 
-	today := time.Now().Format("2006-01-02")
+	today := bizclock.Today()
 	const maxKeyConcurrency = 4
 	sem := make(chan struct{}, maxKeyConcurrency)
 	var wg sync.WaitGroup
@@ -1063,7 +1141,7 @@ func (s *PlatformService) fetchSub2APIKeyUsageToday(session Session) ([]KeyUsage
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			statsURL := session.BaseURL + "/api/v1/usage/stats?start_date=" + today + "&end_date=" + today + "&api_key_id=" + record.id + "&timezone=Asia%2FShanghai"
+			statsURL := session.BaseURL + "/api/v1/usage/stats?start_date=" + today + "&end_date=" + today + "&api_key_id=" + record.id + "&timezone=" + url.QueryEscape(bizclock.Name)
 			response, err := s.httpClient.requestJSON(statsURL, authOptions)
 			if err != nil {
 				mu.Lock()
@@ -1208,6 +1286,12 @@ func (s *PlatformService) fetchNewAPIKeyUsageToday(session Session, _ []GroupInf
 	return stats, nil
 }
 
+// loginNewAPI 用账号密码登录 new-api，兼容两代鉴权：
+//   - 新版：响应 data 里有 access_token（15 分钟 JWT），refresh token 通过 HttpOnly Cookie 下发；
+//     面板接口只认 Authorization: Bearer，Cookie 会话已不再生效。
+//   - 旧版：Gin Session Cookie + New-Api-User（用户 ID 取自 data.id）。
+//
+// 开启二次验证的账号无法无人值守登录，返回 ErrorVerificationRequired，提示改用访问令牌。
 func (s *PlatformService) loginNewAPI(baseURL string, username string, password string) (LoginResult, error) {
 	response, err := s.httpClient.requestJSON(baseURL+"/api/user/login", requestOptions{
 		Method: http.MethodPost,
@@ -1222,34 +1306,26 @@ func (s *PlatformService) loginNewAPI(baseURL string, username string, password 
 		}
 	}
 	loginData := dataRecord(response.Payload)
-	userID := newAPIUserID(loginData)
-	accessToken := ""
-	if value := firstString(loginData, []string{"access_token", "accessToken"}); value != nil {
-		accessToken = strings.TrimSpace(*value)
+	if newAPILoginRequiresVerification(loginData) {
+		return LoginResult{}, newRequestError(ErrorVerificationRequired, PlatformNewAPI)
 	}
-	tokenType := ""
-	if accessToken != "" {
-		tokenType = "Bearer"
-		if value := firstString(loginData, []string{"token_type", "tokenType"}); value != nil && strings.TrimSpace(*value) != "" {
-			tokenType = strings.TrimSpace(*value)
+
+	session, userData, isBearer := newAPIBearerSession(baseURL, response)
+	if isBearer {
+		if session.RefreshToken == "" {
+			// 没有 refresh cookie 时 15 分钟后就无法续期（常见于反向代理剥离了 Set-Cookie），直接报错比静默失效更好排查。
+			log.Printf("new-api login returned no refresh cookie base_url=%s", baseURL)
+			return LoginResult{}, newRequestError(ErrorAuth, PlatformNewAPI)
+		}
+	} else {
+		session = Session{Platform: PlatformNewAPI, BaseURL: baseURL, Cookie: cookieHeader(response.Header), UserID: newAPIUserID(loginData)}
+		userData = loginData
+		if strings.TrimSpace(session.Cookie) == "" || strings.TrimSpace(session.UserID) == "" {
+			return LoginResult{}, newRequestError(ErrorAuth, PlatformNewAPI)
 		}
 	}
-	session := Session{
-		Platform:    PlatformNewAPI,
-		BaseURL:     baseURL,
-		Cookie:      cookieHeader(response.Header),
-		UserID:      userID,
-		AccessToken: accessToken,
-		TokenType:   tokenType,
-	}
-	if strings.TrimSpace(session.Cookie) == "" && session.AccessToken == "" {
-		return LoginResult{}, newRequestError(ErrorAuth, PlatformNewAPI)
-	}
-	if strings.TrimSpace(session.UserID) == "" {
-		return LoginResult{}, newRequestError(ErrorAuth, PlatformNewAPI)
-	}
 	session.QuotaPerUnit = s.fetchNewAPIQuotaPerUnit(session)
-	metrics, err := s.fetchNewAPIMetrics(session, loginData)
+	metrics, err := s.fetchNewAPIMetrics(session, userData)
 	if err != nil {
 		log.Printf("new-api metrics fetch failed base_url=%s err=%v", baseURL, err)
 		metrics = defaultMetrics()
@@ -1434,16 +1510,15 @@ func newAPIUserID(loginData map[string]any) string {
 	return ""
 }
 
+// todayStart / todayEnd 是当前业务日（北京时间）的起止 Unix 秒。
 func todayStart() int64 {
-	now := time.Now()
-	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	return start.Unix()
+	start, _ := bizclock.DayBounds(time.Now())
+	return start
 }
 
 func todayEnd() int64 {
-	now := time.Now()
-	end := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), now.Location())
-	return end.Unix()
+	_, end := bizclock.DayBounds(time.Now())
+	return end
 }
 
 // ListSub2APIKeys 获取上游 Sub2API 站点的 API Key 列表。
@@ -1658,49 +1733,6 @@ func groupID2(record map[string]any) string {
 	return ""
 }
 
-// CreateSub2APIAdminAccount 在 admin 站点通过 /api/v1/admin/accounts 创建转发账号。
-// payload 为完整的创建参数（platform、type、credentials、extra 等），由调用方组装。
-// 返回新建账号的 ID（字符串）；失败时返回 error。
-func (s *PlatformService) CreateSub2APIAdminAccount(session Session, payload map[string]any) (string, error) {
-	if session.Platform != PlatformSub2API || !session.IsAuthenticated() {
-		return "", newRequestError(ErrorAuth, PlatformSub2API)
-	}
-	options := adminAuthOptions(session)
-	options.Method = http.MethodPost
-	options.Body = payload
-	response, err := s.httpClient.requestJSON(session.BaseURL+"/api/v1/admin/accounts", options)
-	if err != nil {
-		return "", err
-	}
-	data := dataRecord(response.Payload)
-	accountID := groupID2(data)
-	return accountID, nil
-}
-
-// DeleteSub2APIKey 删除上游 Sub2API 站点的指定 API Key。
-func (s *PlatformService) DeleteSub2APIKey(session Session, keyID string) error {
-	if session.Platform != PlatformSub2API || strings.TrimSpace(session.AccessToken) == "" {
-		return newRequestError(ErrorAuth, PlatformSub2API)
-	}
-	_, err := s.httpClient.requestJSON(session.BaseURL+"/api/v1/keys/"+keyID, requestOptions{
-		AccessToken: session.AccessToken,
-		TokenType:   session.TokenType,
-		Method:      http.MethodDelete,
-	})
-	return err
-}
-
-// DeleteSub2APIAdminAccount 删除 admin 站点的指定转发账号。
-func (s *PlatformService) DeleteSub2APIAdminAccount(session Session, accountID string) error {
-	if session.Platform != PlatformSub2API || !session.IsAuthenticated() {
-		return newRequestError(ErrorAuth, PlatformSub2API)
-	}
-	options := adminAuthOptions(session)
-	options.Method = http.MethodDelete
-	_, err := s.httpClient.requestJSON(session.BaseURL+"/api/v1/admin/accounts/"+accountID, options)
-	return err
-}
-
 // FetchAdminUsageStats 平台中性的管理员今日消费查询。
 // sub2api 返回 actual_cost，new-api 返回 quota 并按 quotaPerUnit 换算为 USD。
 func (s *PlatformService) FetchAdminUsageStats(session Session, startDate, endDate string) (float64, error) {
@@ -1712,30 +1744,32 @@ func (s *PlatformService) FetchAdminUsageStats(session Session, startDate, endDa
 	}
 }
 
-// fetchNewAPIAdminUsageStats 调用 new-api /api/log/self/stat 获取指定日期范围内的总消费 quota。
+// fetchNewAPIAdminUsageStats 调用 new-api 管理员全站统计接口 /api/log/stat，获取指定日期范围内
+// 本站所有用户的消费额度（即本站营收）。旧实现误用 /api/log/self/stat，只统计到管理员本人的调用。
+// 日期边界按业务时区（北京时间）切分，与仪表盘「今日」的口径保持一致。
 func (s *PlatformService) fetchNewAPIAdminUsageStats(session Session, startDate, endDate string) (float64, error) {
 	if !session.IsAuthenticated() {
 		return 0, newRequestError(ErrorAuth, PlatformNewAPI)
 	}
-	start, err := time.Parse("2006-01-02", startDate)
+	startTS, endTS, err := localDateRangeUnix(startDate, endDate, bizclock.Location())
 	if err != nil {
 		return 0, err
 	}
-	end, err := time.Parse("2006-01-02", endDate)
+	return s.fetchNewAPIConsumeUSD(session, newAPISiteLogStatPath, startTS, endTS, nil)
+}
+
+// localDateRangeUnix 把 YYYY-MM-DD 日期区间换算为 [起始日 00:00:00, 结束日 23:59:59] 的 Unix 秒，
+// 日期边界按 loc 时区计算。旧实现用 time.Parse（固定 UTC），在北京时间下窗口整体偏移 8 小时。
+func localDateRangeUnix(startDate string, endDate string, loc *time.Location) (int64, int64, error) {
+	start, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(startDate), loc)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	startTS := start.Unix()
-	endTS := time.Date(end.Year(), end.Month(), end.Day(), 23, 59, 59, 0, end.Location()).Unix()
-	statURL := session.BaseURL + "/api/log/self/stat?type=2&start_timestamp=" + strconvInt(startTS) + "&end_timestamp=" + strconvInt(endTS)
-	cookieOptions := newAPIAuthOptions(session)
-	response, err := s.httpClient.requestJSON(statURL, cookieOptions)
+	end, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(endDate), loc)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	data := dataRecord(response.Payload)
-	quota := firstNumber(data, []string{"quota"})
-	return quotaToUSDValueWithUnit(quota, session.QuotaPerUnit), nil
+	return start.Unix(), end.AddDate(0, 0, 1).Unix() - 1, nil
 }
 
 // FetchAdminSiteBalanceFiltered 平台中性的站点用户总余额统计。
@@ -1891,12 +1925,13 @@ func (s *PlatformService) fetchNewAPIAdminGroups(session Session) ([]GroupInfo, 
 	return newAPIGroups(groupsPayload.Payload, pricingPayload.Payload), nil
 }
 
-// FetchAdminGroupDailyStats 平台中性的分组今日用量统计。
-// sub2api 复用 FetchSub2APIGroupDailyStats 的多级降级策略，new-api 复用 FetchNewAPIGroupDailyStats 的逐组查询。
+// FetchAdminGroupDailyStats 平台中性的本站（admin 工作区）分组今日用量统计。
+// sub2api 复用 FetchSub2APIGroupDailyStats 的多级降级策略；new-api 使用管理员全站统计接口逐组查询
+// （不能复用上游口径的 FetchNewAPIGroupDailyStats，它只统计当前登录用户自己）。
 func (s *PlatformService) FetchAdminGroupDailyStats(session Session, groups []GroupInfo) ([]GroupDailyStat, error) {
 	switch session.Platform {
 	case PlatformNewAPI:
-		return s.FetchNewAPIGroupDailyStats(session, groups)
+		return s.fetchNewAPIGroupDailyStats(session, groups, newAPISiteLogStatPath)
 	default:
 		return s.FetchSub2APIGroupDailyStats(session, groups)
 	}
@@ -2318,7 +2353,7 @@ func (s *PlatformService) updateNewAPIGroupRatio(session Session, groupName stri
 	// 找到 GroupRatio 的当前值并解析
 	ratioMap := map[string]float64{}
 	if ratioStr := firstString(data, []string{"GroupRatio"}); ratioStr != nil && *ratioStr != "" {
-		if jsonErr := jsonUnmarshalString(*ratioStr, &ratioMap); jsonErr != nil {
+		if jsonErr := json.Unmarshal([]byte(*ratioStr), &ratioMap); jsonErr != nil {
 			log.Printf("[auto-pricing] new-api GroupRatio parse failed base_url=%s err=%v", session.BaseURL, jsonErr)
 			return jsonErr
 		}
@@ -2328,7 +2363,7 @@ func (s *PlatformService) updateNewAPIGroupRatio(session Session, groupName stri
 	ratioMap[groupName] = multiplier
 
 	// 序列化为 JSON 字符串
-	ratioBytes, err := jsonMarshal(ratioMap)
+	ratioBytes, err := json.Marshal(ratioMap)
 	if err != nil {
 		return err
 	}
@@ -2511,10 +2546,9 @@ func (s *PlatformService) UpdateSub2APIAdminAccountStatus(session Session, accou
 // sub2APIUserIDKeys/sub2APIUserCreatedAtKeys/sub2APIUserLastUsedAtKeys/sub2APIBalanceHistoryTimeKeys
 // 是解析 Sub2API admin 用户资料相关字段时兼容的候选 key 列表（snake_case / camelCase）。
 var (
-	sub2APIUserIDKeys             = []string{"id", "user_id", "userId"}
-	sub2APIUserCreatedAtKeys      = []string{"created_at", "createdAt", "registered_at", "registeredAt"}
-	sub2APIUserLastUsedAtKeys     = []string{"last_used_at", "lastUsedAt"}
-	sub2APIBalanceHistoryTimeKeys = []string{"created_at", "createdAt"}
+	sub2APIUserIDKeys         = []string{"id", "user_id", "userId"}
+	sub2APIUserCreatedAtKeys  = []string{"created_at", "createdAt", "registered_at", "registeredAt"}
+	sub2APIUserLastUsedAtKeys = []string{"last_used_at", "lastUsedAt"}
 )
 
 var sub2APIAdminUsersSortKeys = map[string]struct{}{
@@ -2524,80 +2558,6 @@ var sub2APIAdminUsersSortKeys = map[string]struct{}{
 	"status":       {},
 	"role":         {},
 	"total_tokens": {},
-}
-
-// FetchSub2APIAdminUserBreakdown reads Sub2API's admin dashboard user breakdown
-// endpoint with a narrow query surface. It is intentionally separate from the
-// generic admin users list because this endpoint is usage-period based and the
-// upstream end_date is exclusive.
-func (s *PlatformService) FetchSub2APIAdminUserBreakdown(session Session, query Sub2APIUserBreakdownQuery) (Sub2APIUserBreakdown, error) {
-	if session.Platform != PlatformSub2API || !session.IsAuthenticated() {
-		return Sub2APIUserBreakdown{}, newRequestError(ErrorAuth, PlatformSub2API)
-	}
-	query = normalizeSub2APIUserBreakdownQuery(query)
-	values := url.Values{}
-	values.Set("start_date", query.StartDate)
-	values.Set("end_date", query.EndDate)
-	values.Set("sort_by", query.SortBy)
-	values.Set("limit", strconv.Itoa(query.Limit))
-	values.Set("timezone", query.Timezone)
-	requestURL := session.BaseURL + "/api/v1/admin/dashboard/user-breakdown?" + values.Encode()
-	response, err := s.httpClient.requestJSON(requestURL, adminAuthOptions(session))
-	if err != nil {
-		return Sub2APIUserBreakdown{}, err
-	}
-	return parseSub2APIUserBreakdown(response.Payload, query), nil
-}
-
-func normalizeSub2APIUserBreakdownQuery(query Sub2APIUserBreakdownQuery) Sub2APIUserBreakdownQuery {
-	query.StartDate = strings.TrimSpace(query.StartDate)
-	query.EndDate = strings.TrimSpace(query.EndDate)
-	query.SortBy = strings.TrimSpace(query.SortBy)
-	if query.SortBy != "total_tokens" {
-		query.SortBy = "total_tokens"
-	}
-	if query.Limit < 1 {
-		query.Limit = 50
-	}
-	if query.Limit > 200 {
-		query.Limit = 200
-	}
-	query.Timezone = strings.TrimSpace(query.Timezone)
-	if query.Timezone == "" {
-		query.Timezone = "Asia/Shanghai"
-	}
-	return query
-}
-
-func parseSub2APIUserBreakdown(payload any, fallback Sub2APIUserBreakdownQuery) Sub2APIUserBreakdown {
-	data := dataRecord(payload)
-	usersRaw, _ := data["users"].([]any)
-	if len(usersRaw) == 0 {
-		usersRaw = dataArray(payload)
-	}
-	users := make([]Sub2APIUserBreakdownItem, 0, len(usersRaw))
-	for _, raw := range usersRaw {
-		record := dataRecord(raw)
-		user := Sub2APIUserBreakdownItem{
-			UserID:       firstStringy(record, sub2APIUserIDKeys),
-			Email:        safeString(record, "email"),
-			Requests:     intFromRecord(record, []string{"requests"}, 0),
-			InputTokens:  int64FromRecord(record, []string{"input_tokens", "inputTokens"}),
-			OutputTokens: int64FromRecord(record, []string{"output_tokens", "outputTokens"}),
-			CacheTokens:  int64FromRecord(record, []string{"cache_tokens", "cacheTokens"}),
-			TotalTokens:  int64FromRecord(record, []string{"total_tokens", "totalTokens"}),
-			Cost:         floatFromRecord(record, []string{"cost"}),
-			ActualCost:   floatFromRecord(record, []string{"actual_cost", "actualCost"}),
-		}
-		if user.UserID != "" {
-			users = append(users, user)
-		}
-	}
-	return Sub2APIUserBreakdown{
-		Users:     users,
-		StartDate: stringFromRecord(data, []string{"start_date", "startDate"}, fallback.StartDate),
-		EndDate:   stringFromRecord(data, []string{"end_date", "endDate"}, fallback.EndDate),
-	}
 }
 
 func int64FromRecord(record map[string]any, keys []string) int64 {
@@ -2612,13 +2572,6 @@ func floatFromRecord(record map[string]any, keys []string) float64 {
 		return *number
 	}
 	return 0
-}
-
-func stringFromRecord(record map[string]any, keys []string, fallback string) string {
-	if value := firstString(record, keys); value != nil {
-		return *value
-	}
-	return fallback
 }
 
 // FetchSub2APIAdminUsersPage 透传 Sub2API admin 用户列表。查询参数只允许分页、status/role、search、排序和时区，
@@ -2745,10 +2698,9 @@ func intFromRecordOK(record map[string]any, keys []string) (int, bool) {
 	return 0, false
 }
 
-// FetchSub2APIAdminUser 通过 GET /api/v1/admin/users/:id 查询指定 Sub2API 用户的只读资料，
-// 仅用于工单模块"Sub2API 用户资料"弹窗展示，绝不写入/修改 Sub2API 数据。调用方必须传入
-// 当前 TransitHub workspace 的 admin session（已经过 RequireSession 刷新并校验过 admin 身份），
-// 不能使用 iframe 用户自己的 token 查询别的用户的资料。
+// FetchSub2APIAdminUser 通过 GET /api/v1/admin/users/:id 查询指定 Sub2API 用户的只读资料
+// （群发邮件按用户 ID 解析收件人时使用），绝不写入/修改 Sub2API 数据。调用方必须传入
+// 当前 TransitHub workspace 的 admin session（已经过 RequireSession 刷新并校验过 admin 身份）。
 func (s *PlatformService) FetchSub2APIAdminUser(session Session, userID string) (Sub2APIAdminUser, error) {
 	if session.Platform != PlatformSub2API || !session.IsAuthenticated() {
 		return Sub2APIAdminUser{}, newRequestError(ErrorAuth, PlatformSub2API)
@@ -2763,44 +2715,6 @@ func (s *PlatformService) FetchSub2APIAdminUser(session Session, userID string) 
 		return Sub2APIAdminUser{}, err
 	}
 	return parseSub2APIAdminUser(dataRecord(response.Payload)), nil
-}
-
-// FetchSub2APIAdminUserBalanceHistory 通过 GET /api/v1/admin/users/:id/balance-history 查询
-// 指定 Sub2API 用户的余额/充值历史。page/pageSize 非法时分别回退到 1/20；codeType 为空时不带
-// type 查询参数。
-func (s *PlatformService) FetchSub2APIAdminUserBalanceHistory(session Session, userID string, page int, pageSize int, codeType string) (Sub2APIUserBalanceHistory, error) {
-	if session.Platform != PlatformSub2API || !session.IsAuthenticated() {
-		return Sub2APIUserBalanceHistory{}, newRequestError(ErrorAuth, PlatformSub2API)
-	}
-	trimmedID := strings.TrimSpace(userID)
-	if trimmedID == "" {
-		return Sub2APIUserBalanceHistory{}, newRequestError(ErrorInvalidResponse, PlatformSub2API)
-	}
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 {
-		pageSize = 20
-	}
-	requestURL := session.BaseURL + "/api/v1/admin/users/" + url.PathEscape(trimmedID) +
-		"/balance-history?page=" + strconvInt(int64(page)) + "&page_size=" + strconvInt(int64(pageSize))
-	if trimmedType := strings.TrimSpace(codeType); trimmedType != "" {
-		requestURL += "&type=" + url.QueryEscape(trimmedType)
-	}
-	response, err := s.httpClient.requestJSON(requestURL, adminAuthOptions(session))
-	if err != nil {
-		return Sub2APIUserBalanceHistory{}, err
-	}
-	history := Sub2APIUserBalanceHistory{
-		TotalRecharged: firstNumber(dataRecord(response.Payload), []string{"total_recharged", "totalRecharged"}),
-	}
-	if total, ok := paginationTotal(response.Payload); ok {
-		history.Total = total
-	}
-	for _, item := range dataArray(response.Payload) {
-		history.Items = append(history.Items, parseSub2APIBalanceHistoryItem(item))
-	}
-	return history, nil
 }
 
 // parseSub2APIAdminUser 从 GET /api/v1/admin/users/:id 的响应记录中解析只读字段，兼容
@@ -2829,17 +2743,6 @@ func parseSub2APIAdminUser(value any) Sub2APIAdminUser {
 	}
 	user.CreatedAt = parseFlexibleTime(firstAny(value, sub2APIUserCreatedAtKeys))
 	user.LastUsedAt = parseFlexibleTime(firstAny(value, sub2APIUserLastUsedAtKeys))
+	user.TotalRecharged = firstNumber(value, []string{"total_recharged", "totalRecharged"})
 	return user
-}
-
-// parseSub2APIBalanceHistoryItem 解析余额/充值历史单条记录，兼容 snake_case / camelCase。
-func parseSub2APIBalanceHistoryItem(value any) Sub2APIBalanceHistoryItem {
-	item := Sub2APIBalanceHistoryItem{ID: firstStringy(value, []string{"id"})}
-	item.Type = firstStringy(value, []string{"type", "code_type", "codeType"})
-	item.Amount = firstNumber(value, []string{"amount", "balance", "value"})
-	if note := firstString(value, []string{"notes", "note", "remark"}); note != nil {
-		item.Note = *note
-	}
-	item.CreatedAt = parseFlexibleTime(firstAny(value, sub2APIBalanceHistoryTimeKeys))
-	return item
 }

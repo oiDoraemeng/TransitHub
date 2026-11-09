@@ -74,7 +74,7 @@
 
 ## 项目概览
 
-TransitHub 是一个自部署的后台运营中心，用于管理多个上游站点和管理员工作区。它关注真实运营工作流：连接上游平台、追踪余额和分组倍率、查看仪表盘指标、配置通知，并运行可定时恢复原倍率的分组活动调价。
+TransitHub 是一个自部署的后台运营中心，用于管理多个上游站点和管理员工作区。它专注于中转站的经营分析：上下游成本与营收、用户活跃与留存、销售数据，并提供余额与倍率监控和通知。
 
 项目由 Go 后端和 Vue 3 管理前端组成，使用 PostgreSQL 和 Redis。
 
@@ -83,10 +83,13 @@ TransitHub 是一个自部署的后台运营中心，用于管理多个上游站
 - **管理员工作区管理** - 在多个管理员账号/工作区之间切换，并隔离工作区数据。
 - **上游站点管理** - 添加、同步、查看和管理上游站点，并缓存关键指标。
 - **仪表盘指标** - 查看实时和历史运营数据，包括余额、成本、趋势、分组用量和上游下钻明细。
-- **分组倍率追踪** - 记录分组倍率快照、变动、历史、平台标签和自定义分组类型。
-- **活动调价** - 创建立即或定时的调价活动，更新选中的 admin 分组，并在活动结束后恢复原倍率。
-- **自动调价支持** - 基于上游倍率变化，为映射分组配置自动调价规则。
-- **通知渠道** - 配置钉钉、飞书和 Telegram 机器人，用于余额预警、倍率变化、自动调价和活动通知。
+- **分组倍率** - 只读的上游分组倍率列表，支持搜索、筛选、涨跌和历史记录。
+- **用户活跃分析** - 同步自有 sub2api/new-api 站点的用户与每日用量，找出不活跃和用量下降的用户，做同比环比，并统计充值、消耗和用户余额。
+- **销售分析** - 按渠道看入账、付费和复购用户、新用户转化、收入集中度和入账排行，并与上一周期对比。不算销售的入账可以去掉：逐笔选择，或者整个渠道（例如管理员加款）不计入。
+- **大户关注** - 系统按近 7 天日均消耗和累计消耗推荐大户，也可以手动添加；看余额还能用几天，快用完时用机器人提醒你，还能一键复制提醒话术发给用户。
+- **群发邮件** - 按选中用户或活跃分群发送邮件，带退订链接和工作区级退订名单。
+- **线索** - 记录潜在用户的邮箱和来源，可以单个添加或批量导入，再通过同一个发送队列群发：带退订链接、标题前加「【广告】」，并限制最近 24 小时的发送量。
+- **通知渠道** - 配置钉钉、飞书和 Telegram 机器人，用于余额预警和倍率变化通知。
 - **系统设置** - 管理刷新间隔、通知策略和运行时展示配置。
 
 ## 技术栈
@@ -110,7 +113,7 @@ git clone https://github.com/deviseo/transit-hub.git transit-hub
 cd transit-hub
 
 # 先编辑 deploy/docker-compose.prod.yml：
-# - 镜像 tag（默认使用 deviseo/transithub:v0.1.15）
+# - 镜像 tag（默认使用 deviseo/transithub:v1.6.0）
 # - 替换所有 change-this-* 占位值
 # - DATABASE_URL 和 POSTGRES_PASSWORD 中的数据库密码
 # - ADMIN_EMAIL / ADMIN_PASSWORD
@@ -135,18 +138,50 @@ http://YOUR_SERVER_IP:10621
 ```text
 data/postgres
 data/redis
-data/ticket-uploads
+data/app        # 在线更新的版本、凭据加密的密钥和工单图片
 ```
 
-`data/ticket-uploads` 存放工单图片附件（挂载到 `app` 容器的 `TICKET_UPLOAD_DIR`，默认 `/app/data/ticket-uploads`），不会作为公开静态目录对外暴露。重建 `app` 容器前请确认该 volume 已存在，否则图片文件会丢失（数据库里的附件 metadata 不受影响）。
-
-`SMTP_ENCRYPTION_KEY` 是可选环境变量，仅当需要在「系统设置 - 邮件设置」中保存 SMTP 密码或发送测试邮件时才需要配置。缺失该变量不会阻止应用启动，也不影响任何非 SMTP 功能。生成方式：
+SMTP 密码加密保存，默认使用从凭据加密密钥（见下文「凭据加密」，即 `data/app/credential.key`）派生的密钥，不需要额外配置。想单独管理 SMTP 的密钥时，可以设置可选的环境变量 `SMTP_ENCRYPTION_KEY`：设置后以它为准，之前保存的密码照样能读。生成方式：
 
 ```bash
 openssl rand -base64 32
 ```
 
-该值必须是 base64 编码的 32 字节随机值，且一经设置需要长期稳定保存；更换 key 后，旧的 SMTP 密码密文将无法解密，需要重新填写并保存密码。
+该值必须是 base64 编码的 32 字节随机值，设置后需要长期稳定保存：更换后，用旧 key 保存的 SMTP 密码将无法解密，需要重新填写并保存。数据目录不是持久卷、又没有设置任何密钥时，不能保存 SMTP 密码。
+
+### 更新
+
+点击后台顶栏的版本号检查更新。
+
+**在线更新（仅系统管理员）**：有新版本时，在弹窗里点「更新到 vX.Y.Z」。服务器会从本仓库的 GitHub Release 下载对应 CPU 架构的更新包，用 Release 里的 `checksums.txt` 校验 SHA-256，安装到 `/app/data/updates/`，然后自动重启到新版本；新版本起来后页面自动刷新。新版本第一次启动失败时，服务会自动退回原来的版本。
+
+- 请保留 `deploy/docker-compose.prod.yml` 里 `../data/app:/app/data` 这个挂载。不挂载也能在线更新，但重建容器后会回到镜像自带的版本。v1.0.0 之前部署的，请给 `app` 服务补上这条 `volumes`。
+- 在线更新需要运行在 Linux（amd64 或 arm64）上；开启了「系统设置」里的出站代理时，下载会走代理。
+- 镜像版本更新时以镜像为准：拉取了比在线更新版本更新的镜像后，运行的是镜像里的版本。
+
+**Docker 更新**：把 `deploy/docker-compose.prod.yml` 里的镜像版本改成新版本（用 `latest` 的跳过这一步），然后运行：
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml pull
+docker compose -f deploy/docker-compose.prod.yml up -d
+```
+
+### 凭据加密
+
+保存的登录凭据都是加密存储的：你自己站点的管理员会话、上游站点的登录状态（cookie、token、Admin Key）、通知机器人的密钥，以及出站代理地址。只拿到数据库或备份，看不到这些凭据。
+
+- 密钥在第一次启动时自动生成，保存在 `data/app/credential.key`（也就是 `../data/app:/app/data` 这个挂载里）。想自己管理密钥，可以设置环境变量 `CREDENTIAL_ENCRYPTION_KEY`（base64 编码的 32 字节，`openssl rand -base64 32` 生成），它优先于密钥文件。
+- 备份 `data/postgres` 时要连同 `data/app/credential.key` 一起备份。没有密钥，保存的凭据就读不出来，只能重新登录站点、重新填写机器人和代理。
+- 数据目录不是持久卷时，TransitHub 继续不加密保存（否则重建容器后密钥丢失），并在版本号弹窗里提示，直到挂载好为止。
+- 旧版本保存的凭据会在启动约一分钟后自动改成加密保存。v1.0.2 之前的版本读不懂加密后的凭据，所以不要再降级到 v1.0.2 之前。
+
+### TransitLink 客户端配置
+
+「客户端」页面会在 `/api/client/v1/sites/<代码>` 发布一份只读配置，供 TransitLink 桌面客户端读取。用户的电脑需要能访问到它，所以请把 `/api/client/` 公开出去（例如通过反向代理）；后台和其他 `/api/` 路径可以继续只在内网访问。在该页面把「TransitHub 对外地址」填成公网 URL，再把生成的 `transitlink://connect?config=...` 链接发给用户。
+
+- **推荐配置**：给 TransitLink 能一键配置的每个工具（Claude Code、Codex、Gemini CLI、Grok Build、OpenCode、DeepSeek Harness、Pi、Oh My Pi、Kimi Code、MiniMax Code、OpenClaw）分别设置推荐的分组和模型，用户一键配置时默认用它们，也可以自己改。Gemini CLI 到 DeepSeek Harness 要 TransitLink 0.5.0 或更高版本才会读取，Pi 到 OpenClaw 要 0.6.0 或更高版本。
+- **工单**：在同一页面打开后，用户可以在 TransitLink 里给你提交问题，你在「工单」页面回复。换取工单会话前，TransitHub 会用用户自己的登录去你的站点核实身份，只有你的用户能提交。工单接口也在 `/api/client/` 下。新工单推送给哪些机器人，在「系统设置 → 策略」里选。
+- **TransitLink 最低版本**：低于这个版本的客户端会提示用户更新。
 
 ### 开发依赖服务
 
@@ -163,8 +198,18 @@ docker compose -f deploy/docker-compose.yml up -d
 由于 Dockerfile 放在 `deploy/`，但构建上下文需要使用仓库根目录，请使用：
 
 ```bash
-docker build -f deploy/Dockerfile -t deviseo/transithub:v0.1.15 .
+docker build -f deploy/Dockerfile -t deviseo/transithub:v1.6.0 .
 ```
+
+### 发布包
+
+在线更新安装的是 GitHub Release 里附带的更新包，用下面的命令构建：
+
+```bash
+scripts/build-release.sh v1.6.0
+```
+
+它会在 `dist/release/v1.6.0/` 生成 `transithub_v1.6.0_linux_amd64.tar.gz`、`transithub_v1.6.0_linux_arm64.tar.gz` 和 `checksums.txt`，三个文件都要上传到 Release。版本号必须和 `backend/internal/config/config.go` 里的 `defaultAppVersion` 一致，服务端靠它确认新版本已经启动。
 
 ## 本地开发
 
@@ -185,11 +230,6 @@ REDIS_URL=redis://127.0.0.1:6379/0
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=transithub
 ALLOW_PUBLIC_REGISTER=true
-# 仅限本地抽奖联调；线上必须保持 false 或不设置
-LOTTERY_ALLOW_PRIVATE_SUB2API_TARGETS=false
-PROXY_KEY_ENCRYPTION_KEY=change-this-to-a-generated-base64-32-byte-key
-PROXY_MAX_REQUEST_BYTES=67108864
-PROXY_MODEL_REFRESH_INTERVAL=5m
 ```
 
 ### 前端
@@ -237,12 +277,13 @@ transit-hub/
 │       ├── admin_accounts/
 │       ├── auth/
 │       ├── dashboard/
-│       ├── group_rate_campaigns/
 │       ├── group_rates/
+│       ├── mass_email/
 │       ├── my_sites/
 │       ├── settings/
 │       ├── system/
-│       └── upstream/
+│       ├── upstream/
+│       └── user_activity/
 ├── frontend/                 # Vue 3 管理前端
 │   └── src/modules/          # 前端业务模块
 ├── deploy/                   # Dockerfile 和 Compose 文件
@@ -253,9 +294,9 @@ transit-hub/
 ## 核心工作流
 
 - 工作区隔离的多上游运营：每个 admin workspace 独立管理，可连接多个 sub2api/new-api 上游并执行同步与账号管理。
-- 分组倍率工作流：跟踪最新上游倍率，支持搜索和筛选、分组关联，以及按活动组织调价。
-- 已对接分组自动调价：支持手动或同步后执行，可配置策略、查看执行状态并发送通知。
-- 日常运维面板：覆盖仪表盘指标、连接健康、工单和邮件/模板管理。
+- 仪表盘：结合自有站点营收与上游成本，展示每日利润、余额和趋势。
+- 分组倍率：跟踪最新上游倍率，支持搜索、筛选和涨跌历史。
+- 用户活跃分析：找出不活跃和用量下降的用户，并据此定向群发邮件。
 
 ## Star History 星际历史
 

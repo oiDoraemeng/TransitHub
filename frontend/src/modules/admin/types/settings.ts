@@ -41,6 +41,23 @@ export type StrategySettings = {
   multiplierNotifyBotIds: string[]
   multiplierTemplate: string
   multiplierTemplateFormat?: NotificationTemplateFormat
+  // 经营日报：每天在 dailyReportTime（北京时间 HH:MM）把昨天的数据发给 dailyReportBotIds。
+  enableDailyReport?: boolean
+  dailyReportTime?: string
+  dailyReportBotIds?: string[]
+  // 工单通知：TransitLink 用户新建工单或追问时推送给这些机器人。
+  ticketNotifyBotIds?: string[]
+}
+
+export type DailyReport = {
+  date: string
+  workspace: string
+  text: string
+}
+
+export type SendDailyReportTestResponse = {
+  report: DailyReport
+  sent: number
 }
 
 export type DingtalkChannelSettings = {
@@ -133,4 +150,42 @@ export type TestEmailTemplatePayload = {
 export type TestEmailTemplateResponse = {
   success: boolean
   message: string
+}
+
+// 出站代理生效方式：沿用启动环境变量（从未保存过配置）/ 直连 / 使用代理。
+export type OutboundProxyMode = 'environment' | 'direct' | 'proxy'
+
+export type OutboundProxySettings = {
+  configured: boolean
+  enabled: boolean
+  // 密码已脱敏为 ***，原样提交时后端沿用已保存的密码
+  proxyUrl: string
+  bypass: string
+  mode: OutboundProxyMode
+  canEdit: boolean
+  environment: {
+    proxyUrl: string
+    bypass: string
+  }
+  updatedAt?: string
+}
+
+export type SaveOutboundProxyPayload = {
+  enabled: boolean
+  proxyUrl: string
+  bypass: string
+}
+
+export type TestOutboundProxyPayload = SaveOutboundProxyPayload & {
+  targetUrl: string
+}
+
+export type OutboundProxyFailure = 'dns' | 'proxy' | 'tls' | 'timeout' | 'refused' | 'network'
+
+export type TestOutboundProxyResponse = {
+  ok: boolean
+  route: 'proxy' | 'direct'
+  statusCode?: number
+  durationMs: number
+  failure?: OutboundProxyFailure
 }

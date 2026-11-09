@@ -45,7 +45,7 @@ type RefreshConfig struct {
 
 // Service 管理上游站点的生命周期（创建、编辑、同步、删除）。
 // 站点运行时状态缓存在 Redis（通过 SiteCache），PostgreSQL 负责持久化。
-// 当系统设置开启了数据刷新频率时，定时器按配置的间隔自动同步各站点。
+// 站点所属工作区在系统设置里开启了数据刷新频率时，定时器按该工作区配置的间隔自动同步。
 type Service struct {
 	platformService *PlatformService
 	snapshotWriter  SnapshotWriter
@@ -54,13 +54,16 @@ type Service struct {
 	accounts        AdminAccountResolver
 	deleteGuard     SiteDeleteGuard
 	proxyProvider   EgressProxyClientProvider
-	refreshConfig   RefreshConfig
-	timers          map[string]*time.Timer
-	deletedSites    map[string]struct{}
-	mu              sync.Mutex
+	// refreshConfigs 按工作区（userID|adminAccountID）保存定时同步配置；没有配置的工作区不定时同步。
+	refreshConfigs map[string]RefreshConfig
+	timers         map[string]*time.Timer
+	deletedSites   map[string]struct{}
+	mu             sync.Mutex
 	// AfterSync 在站点同步成功后被调用，传入同步前后的指标数据。
 	// 由系统设置模块注入，用于余额预警和倍率变更检测。
 	AfterSync func(ctx context.Context, userID, adminAccountID, siteID, siteName string, oldMetrics, newMetrics Metrics)
+	// staleRefresh 记录仪表盘触发的补同步（见 RefreshStaleSites）。
+	staleRefresh staleRefreshState
 }
 
 func (s *Service) SetAdminAccountResolver(accounts AdminAccountResolver) {
@@ -113,34 +116,33 @@ func NewService(platformService *PlatformService, repository SiteRepository, sna
 		snapshotWriter:  snapshotWriter,
 		repository:      repository,
 		cache:           cache,
+		refreshConfigs:  make(map[string]RefreshConfig),
 		timers:          make(map[string]*time.Timer),
 		deletedSites:    make(map[string]struct{}),
 	}
 }
 
-// SetRefreshConfig 更新后台定时同步配置。
-// 开启时为所有有会话的站点启动定时器；关闭时清除所有定时器。
-// 由系统设置模块在启动和保存策略时调用。
-func (s *Service) SetRefreshConfig(config RefreshConfig) {
+func workspaceKey(userID string, adminAccountID string) string {
+	return userID + "|" + adminAccountID
+}
+
+// SetWorkspaceRefreshConfig 更新某个工作区的后台定时同步配置，并重新调度该工作区的站点：
+// 开启时为有会话的站点启动定时器，关闭时清除定时器。其他工作区不受影响。
+// 由系统设置模块在启动（逐个工作区恢复）和保存策略时调用。
+func (s *Service) SetWorkspaceRefreshConfig(userID string, adminAccountID string, config RefreshConfig) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	prev := s.refreshConfig
-	s.refreshConfig = config
-
-	if !config.Enabled {
-		// 关闭：清除所有定时器。
-		for id := range s.timers {
-			s.clearTimerLocked(id)
-		}
+	key := workspaceKey(userID, adminAccountID)
+	prev := s.refreshConfigs[key]
+	if config.Enabled {
+		s.refreshConfigs[key] = config
+		log.Printf("[upstream] 后台定时同步已开启 admin_account_id=%s interval=%s", adminAccountID, config.Interval)
+	} else {
+		delete(s.refreshConfigs, key)
 		if prev.Enabled {
-			log.Printf("[upstream] 后台定时同步已关闭")
+			log.Printf("[upstream] 后台定时同步已关闭 admin_account_id=%s", adminAccountID)
 		}
-		return
 	}
-
-	log.Printf("[upstream] 后台定时同步已开启 interval=%s", config.Interval)
-
-	// 开启或间隔变更：重新调度所有有会话的站点。
 	if s.repository == nil {
 		return
 	}
@@ -150,6 +152,9 @@ func (s *Service) SetRefreshConfig(config RefreshConfig) {
 		return
 	}
 	for i := range sites {
+		if sites[i].UserID != userID || sites[i].AdminAccountID != adminAccountID {
+			continue
+		}
 		s.scheduleSyncLocked(sites[i].ID, &sites[i])
 	}
 }
@@ -258,6 +263,9 @@ func (s *Service) FetchGroupDailyStats(ctx context.Context, userID string, id st
 	if err != nil {
 		return nil, err
 	}
+	// 刷新成功后先写回会话，再处理统计结果：统计失败也不能丢掉已轮换的 refresh token。
+	s.writeBackRefreshedSession(ctx, id, userID, session, refreshedSession)
+
 	var stats []GroupDailyStat
 	if refreshedSession.Platform == PlatformNewAPI {
 		stats, err = platformService.FetchNewAPIGroupDailyStats(refreshedSession, groups)
@@ -269,20 +277,13 @@ func (s *Service) FetchGroupDailyStats(ctx context.Context, userID string, id st
 	if err != nil {
 		return nil, err
 	}
-
-	// 将刷新后的会话写回缓存和数据库。
-	site, err = s.cache.Get(ctx, id)
-	if err == nil && site != nil && site.UserID == userID {
-		site.Session = &refreshedSession
-		_ = s.setCachedSite(ctx, site)
-		_ = s.saveSite(ctx, site)
-	}
 	return stats, nil
 }
 
 // KeyUsageToday 返回当前工作区所有上游站点中，今天有消费的 key 明细（仪表盘「今日成本」下钻数据源）。
-// 只处理有 session 且 rechargeRate > 0 的站点：这与 dashboard.MetricsService.LiveMetrics() 中
-// todayPurchase 的统计口径完全一致（rechargeRate <= 0 的站点被整体跳过），确保弹窗总额与卡片数值一致。
+// 只处理有 session 且 rechargeRate > 0 的站点，筛选条件与 dashboard.MetricsService.LiveMetrics() 的 todayPurchase 相同；
+// 但取数方式不同：这里实时逐个 key 查询，卡片读取各站点最近一次同步的账号级合计，所以两者可能有差异
+// （查询时间不同；今天已删除的 key 不在这里的列表中，但计入了账号合计）。
 // 站点级并发限制 4；任一站点请求上游平台失败即让整个方法返回错误，不允许把失败站点当 0 处理。
 func (s *Service) KeyUsageToday(ctx context.Context, userID string) ([]KeyUsageTodayItem, error) {
 	adminAccountID, err := s.requireCurrentAdminAccountID(ctx, userID)
@@ -339,18 +340,13 @@ func (s *Service) KeyUsageToday(ctx context.Context, userID string) ([]KeyUsageT
 				recordFailure(refreshErr)
 				return
 			}
+			// 刷新成功后先写回会话，再拉取用量：拉取失败也不能丢掉已轮换的 refresh token。
+			s.writeBackRefreshedSession(ctx, site.ID, site.UserID, session, refreshedSession)
 
 			stats, fetchErr := platformService.FetchKeyUsageToday(refreshedSession, groups)
 			if fetchErr != nil {
 				recordFailure(fetchErr)
 				return
-			}
-
-			// 将刷新后的会话写回缓存和数据库，与 FetchGroupDailyStats 的写回模式一致。
-			if cached, cacheErr := s.cache.Get(ctx, site.ID); cacheErr == nil && cached != nil && cached.UserID == site.UserID {
-				cached.Session = &refreshedSession
-				_ = s.setCachedSite(ctx, cached)
-				_ = s.saveSite(ctx, cached)
 			}
 
 			mu.Lock()
@@ -503,6 +499,7 @@ func (s *Service) Create(ctx context.Context, userID string, dto CreateRequest) 
 	site.Status = StatusConnected
 	site.ErrorKey = nil
 	site.LastSyncedAt = &now
+	applyDiscoveredUserKeyAccount(site, dto.AuthMode, result.Session)
 
 	_ = s.setCachedSite(ctx, site)
 
@@ -550,6 +547,10 @@ func (s *Service) Update(ctx context.Context, userID string, id string, dto Upda
 	site.Account = strings.TrimSpace(dto.Account)
 	if normalizedAuthMode(dto.AuthMode) == AuthModeUserKey {
 		site.Account = strings.TrimSpace(dto.UserID)
+		if site.Account == "" {
+			// 用户 ID 可选：留空时保留原值，重新登录成功后再用访问令牌识别出的用户 ID 回填。
+			site.Account = previousSite.Account
+		}
 	}
 	site.Remark = strings.TrimSpace(dto.Remark)
 	site.RechargeRate = dto.RechargeRate
@@ -598,6 +599,7 @@ func (s *Service) Update(ctx context.Context, userID string, id string, dto Upda
 		site.Status = StatusConnected
 		site.ErrorKey = nil
 		site.LastSyncedAt = &now
+		applyDiscoveredUserKeyAccount(site, dto.AuthMode, result.Session)
 
 		_ = s.setCachedSite(ctx, site)
 
@@ -676,6 +678,34 @@ func normalizedAuthMode(authMode AuthMode) AuthMode {
 	default:
 		return AuthModePassword
 	}
+}
+
+// applyDiscoveredUserKeyAccount 在访问令牌登录成功后，用会话里的用户 ID（用户填写或由令牌自动识别）
+// 作为站点账号展示，保证未填写用户 ID 时站点列表仍能看到所属用户。
+func applyDiscoveredUserKeyAccount(site *Site, authMode AuthMode, session Session) {
+	if normalizedAuthMode(authMode) != AuthModeUserKey {
+		return
+	}
+	if userID := strings.TrimSpace(session.UserID); userID != "" {
+		site.Account = userID
+	}
+}
+
+// writeBackRefreshedSession 把刷新得到的新会话写回缓存和数据库。
+// refresh token 每次刷新都会轮换（sub2api 删除旧 token；new-api 在 30 秒容错窗口后把旧 token 视为
+// 重放并吊销整个登录会话），所以只要刷新成功，即使后续业务请求失败也必须写回。
+// 会话没有变化时不写，避免把调用方手里较旧的副本覆盖到其他流程刚写入的新会话上。
+func (s *Service) writeBackRefreshedSession(ctx context.Context, siteID string, ownerUserID string, previous Session, refreshed Session) {
+	if previous.sameCredentials(refreshed) {
+		return
+	}
+	site, err := s.cache.Get(ctx, siteID)
+	if err != nil || site == nil || site.UserID != ownerUserID {
+		return
+	}
+	site.Session = &refreshed
+	_ = s.setCachedSite(ctx, site)
+	_ = s.saveSite(ctx, site)
 }
 
 // Sync 手动触发单个站点的同步。
@@ -845,15 +875,14 @@ func (s *Service) sync(ctx context.Context, id string) (Response, error) {
 	platformService, release, proxyErr := s.platformForProxy(ctx, site)
 	defer release()
 	refreshedSession := session
-	var refreshErr error
-	if proxyErr != nil {
-		refreshErr = proxyErr
-	} else {
+	refreshErr := proxyErr
+	if refreshErr == nil {
 		refreshedSession, refreshErr = platformService.RefreshSession(session)
 	}
+	syncErr := refreshErr
 	metrics := Metrics{}
 	if refreshErr == nil {
-		metrics, refreshErr = platformService.FetchMetrics(refreshedSession)
+		metrics, syncErr = platformService.FetchMetrics(refreshedSession)
 	}
 
 	// 重新读取站点确认仍存在（可能在同步期间被删除）。
@@ -865,13 +894,17 @@ func (s *Service) sync(ctx context.Context, id string) (Response, error) {
 	// 在覆盖前保存旧指标，用于同步后的预警检测。
 	oldMetrics := site.Metrics
 
-	if refreshErr != nil {
+	// 刷新成功且会话确实变化时，无论指标是否拉取成功都写回新会话（见 writeBackRefreshedSession）；
+	// 会话未变化时保留缓存中的值，避免覆盖其他流程在同步期间刚轮换出的新会话。
+	if refreshErr == nil && !session.sameCredentials(refreshedSession) {
+		site.Session = &refreshedSession
+	}
+	if syncErr != nil {
 		site.Status = StatusError
-		key := errorKey(refreshErr)
+		key := errorKey(syncErr)
 		site.ErrorKey = &key
 	} else {
 		now := time.Now().UnixMilli()
-		site.Session = &refreshedSession
 		site.Metrics = metrics
 		site.Status = StatusConnected
 		site.ErrorKey = nil
@@ -888,7 +921,7 @@ func (s *Service) sync(ctx context.Context, id string) (Response, error) {
 	if saveErr := s.saveSite(ctx, site); saveErr != nil {
 		return response, saveErr
 	}
-	if refreshErr == nil {
+	if syncErr == nil {
 		s.saveSnapshot(ctx, site)
 		if s.AfterSync != nil {
 			go s.AfterSync(context.Background(), site.UserID, site.AdminAccountID, site.ID, site.Name, oldMetrics, metrics)
@@ -1019,10 +1052,14 @@ func (s *Service) scheduleSyncLocked(id string, site *Site) {
 	if _, deleted := s.deletedSites[id]; deleted {
 		return
 	}
-	if !s.refreshConfig.Enabled || site == nil || site.Session == nil {
+	if site == nil || site.Session == nil {
 		return
 	}
-	delay := s.refreshConfig.Interval
+	config := s.refreshConfigs[workspaceKey(site.UserID, site.AdminAccountID)]
+	if !config.Enabled || config.Interval <= 0 {
+		return
+	}
+	delay := config.Interval
 	log.Printf("[upstream-timer] 定时同步已调度 id=%s delay=%s", id, delay)
 	s.timers[id] = time.AfterFunc(delay, func() {
 		log.Printf("[upstream-timer] 定时同步触发 id=%s", id)
@@ -1069,9 +1106,6 @@ func validateCreate(dto CreateRequest) error {
 	if normalizedAuthMode(dto.AuthMode) == AuthModeUserKey && strings.TrimSpace(dto.AccessToken) == "" {
 		fields = append(fields, "accessToken")
 	}
-	if normalizedAuthMode(dto.AuthMode) == AuthModeUserKey && strings.TrimSpace(dto.UserID) == "" {
-		fields = append(fields, "userId")
-	}
 	if dto.RechargeRate <= 0 {
 		fields = append(fields, "rechargeRate")
 	}
@@ -1109,9 +1143,6 @@ func validateUpdate(dto UpdateRequest) error {
 	}
 	if normalizedAuthMode(dto.AuthMode) == AuthModeUserKey && strings.TrimSpace(dto.AccessToken) == "" {
 		fields = append(fields, "accessToken")
-	}
-	if normalizedAuthMode(dto.AuthMode) == AuthModeUserKey && strings.TrimSpace(dto.UserID) == "" {
-		fields = append(fields, "userId")
 	}
 	if dto.RechargeRate <= 0 {
 		fields = append(fields, "rechargeRate")

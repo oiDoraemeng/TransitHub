@@ -24,10 +24,15 @@ const (
 	ErrorMissingCredentials          = "admin.dashboard.adminAuth.errors.missingCredentials"
 	ErrorInvalidURL                  = "admin.dashboard.adminAuth.errors.invalidUrl"
 	ErrorAdminOnly                   = "admin.dashboard.adminAuth.errors.adminOnly"
+	ErrorInvalidPricing              = "admin.dashboard.pricing.errors.invalid"
 	ErrorNetwork                     = "admin.dashboard.adminAuth.errors.network"
 	ErrorPlatformUnsupported         = "admin.dashboard.adminAuth.errors.platformUnsupported"
 	ErrorUnknown                     = "admin.dashboard.adminAuth.errors.unknown"
 	ErrorUpstreamKeyUsageUnavailable = "admin.dashboard.upstreamKeyUsage.errors.unavailable"
+	// ErrorVerificationRequired 表示账号开启了二次验证，无法用密码无人值守登录，需要改用访问令牌。
+	ErrorVerificationRequired = "admin.dashboard.adminAuth.errors.verificationRequired"
+	// ErrorTokenRejected 表示未填写用户 ID 时 new-api 访问令牌校验失败（旧版令牌需要同时填写用户 ID）。
+	ErrorTokenRejected = "admin.dashboard.adminAuth.errors.tokenRejected"
 )
 
 // AdminSession 是持久化到 Redis 的仪表盘 admin 会话。

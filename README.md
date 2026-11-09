@@ -74,7 +74,7 @@ Please read the following carefully before using this project:
 
 ## Overview
 
-TransitHub is a self-hosted admin and operations hub for managing multiple upstream sites and admin workspaces. It focuses on practical operator workflows: connecting upstream platforms, tracking balances and group multipliers, monitoring dashboard metrics, configuring notifications, and running scheduled group-rate campaigns that can automatically restore original multipliers after an activity ends.
+TransitHub is a self-hosted admin and operations hub for managing multiple upstream sites and admin workspaces. It focuses on business analysis for relay operators: upstream and downstream cost and revenue, user activity and retention, and sales, together with balance and multiplier monitoring and notifications.
 
 The project is built as a Go backend with a Vue 3 admin frontend, backed by PostgreSQL and Redis.
 
@@ -83,10 +83,14 @@ The project is built as a Go backend with a Vue 3 admin frontend, backed by Post
 - **Admin workspace management** - Switch between admin accounts/workspaces and isolate workspace-scoped data.
 - **Upstream site management** - Add, sync, inspect, and manage upstream sites with cached metrics.
 - **Dashboard metrics** - View live and historical operation data, including balances, costs, trends, group usage, and upstream drilldowns.
-- **Group multiplier tracking** - Track group multiplier snapshots, changes, history, platform tags, and custom group types.
-- **Group-rate campaigns** - Create immediate or scheduled pricing activities, update selected admin groups, retain activity records, and restore original multipliers at the configured end time.
-- **Auto pricing support** - Configure mapped group auto-pricing rules based on upstream multiplier changes.
-- **Notification channels** - Configure DingTalk, Feishu, and Telegram bots for balance warnings, multiplier changes, auto-pricing, and campaign notifications.
+- **Group multiplier tracking** - A read-only list of upstream group multipliers with search, filters, changes, and history.
+- **User activity analytics** - Sync your own sub2api/new-api users and daily usage to find inactive or declining users, compare periods, and track top-ups, spend, and user balances.
+- **Sales analysis** - Credits by channel, paying and repeat users, conversion, concentration and the top payers, with a period-over-period comparison. Leave out credits that are not sales, one entry at a time or a whole channel such as admin top-ups.
+- **Top spenders** - Your biggest users, suggested by 7-day and lifetime spend or added by hand, with their balance and how many days it will last. A bot alerts you when one is about to run out, and you can copy a ready-made reminder to send them.
+- **Mass email** - Email selected users or an activity segment, with an unsubscribe link and a per-workspace suppression list.
+- **Leads** - Keep email addresses of potential users with their source, add them one at a time or import a batch, and email them through the same queue with unsubscribe links, an ad label in the subject and a 24-hour sending limit.
+- **TransitLink client** - Publish a site link for the TransitLink desktop client with your branding, recommended groups and models, notice, and support contacts. Users open the link to connect and set up Claude Code, Codex, Gemini CLI, Grok Build, OpenCode, DeepSeek Harness, Pi, Oh My Pi, Kimi Code, MiniMax Code and OpenClaw in one click.
+- **Notification channels** - Configure DingTalk, Feishu, and Telegram bots for balance warnings and multiplier changes.
 - **System settings** - Manage refresh intervals, notification strategy, and runtime display settings.
 
 ## Tech Stack
@@ -110,7 +114,7 @@ git clone https://github.com/deviseo/transit-hub.git transit-hub
 cd transit-hub
 
 # Edit deploy/docker-compose.prod.yml first:
-# - image tag (defaults to deviseo/transithub:v0.1.15)
+# - image tag (defaults to deviseo/transithub:v1.6.0)
 # - replace every change-this-* placeholder
 # - database password in both DATABASE_URL and POSTGRES_PASSWORD
 # - ADMIN_EMAIL / ADMIN_PASSWORD
@@ -135,18 +139,50 @@ Persistent data is stored under the repository root `data/` directory by default
 ```text
 data/postgres
 data/redis
-data/ticket-uploads
+data/app        # online updates, the credential encryption key and ticket images
 ```
 
-`data/ticket-uploads` holds uploaded ticket images (mounted into the `app` container at `TICKET_UPLOAD_DIR`, default `/app/data/ticket-uploads`). It is not served as a public static directory; make sure this volume is present before recreating the `app` container, otherwise uploaded images will be lost even though their metadata remains in the database.
-
-`SMTP_ENCRYPTION_KEY` is an optional environment variable, only required if you want to save an SMTP password or send test emails from **System Settings > Email Settings**. Its absence does not prevent the application from starting and does not affect any non-SMTP feature. Generate a value with:
+SMTP passwords are stored encrypted. By default they use a key derived from the credential encryption key (see Credential encryption below, `data/app/credential.key`), so nothing needs to be configured. To manage the SMTP key separately, set the optional `SMTP_ENCRYPTION_KEY` environment variable: it then takes precedence, and passwords saved before it was set can still be read. Generate a value with:
 
 ```bash
 openssl rand -base64 32
 ```
 
-This must be a base64-encoded 32-byte value, and it must be kept stable long-term once set. Rotating the key makes any previously saved SMTP password ciphertext undecryptable, requiring the password to be re-entered and saved.
+This must be a base64-encoded 32-byte value, and it must be kept stable once set: changing it makes SMTP passwords saved with the old key unreadable, so they have to be entered and saved again. If the data directory isn't a persistent volume and no key is set, SMTP passwords can't be saved.
+
+### Updating
+
+Click the version number in the admin console's top bar to check for updates.
+
+**Online update (system admin only).** When a newer release is available, open the dialog and choose **Update to vX.Y.Z**. The server downloads the package for its CPU from this repository's GitHub Releases, checks its SHA-256 against the release's `checksums.txt`, installs it under `/app/data/updates/`, and restarts itself into the new version. The page reloads by itself once the new version is up. If the new version fails on its first start, the server goes back to the version it was running before.
+
+- Keep the `../data/app:/app/data` volume from `deploy/docker-compose.prod.yml`. Without it an online update still works, but recreating the container brings back the version inside the image. Deployments created before v1.0.0 should add this `volumes` entry to the `app` service.
+- Online updates need Linux on amd64 or arm64. Downloads go through the outbound proxy from **System Settings** when one is enabled.
+- A newer image always takes precedence: if you pull an image that is newer than the online-installed version, the image's version runs.
+
+**Docker.** Change the image tag in `deploy/docker-compose.prod.yml` (skip this if you use `latest`), then run:
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml pull
+docker compose -f deploy/docker-compose.prod.yml up -d
+```
+
+### Credential Encryption
+
+Saved credentials are encrypted at rest: your site's admin session, upstream site logins (cookies, tokens, Admin Keys), notification bot secrets and the outbound proxy URL. A database dump or backup alone doesn't reveal them.
+
+- The key is generated on first start as `data/app/credential.key`, inside the `../data/app:/app/data` volume. To manage it yourself, set `CREDENTIAL_ENCRYPTION_KEY` to a base64-encoded 32-byte value (`openssl rand -base64 32`); it takes precedence over the file.
+- Back up `data/app/credential.key` together with `data/postgres`. Without the key, saved credentials can't be read: you'd have to log in to your sites again and re-enter bot and proxy settings.
+- If the data directory isn't a persistent volume, TransitHub keeps storing credentials unencrypted, because a generated key would be lost when the container is recreated. The version dialog shows a warning until it's fixed.
+- Credentials saved by earlier versions are encrypted automatically about a minute after startup. Versions before v1.0.2 can't read encrypted credentials, so don't downgrade below v1.0.2.
+
+### TransitLink Client Config
+
+The **Client** page publishes a read-only config at `/api/client/v1/sites/<code>` for the TransitLink desktop client. Your users' computers must be able to reach it, so expose `/api/client/` publicly (for example through your reverse proxy); the admin console and the other `/api/` paths can stay private. Set **Public TransitHub address** on that page to the public URL, then share the generated `transitlink://connect?config=...` link with your users.
+
+- **Recommended setup**: set a recommended group and model for each tool TransitLink can set up: Claude Code, Codex, Gemini CLI, Grok Build, OpenCode, DeepSeek Harness, Pi, Oh My Pi, Kimi Code, MiniMax Code and OpenClaw. One-click setup uses them by default and users can change them. Gemini CLI through DeepSeek Harness need TransitLink 0.5.0 or later; Pi through OpenClaw need 0.6.0 or later.
+- **Tickets**: turn them on in the same page and TransitLink users can send you questions, which you answer on the **Tickets** page. Before opening a ticket session, TransitHub checks the user's own login against your site, so only your users can file tickets. The ticket API also lives under `/api/client/`. Choose the bots that hear about new tickets in **System Settings > Strategy**.
+- **Minimum TransitLink version**: older clients show a banner asking their users to update.
 
 ### Development Services
 
@@ -163,8 +199,18 @@ This starts PostgreSQL and Redis on local ports `5432` and `6379`.
 Because the Dockerfile is stored in `deploy/` but expects the repository root as build context, build with:
 
 ```bash
-docker build -f deploy/Dockerfile -t deviseo/transithub:v0.1.15 .
+docker build -f deploy/Dockerfile -t deviseo/transithub:v1.6.0 .
 ```
+
+### Release Packages
+
+Online updates install the packages attached to a GitHub Release. Build them with:
+
+```bash
+scripts/build-release.sh v1.6.0
+```
+
+This writes `transithub_v1.6.0_linux_amd64.tar.gz`, `transithub_v1.6.0_linux_arm64.tar.gz` and `checksums.txt` to `dist/release/v1.6.0/`; upload all three to the release. The version must match `defaultAppVersion` in `backend/internal/config/config.go`, because the server uses it to confirm that the new version started.
 
 ## Local Development
 
@@ -185,11 +231,6 @@ REDIS_URL=redis://127.0.0.1:6379/0
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=transithub
 ALLOW_PUBLIC_REGISTER=true
-# Local lottery debugging only; keep false or unset in production
-LOTTERY_ALLOW_PRIVATE_SUB2API_TARGETS=false
-PROXY_KEY_ENCRYPTION_KEY=change-this-to-a-generated-base64-32-byte-key
-PROXY_MAX_REQUEST_BYTES=67108864
-PROXY_MODEL_REFRESH_INTERVAL=5m
 ```
 
 ### Frontend
@@ -237,12 +278,13 @@ transit-hub/
 │       ├── admin_accounts/
 │       ├── auth/
 │       ├── dashboard/
-│       ├── group_rate_campaigns/
 │       ├── group_rates/
+│       ├── mass_email/
 │       ├── my_sites/
 │       ├── settings/
 │       ├── system/
-│       └── upstream/
+│       ├── upstream/
+│       └── user_activity/
 ├── frontend/                 # Vue 3 admin frontend
 │   └── src/modules/          # Feature modules
 ├── deploy/                   # Dockerfile and compose files
@@ -253,9 +295,9 @@ transit-hub/
 ## Core Workflows
 
 - Workspace-isolated operations keep each admin workspace scoped while connecting multiple sub2api/new-api upstreams for synchronization and account management.
-- Group multiplier workflows track current upstream rates, support search and filtering, map own groups to upstream groups, and organize campaign-based adjustments.
-- Mapped-group automatic pricing can run manually or after sync with configurable strategies, execution status, and notifications.
-- Operational panels cover dashboard metrics, connection health, tickets, and email/template administration for day-to-day support.
+- The dashboard combines revenue from your own site with upstream cost to show daily profit, balances, and trends.
+- The group multiplier list tracks current upstream rates with search, filters, and change history.
+- User activity analysis finds inactive and declining users and feeds targeted mass email campaigns.
 
 ## Star History
 

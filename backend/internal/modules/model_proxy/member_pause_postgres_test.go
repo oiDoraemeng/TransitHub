@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"transithub/backend/internal/database/migrations"
 )
 
 func memberPauseTestRepository(t testing.TB) *Repository {
@@ -58,21 +58,8 @@ func memberPauseTestRepository(t testing.TB) *Repository {
 	if _, err := pool.Exec(ctx, `CREATE TABLE upstream_sites (id text PRIMARY KEY, name text NOT NULL DEFAULT '')`); err != nil {
 		t.Fatal(err)
 	}
-	files, err := filepath.Glob("../../database/migrations/*.sql")
-	if err != nil {
+	if err := migrations.Run(ctx, pool); err != nil {
 		t.Fatal(err)
-	}
-	for _, file := range files {
-		if filepath.Base(file) < "000019" {
-			continue
-		}
-		body, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := pool.Exec(ctx, string(body)); err != nil {
-			t.Fatalf("migration %s: %v", file, err)
-		}
 	}
 	return NewRepository(pool)
 }

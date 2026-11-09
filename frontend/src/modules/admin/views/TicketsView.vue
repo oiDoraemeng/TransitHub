@@ -1,235 +1,155 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertCircle, Inbox, Loader2, RefreshCw, Settings2 } from 'lucide-vue-next'
+import { RouterLink } from 'vue-router'
+import { Inbox, Loader2, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-import { useTickets } from '../composables/useTickets'
+import { listTickets } from '../api/tickets'
+import { getClientConfig } from '../api/clientConfig'
+import { ticketStatuses, type AdminTicket, type AdminTicketList, type TicketStatus } from '../types/tickets'
 import TicketDetailDrawer from '../components/tickets/TicketDetailDrawer.vue'
-import TicketEmbedConfigModal from '../components/tickets/TicketEmbedConfigModal.vue'
-import Sub2apiUserProfileModal from '../components/tickets/Sub2apiUserProfileModal.vue'
-import type { AdminTicketListItem } from '../types/tickets'
 
+// 工单：TransitLink 用户提交的问题。默认先看待处理的（待回复和用户追问）。
 const { t, locale } = useI18n()
 
-const {
-  tickets,
-  total,
-  page,
-  pageSize,
-  totalPages,
-  statusFilter,
-  isLoading,
-  errorKey,
-  loadTickets,
-  setStatusFilter,
-  goToPage,
-} = useTickets()
+type Filter = TicketStatus | ''
+const filter = ref<Filter>('')
+const page = ref(1)
+const pageSize = 20
+const data = ref<AdminTicketList | null>(null)
+const loading = ref(false)
+const error = ref('')
+const openTicketId = ref<string | null>(null)
+const ticketsEnabled = ref<boolean | null>(null)
 
-const detailTicketId = ref<string | null>(null)
-const isDetailOpen = ref(false)
-const isEmbedConfigOpen = ref(false)
-const profileTicketId = ref<string | null>(null)
-const isProfileOpen = ref(false)
-
-const statusOptions = ['open', 'pending', 'replied', 'closed'] as const
-
-const openDetail = (ticket: AdminTicketListItem) => {
-  detailTicketId.value = ticket.id
-  isDetailOpen.value = true
-}
-
-const closeDetail = () => {
-  isDetailOpen.value = false
-  detailTicketId.value = null
-}
-
-const openProfile = (ticket: AdminTicketListItem) => {
-  profileTicketId.value = ticket.id
-  isProfileOpen.value = true
-}
-
-const closeProfile = () => {
-  isProfileOpen.value = false
-  profileTicketId.value = null
-}
-
-const handleUpdated = async () => {
-  await loadTickets()
-}
-
-const handleStatusChange = async (event: Event) => {
-  const target = event.target as HTMLSelectElement
-  await setStatusFilter(target.value)
-}
-
-const formatDateTime = (value: string | null): string => {
-  if (!value) return t('admin.tickets.common.placeholder')
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return t('admin.tickets.common.placeholder')
-  return new Intl.DateTimeFormat(locale.value, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
-
-const statusBadgeClass = (status: string): string => {
-  switch (status) {
-    case 'open':
-      return 'border-sky-400/30 bg-sky-500/10 text-sky-600 dark:text-sky-300'
-    case 'pending':
-      return 'border-amber-400/30 bg-amber-500/10 text-amber-600 dark:text-amber-300'
-    case 'replied':
-      return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
-    case 'closed':
-      return 'border-border/60 bg-surface-elevated text-muted-foreground'
-    default:
-      return 'border-border/60 bg-surface-elevated text-muted-foreground'
+const load = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    data.value = await listTickets({ status: filter.value, page: page.value, pageSize })
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : 'admin.tickets.errors.request'
+  } finally {
+    loading.value = false
   }
 }
 
-const canGoPrevious = () => page.value > 1 && !isLoading.value
-const canGoNext = () => page.value < totalPages.value && !isLoading.value
+const choose = (next: Filter) => {
+  filter.value = next
+  page.value = 1
+  void load()
+}
+
+const goTo = (next: number) => {
+  page.value = next
+  void load()
+}
+
+const counts = computed(() => data.value?.counts ?? { open: 0, pending: 0, replied: 0, closed: 0 })
+const allCount = computed(() => counts.value.open + counts.value.pending + counts.value.replied + counts.value.closed)
+const tabs = computed(() => [
+  { value: '' as Filter, label: t('admin.tickets.tabs.all'), count: allCount.value },
+  ...ticketStatuses.map((status) => ({ value: status as Filter, label: t(`admin.tickets.status.${status}`), count: counts.value[status] })),
+])
+
+const statusClass = (status: TicketStatus) => ({
+  open: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  pending: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  replied: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  closed: 'bg-surface-elevated text-muted-foreground',
+}[status])
+
+const needsReply = (ticket: AdminTicket) => ticket.status === 'open' || ticket.status === 'pending'
+
+const userName = (ticket: AdminTicket) => ticket.siteUsername || ticket.siteEmail || t('admin.tickets.unknownUser')
+
+const formatTime = (value: string) => {
+  const date = new Date(value)
+  const sameDay = date.toDateString() === new Date().toDateString()
+  return new Intl.DateTimeFormat(locale.value, sameDay ? { hour: '2-digit', minute: '2-digit' } : { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date)
+}
+
+// 停留在页面上时每分钟刷新一次，新工单不用手动刷新。
+let timer: number | undefined
+onMounted(async () => {
+  void load()
+  timer = window.setInterval(() => { if (!openTicketId.value) void load() }, 60_000)
+  try {
+    const config = await getClientConfig()
+    ticketsEnabled.value = config.enabled && config.tickets.enabled
+  } catch {
+    ticketsEnabled.value = null
+  }
+})
+onBeforeUnmount(() => window.clearInterval(timer))
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <div class="flex flex-col space-y-4">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-        <div class="flex items-center gap-3 w-full sm:w-auto flex-1">
-          <div class="relative w-full sm:w-48">
-            <select
-              :value="statusFilter"
-              class="h-10 w-full rounded-xl border border-border/50 bg-surface px-3 pr-8 text-sm text-foreground outline-none appearance-none transition-all focus:border-primary focus:ring-1 focus:ring-primary"
-              @change="handleStatusChange"
-            >
-              <option value="">{{ t('admin.tickets.tabs.all') }}</option>
-              <option v-for="status in statusOptions" :key="status" :value="status">
-                {{ t(`admin.tickets.status.${status}`) }}
-              </option>
-            </select>
-            <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2 shrink-0">
-          <Button variant="secondary" class="h-10 rounded-xl gap-2" @click="isEmbedConfigOpen = true">
-            <Settings2 class="h-4 w-4" />
-            {{ t('admin.tickets.actions.embedSettings') }}
-          </Button>
-          <Button variant="secondary" class="h-10 rounded-xl gap-2" :disabled="isLoading" @click="loadTickets">
-            <Loader2 v-if="isLoading" class="h-4 w-4 animate-spin" />
-            <RefreshCw v-else class="h-4 w-4" />
-            {{ t('admin.tickets.actions.refresh') }}
-          </Button>
-        </div>
+  <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+    <header class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight text-foreground">{{ t('admin.tickets.title') }}</h1>
+        <p class="mt-1 max-w-2xl text-sm text-muted-foreground">{{ t('admin.tickets.subtitle') }}</p>
       </div>
+      <Button variant="secondary" :disabled="loading" @click="load">
+        <Loader2 v-if="loading" class="h-4 w-4 animate-spin" />
+        <RefreshCw v-else class="h-4 w-4" />
+        {{ t('admin.tickets.refresh') }}
+      </Button>
+    </header>
 
-      <div v-if="errorKey" class="flex items-start gap-3 rounded-2xl border border-warning/20 bg-warning/10 p-4 text-sm text-warning shrink-0">
-        <AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />
-        <span>{{ t(errorKey) }}</span>
-      </div>
+    <p v-if="ticketsEnabled === false" class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+      {{ t('admin.tickets.disabledHint') }}
+      <RouterLink to="/admin/client" class="font-medium underline underline-offset-2">{{ t('admin.tickets.openClientPage') }}</RouterLink>
+    </p>
 
-      <div class="min-h-0 overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm flex flex-col">
-        <div v-if="isLoading" class="flex items-center justify-center py-16 text-muted-foreground">
-          <Loader2 class="mr-2 h-5 w-5 animate-spin" />
-          {{ t('admin.tickets.status.loading') }}
-        </div>
-
-        <div v-else-if="tickets.length === 0" class="flex flex-col items-center justify-center px-6 py-16 text-center">
-          <div class="flex h-12 w-12 items-center justify-center rounded-2xl border border-border/50 bg-surface-elevated text-muted-foreground">
-            <Inbox class="h-5 w-5" />
-          </div>
-          <h3 class="mt-4 font-semibold text-foreground">{{ t('admin.tickets.empty.title') }}</h3>
-          <p class="mt-2 max-w-sm text-sm text-muted-foreground">{{ t('admin.tickets.empty.description') }}</p>
-        </div>
-
-        <div v-else class="flex-1 overflow-auto">
-          <table class="w-full min-w-[980px] text-left text-sm relative">
-            <thead class="sticky top-0 z-10 border-b border-border/50 bg-surface-elevated/90 backdrop-blur-sm">
-              <tr>
-                <th class="px-6 py-3 font-medium text-muted-foreground">{{ t('admin.tickets.fields.title') }}</th>
-                <th class="px-6 py-3 font-medium text-muted-foreground">{{ t('admin.tickets.fields.status') }}</th>
-                <th class="px-6 py-3 font-medium text-muted-foreground">{{ t('admin.tickets.fields.category') }}</th>
-                <th class="px-6 py-3 font-medium text-muted-foreground">{{ t('admin.tickets.fields.priority') }}</th>
-                <th class="px-6 py-3 font-medium text-muted-foreground">{{ t('admin.tickets.fields.manualEmail') }}</th>
-                <th class="px-6 py-3 font-medium text-muted-foreground">{{ t('admin.tickets.fields.sub2apiUser') }}</th>
-                <th class="px-6 py-3 font-medium text-muted-foreground">{{ t('admin.tickets.fields.sub2apiSrcHost') }}</th>
-                <th class="px-6 py-3 font-medium text-muted-foreground">{{ t('admin.tickets.fields.lastMessageAt') }}</th>
-                <th class="px-6 py-3 text-right font-medium text-muted-foreground">{{ t('admin.tickets.fields.actions') }}</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-border/50">
-              <tr v-for="ticket in tickets" :key="ticket.id" class="transition-colors hover:bg-surface/30">
-                <td class="px-6 py-2.5 font-medium text-foreground">{{ ticket.title }}</td>
-                <td class="px-6 py-2.5">
-                  <span :class="['inline-flex rounded-md border px-2 py-1 text-xs font-semibold', statusBadgeClass(ticket.status)]">
-                    {{ t(`admin.tickets.status.${ticket.status}`) }}
-                  </span>
-                </td>
-                <td class="px-6 py-2.5">
-                  <span class="inline-flex rounded-md border border-border/60 bg-surface-elevated px-2 py-1 text-xs text-foreground">{{ ticket.category }}</span>
-                </td>
-                <td class="px-6 py-2.5">
-                  <span class="inline-flex rounded-md border border-border/60 bg-surface-elevated px-2 py-1 text-xs text-foreground">{{ ticket.priority }}</span>
-                </td>
-                <td class="px-6 py-2.5 text-muted-foreground">{{ ticket.manualEmail }}</td>
-                <td class="px-6 py-2.5 text-muted-foreground">
-                  <button
-                    v-if="ticket.sub2apiUserId"
-                    type="button"
-                    class="flex flex-col text-left underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
-                    @click="openProfile(ticket)"
-                  >
-                    <span>{{ ticket.sub2apiEmail || ticket.sub2apiUserId }}</span>
-                    <span v-if="ticket.sub2apiRole" class="text-xs">{{ ticket.sub2apiRole }}</span>
-                  </button>
-                  <span v-else>{{ t('admin.tickets.common.placeholder') }}</span>
-                </td>
-                <td class="px-6 py-2.5 text-muted-foreground truncate max-w-[220px]" :title="ticket.sub2apiSrcHost">{{ ticket.sub2apiSrcHost || t('admin.tickets.common.placeholder') }}</td>
-                <td class="px-6 py-2.5 text-muted-foreground">{{ formatDateTime(ticket.lastMessageAt) }}</td>
-                <td class="px-6 py-2.5 text-right">
-                  <Button variant="secondary" size="sm" @click="openDetail(ticket)">
-                    {{ t('admin.tickets.actions.viewDetail') }}
-                  </Button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="flex flex-col gap-3 border-t border-border/50 bg-surface-elevated/30 px-4 py-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <span>{{ t('admin.tickets.pagination.total', { total }) }}</span>
-            <span>{{ t('admin.tickets.pagination.pageSize', { pageSize }) }}</span>
-            <span>{{ t('admin.tickets.pagination.currentPage', { page, totalPages }) }}</span>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <Button variant="secondary" size="sm" :disabled="!canGoPrevious()" @click="goToPage(page - 1)">
-              {{ t('admin.tickets.pagination.previous') }}
-            </Button>
-            <Button variant="secondary" size="sm" :disabled="!canGoNext()" @click="goToPage(page + 1)">
-              {{ t('admin.tickets.pagination.next') }}
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div class="flex flex-wrap gap-2" role="tablist" :aria-label="t('admin.tickets.title')">
+      <button
+        v-for="tab in tabs"
+        :key="tab.value"
+        type="button"
+        role="tab"
+        :aria-selected="filter === tab.value"
+        class="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        :class="filter === tab.value ? 'border-primary bg-primary/10 font-medium text-primary' : 'border-border/60 text-muted-foreground hover:bg-surface hover:text-foreground'"
+        @click="choose(tab.value)"
+      >
+        {{ tab.label }}
+        <span class="rounded-full bg-surface-elevated px-1.5 text-xs tabular-nums text-foreground">{{ tab.count }}</span>
+      </button>
     </div>
 
-    <TicketDetailDrawer
-      :open="isDetailOpen"
-      :ticket-id="detailTicketId"
-      @close="closeDetail"
-      @updated="handleUpdated"
-    />
+    <p v-if="error" class="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">{{ t(error) }}</p>
 
-    <TicketEmbedConfigModal :open="isEmbedConfigOpen" @close="isEmbedConfigOpen = false" />
+    <section class="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
+      <p v-if="loading && !data" class="flex items-center gap-2 p-6 text-sm text-muted-foreground"><Loader2 class="h-4 w-4 animate-spin" />{{ t('admin.tickets.loading') }}</p>
+      <div v-else-if="data && data.items.length === 0" class="flex flex-col items-center gap-2 p-10 text-center text-sm text-muted-foreground">
+        <Inbox class="h-8 w-8" />
+        {{ filter ? t('admin.tickets.emptyFiltered') : t('admin.tickets.empty') }}
+      </div>
+      <ul v-else-if="data" class="divide-y divide-border/50">
+        <li v-for="ticket in data.items" :key="ticket.id">
+          <button type="button" class="flex w-full items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-surface/60 focus-visible:bg-surface/60 focus-visible:outline-none" @click="openTicketId = ticket.id">
+            <span class="h-2 w-2 shrink-0 rounded-full" :class="needsReply(ticket) ? 'bg-primary' : 'bg-transparent'" aria-hidden="true"></span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-medium text-foreground">{{ ticket.title }}</p>
+              <p class="mt-0.5 truncate text-xs text-muted-foreground">
+                {{ userName(ticket) }}<template v-if="ticket.siteUserId"> · ID {{ ticket.siteUserId }}</template> · {{ ticket.category }}
+              </p>
+            </div>
+            <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium" :class="statusClass(ticket.status)">{{ t(`admin.tickets.status.${ticket.status}`) }}</span>
+            <span class="w-32 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground">{{ formatTime(ticket.lastMessageAt) }}</span>
+          </button>
+        </li>
+      </ul>
+    </section>
 
-    <Sub2apiUserProfileModal :open="isProfileOpen" :ticket-id="profileTicketId" @close="closeProfile" />
+    <div v-if="data && data.totalPages > 1" class="flex items-center justify-end gap-2 text-sm">
+      <span class="text-muted-foreground">{{ t('admin.tickets.page', { page: data.page, pages: data.totalPages }) }}</span>
+      <Button variant="secondary" size="sm" :disabled="loading || data.page <= 1" @click="goTo(data.page - 1)">{{ t('admin.tickets.previous') }}</Button>
+      <Button variant="secondary" size="sm" :disabled="loading || data.page >= data.totalPages" @click="goTo(data.page + 1)">{{ t('admin.tickets.next') }}</Button>
+    </div>
+
+    <TicketDetailDrawer v-if="openTicketId" :ticket-id="openTicketId" @close="openTicketId = null; load()" @updated="load" />
   </div>
 </template>

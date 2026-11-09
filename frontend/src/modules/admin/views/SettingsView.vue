@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Plus, Save, Loader2, CheckCircle2, MessageSquare, Send, Trash2, Timer, AlertTriangle, TrendingUp, Info, Mail } from 'lucide-vue-next'
+import { Plus, Save, Loader2, CheckCircle2, MessageSquare, Send, Trash2, Timer, AlertTriangle, TrendingUp, Info, Mail, Globe } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import EmailTemplatesPanel from '../components/settings/EmailTemplatesPanel.vue'
 import NotificationTemplateEditor from '../components/settings/NotificationTemplateEditor.vue'
+import OutboundProxyPanel from '../components/settings/OutboundProxyPanel.vue'
+import DailyReportCard from '../components/settings/DailyReportCard.vue'
+import TicketNotifyCard from '../components/settings/TicketNotifyCard.vue'
 import {
   getNotificationChannelSettings,
   getSmtpSettings,
@@ -21,7 +24,7 @@ import type { NotificationChannel, NotificationChannelSettings, NotificationTemp
 const { t } = useI18n()
 
 // Tab Settings
-const activeTab = ref<'strategy' | 'channels' | 'email'>('strategy')
+const activeTab = ref<'strategy' | 'channels' | 'email' | 'network'>('strategy')
 
 // Save loading states
 const isSavingStrategy = ref(false)
@@ -55,6 +58,7 @@ const defaultMultiplierTemplate = computed(() => t('admin.settings.sections.temp
   oldRate: '{oldRate}',
   newRate: '{newRate}',
   changeDirection: '{changeDirection}',
+  costImpact: '{costImpact}',
 }))
 const normalizeBuiltInTemplate = (template?: string) => (template?.trim() ?? '').replace(/>\s+</g, '><')
 const legacyBalanceTemplates = new Set([
@@ -64,6 +68,9 @@ const legacyBalanceTemplates = new Set([
   '<div style="border-left:4px solid #f59e0b;background:rgba(245,158,11,0.12);padding:16px;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#f59e0b">🔴 Balance warning</div><p style="margin:10px 0 0">The available balance for <strong style="color:#3b82f6">{siteName}</strong> is below the warning threshold.</p><p style="margin:10px 0 0">💰 Current balance: <strong style="color:#ef4444">¥{balance}</strong><br>⚠️ Warning threshold: <strong>¥{threshold}</strong></p><p style="margin:10px 0 0">Please review and recharge the upstream account to avoid service interruption.</p></div>',
 ].map(normalizeBuiltInTemplate))
 const legacyMultiplierTemplates = new Set([
+  // 加入 {costImpact}（调价成本影响）之前的默认模板。
+  '🟠 **倍率变更预警**\n\n🏷️ **站点：** {siteName}\n📦 **分组：** {groupName}\n📊 **倍率：** {oldRate}x → **{newRate}x**（{changeDirection}）\n\n🔎 请确认成本变化，并检查下游定价策略。',
+  '🟠 **Multiplier change warning**\n\n🏷️ **Site:** {siteName}\n📦 **Group:** {groupName}\n📊 **Rate:** {oldRate}x → **{newRate}x** ({changeDirection})\n\n🔎 Review the cost change and confirm whether downstream pricing needs adjustment.',
   '【倍率变更】{siteName} 的 {groupName} 分组倍率已{changeDirection}：{oldRate}x -> {newRate}x。',
   '[Multiplier change] {siteName} / {groupName} {changeDirection}: {oldRate}x -> {newRate}x.',
   '<div style="border-left:4px solid #3b82f6;background:rgba(59,130,246,0.12);padding:16px;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#3b82f6">🟠 倍率变更预警</div><p style="margin:10px 0 0">上游站点 <strong style="color:#3b82f6">{siteName}</strong> 的分组 <strong style="color:#8b5cf6">{groupName}</strong> 倍率已<strong style="color:#f59e0b">{changeDirection}</strong>。</p><p style="margin:10px 0 0">▫️ 原倍率: <strong>{oldRate}x</strong><br>🔸 新倍率: <strong style="color:#f59e0b">{newRate}x</strong></p><p style="margin:10px 0 0">🔎 请确认成本变化，并检查下游定价策略。</p></div>',
@@ -80,6 +87,11 @@ const enableMultiplierAlert = ref(false)
 const multiplierSelectedBots = ref<string[]>([])
 const multiplierTemplate = ref(defaultMultiplierTemplate.value)
 const multiplierTemplateFormat = ref<NotificationTemplateFormat>('markdown')
+
+const enableDailyReport = ref(false)
+const dailyReportTime = ref('09:00')
+const dailyReportSelectedBots = ref<string[]>([])
+const ticketNotifySelectedBots = ref<string[]>([])
 
 const normalizeTemplateFormat = (format?: string): NotificationTemplateFormat => (
   format === 'markdown' || format === 'html' ? format : 'text'
@@ -101,6 +113,7 @@ const multiplierTemplateVariables = computed(() => [
   { token: '{oldRate}', label: t('admin.settings.varOldRate') },
   { token: '{newRate}', label: t('admin.settings.varNewRate') },
   { token: '{changeDirection}', label: t('admin.settings.varChangeDirection') },
+  { token: '{costImpact}', label: t('admin.settings.varCostImpact') },
 ])
 const multiplierPreviewValues = computed(() => ({
   '{siteName}': t('admin.settings.templateEditor.samples.siteName'),
@@ -108,6 +121,7 @@ const multiplierPreviewValues = computed(() => ({
   '{oldRate}': t('admin.settings.templateEditor.samples.oldRate'),
   '{newRate}': t('admin.settings.templateEditor.samples.newRate'),
   '{changeDirection}': t('admin.settings.templateEditor.samples.changeDirection'),
+  '{costImpact}': t('admin.settings.templateEditor.samples.costImpact'),
 }))
 // === Tab 2: Channels ===
 const activeChannelTab = ref<NotificationChannel>('dingtalk')
@@ -190,6 +204,10 @@ const applyStrategySettings = (settings: StrategySettings) => {
   const usesDefaultMultiplierTemplate = shouldUseDefaultTemplate(settings.multiplierTemplate, legacyMultiplierTemplates)
   multiplierTemplate.value = usesDefaultMultiplierTemplate ? defaultMultiplierTemplate.value : settings.multiplierTemplate
   multiplierTemplateFormat.value = usesDefaultMultiplierTemplate ? 'markdown' : normalizeTemplateFormat(settings.multiplierTemplateFormat)
+  enableDailyReport.value = settings.enableDailyReport ?? false
+  dailyReportTime.value = settings.dailyReportTime || '09:00'
+  dailyReportSelectedBots.value = settings.dailyReportBotIds ?? []
+  ticketNotifySelectedBots.value = settings.ticketNotifyBotIds ?? []
 }
 
 const currentStrategySettings = (): StrategySettings => ({
@@ -206,6 +224,10 @@ const currentStrategySettings = (): StrategySettings => ({
   multiplierNotifyBotIds: multiplierSelectedBots.value,
   multiplierTemplate: multiplierTemplate.value.trim(),
   multiplierTemplateFormat: multiplierTemplateFormat.value,
+  enableDailyReport: enableDailyReport.value,
+  dailyReportTime: dailyReportTime.value || '09:00',
+  dailyReportBotIds: dailyReportSelectedBots.value,
+  ticketNotifyBotIds: ticketNotifySelectedBots.value,
 })
 
 const loadStrategy = async () => {
@@ -607,6 +629,22 @@ onMounted(async () => {
             {{ t('admin.settings.tabs.email') }}
           </div>
         </button>
+        <button
+          id="settings-tab-network"
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === 'network'"
+          aria-controls="settings-panel-network"
+          @click="activeTab = 'network'"
+          class="relative whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:px-6"
+          :class="activeTab === 'network' ? 'text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-surface/50'"
+        >
+          <div v-if="activeTab === 'network'" class="absolute inset-0 -z-10 rounded-md border border-border/50 bg-background shadow-sm"></div>
+          <div class="flex items-center gap-2">
+            <Globe class="w-4 h-4" />
+            {{ t('admin.settings.tabs.network') }}
+          </div>
+        </button>
       </div>
     </div>
 
@@ -787,6 +825,22 @@ onMounted(async () => {
               </div>
             </div>
           </div>
+
+          <!-- Card 4: Daily business report -->
+          <DailyReportCard
+            v-model:enabled="enableDailyReport"
+            v-model:time="dailyReportTime"
+            v-model:selected-bots="dailyReportSelectedBots"
+            :all-bots="allBots"
+            :has-bots="hasBots"
+          />
+
+          <!-- Card 5: Ticket notifications -->
+          <TicketNotifyCard
+            v-model:selected-bots="ticketNotifySelectedBots"
+            :all-bots="allBots"
+            :has-bots="hasBots"
+          />
 
         </div>
 
@@ -1205,6 +1259,13 @@ onMounted(async () => {
           </div>
         </section>
         <EmailTemplatesPanel />
+        </div>
+
+        <!-- ============================================ -->
+        <!-- Network Proxy Tab（系统级设置）               -->
+        <!-- ============================================ -->
+        <div v-else-if="activeTab === 'network'" id="settings-panel-network" role="tabpanel" aria-labelledby="settings-tab-network">
+          <OutboundProxyPanel />
         </div>
       </transition>
     </div>

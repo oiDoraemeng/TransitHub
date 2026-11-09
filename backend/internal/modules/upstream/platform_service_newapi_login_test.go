@@ -14,6 +14,7 @@ func TestLoginNewAPIUsesBearerTokenAndNestedUserID(t *testing.T) {
 			if r.Method != http.MethodPost {
 				t.Fatalf("login method = %s, want POST", r.Method)
 			}
+			http.SetCookie(w, &http.Cookie{Name: newAPIRefreshCookieName, Value: "dashboard-refresh", Path: "/api/user/auth/refresh"})
 			writeJSON(w, map[string]any{
 				"success": true,
 				"data": map[string]any{
@@ -68,6 +69,9 @@ func TestLoginNewAPIUsesBearerTokenAndNestedUserID(t *testing.T) {
 	}
 	if result.Session.Cookie != "" {
 		t.Fatalf("token login should not require a cookie, got %q", result.Session.Cookie)
+	}
+	if result.Session.RefreshToken != "dashboard-refresh" {
+		t.Fatalf("missing bearer refresh token: %+v", result.Session)
 	}
 	if result.Metrics.Balance.Value == nil || *result.Metrics.Balance.Value != 2 {
 		t.Fatalf("unexpected balance: %+v", result.Metrics.Balance)

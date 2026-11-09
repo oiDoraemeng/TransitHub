@@ -2,991 +2,615 @@ package tickets
 
 import (
 	"context"
-	"errors"
-	"regexp"
+	"crypto/rand"
+	"encoding/hex"
+	"log"
 	"strings"
+	"sync"
 	"time"
-
-	"transithub/backend/internal/modules/upstream"
+	"unicode/utf8"
 )
 
-// emailPattern 是新增工单时手动邮箱的基本格式校验，不追求 RFC 5322 完整实现，
-// 只拦截明显不是邮箱的输入。
-var emailPattern = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
-
-// ticketRepository 是 Service 对 PostgreSQL 存储层的全部依赖，由 *Repository 结构性满足。
-// 定义为接口而不是直接依赖 *Repository 具体类型，使 Service 的业务逻辑可以用内存假实现单测覆盖，
-// 不需要连接真实数据库（与 group_rate_campaigns/connection_health 等模块的既有约定一致）。
-type ticketRepository interface {
-	EnsureSchema(ctx context.Context) error
-
-	GetEmbedConfigByToken(ctx context.Context, embedToken string) (*EmbedConfig, error)
-	GetEmbedConfigByWorkspace(ctx context.Context, userID string, adminAccountID string) (*EmbedConfig, error)
-	InsertEmbedConfig(ctx context.Context, c EmbedConfig) error
-	UpdateEmbedConfig(ctx context.Context, userID string, adminAccountID string, template string, maxImagesPerTicket int, categoryOptions []string, priorityOptions []string) error
-	RotateEmbedToken(ctx context.Context, userID string, adminAccountID string, newToken string) error
-
-	InsertTicketWithMessage(ctx context.Context, t Ticket, m TicketMessage, attachments []TicketAttachment) error
-	InsertMessage(ctx context.Context, m TicketMessage) error
-	ListMessages(ctx context.Context, ticketID string) ([]TicketMessage, error)
-	ListAttachmentsByTicket(ctx context.Context, ticketID string) ([]TicketAttachment, error)
-	GetAttachmentByID(ctx context.Context, id string) (*TicketAttachment, error)
-	ListEmbedTickets(ctx context.Context, userID string, adminAccountID string, srcHost string, sub2apiUserID string) ([]Ticket, error)
-	GetEmbedTicket(ctx context.Context, userID string, adminAccountID string, srcHost string, sub2apiUserID string, id string) (*Ticket, error)
-	ListAdminTickets(ctx context.Context, userID string, adminAccountID string, status string, page int, pageSize int) ([]Ticket, int, error)
-	GetAdminTicket(ctx context.Context, userID string, adminAccountID string, id string) (*Ticket, error)
-	TouchTicket(ctx context.Context, id string, status string, lastMessageAt time.Time) error
-	UpdateStatus(ctx context.Context, id string, status string) error
+// Store 是 Repository 的接口（测试用内存实现替换）。
+type Store interface {
+	CreateTicket(ctx context.Context, ticket Ticket, message Message) error
+	AddMessage(ctx context.Context, ws Workspace, ticketID string, message Message, status string) (bool, error)
+	GetTicket(ctx context.Context, ws Workspace, id string) (*Ticket, error)
+	ListForUser(ctx context.Context, ws Workspace, user SiteUser, limit int) ([]Ticket, error)
+	ListMessages(ctx context.Context, ticketID string) ([]Message, error)
+	MarkCustomerSeen(ctx context.Context, ws Workspace, id string, at time.Time) error
+	SetStatus(ctx context.Context, ws Workspace, id string, status string) (bool, error)
+	ListForAdmin(ctx context.Context, ws Workspace, status string, page int, pageSize int) ([]Ticket, int, error)
+	CountByStatus(ctx context.Context, ws Workspace) (StatusCounts, error)
+	GetAttachment(ctx context.Context, ws Workspace, id string) (*Attachment, error)
 }
 
-// embedSessionStore 是 Service 对 Redis 会话存储的依赖，由 *EmbedSessionStore 结构性满足。
-type embedSessionStore interface {
-	Save(ctx context.Context, token string, session EmbedSession) error
-	Get(ctx context.Context, token string) (*EmbedSession, error)
+// Sessions 保存工单会话（Redis 实现见 SessionStore）。
+type Sessions interface {
+	Create(ctx context.Context, session ClientSession) (string, error)
+	Get(ctx context.Context, token string) (*ClientSession, error)
 }
 
-// sub2APIFetcher 是 Service 对 Sub2API 只读身份接口的依赖，由 *Sub2APIClient 结构性满足。
-type sub2APIFetcher interface {
-	FetchCurrentUser(srcHost string, token string) (Sub2APIUser, error)
+// Verifier 去站点核实用户身份（实现见 SiteVerifier）。
+type Verifier interface {
+	Verify(ctx context.Context, platform string, baseURL string, credential Credential) (SiteUser, error)
 }
 
-// attachmentStorage 是 Service 对本地磁盘附件存储的依赖，由 *AttachmentStorage 结构性满足。
-type attachmentStorage interface {
+// Portals 由「客户端」配置提供：专属链接对应的工作区和站点，以及工作区的工单设置。
+type Portals interface {
+	// Lookup 按专属链接代码查工单入口；链接不存在或没开启时返回 nil。
+	Lookup(ctx context.Context, code string) (*Portal, error)
+	// Settings 返回工作区现在是否开着工单和问题分类（站长可能在用户拿到会话后关掉）。
+	Settings(ctx context.Context, ws Workspace) (enabled bool, categories []string, err error)
+}
+
+// Workspaces 解析站长当前选中的工作区。
+type Workspaces interface {
+	RequireCurrentID(ctx context.Context, userID string) (string, error)
+}
+
+// Files 保存图片附件（实现见 AttachmentStorage）。
+type Files interface {
 	Save(contentType string, data []byte) (string, error)
-	Read(storagePath string) ([]byte, error)
-	Delete(storagePath string) error
+	Read(name string) ([]byte, error)
+	// Thumbnail 返回缩略图（JPEG）；做不了时返回错误，改用原图。
+	Thumbnail(name string) ([]byte, error)
+	Delete(name string) error
 }
 
-// idGenerator/tokenGenerator 允许测试注入固定值；生产环境使用 repository.go 中的
-// randomID/randomToken（crypto/rand）。
-type idGenerator func() (string, error)
-
-// adminSessionProvider 是 Service 对"当前 workspace 已刷新并验证的 Sub2API admin 会话"的依赖，
-// 由 my_sites.Service 结构性满足。只用于只读查询 Sub2API 用户资料，绝不用它写入/修改数据，
-// 也不会把这里拿到的 token 存进 tickets 表或返回给前端。
-type adminSessionProvider interface {
-	RequireSession(ctx context.Context, userID string, adminAccountID string) (upstream.Session, error)
-}
-
-// sub2APIAdminClient 是 Service 对 Sub2API admin 用户只读查询接口的依赖，
-// 由 *upstream.PlatformService 结构性满足。
-type sub2APIAdminClient interface {
-	FetchSub2APIAdminUser(session upstream.Session, userID string) (upstream.Sub2APIAdminUser, error)
-	FetchSub2APIAdminUserBalanceHistory(session upstream.Session, userID string, page int, pageSize int, codeType string) (upstream.Sub2APIUserBalanceHistory, error)
+// Notifier 把新工单和用户追问推送给站长（工作区的通知机器人）。
+type Notifier interface {
+	TicketCreated(ctx context.Context, ticket Ticket, message Message)
+	CustomerReplied(ctx context.Context, ticket Ticket, message Message)
 }
 
 type Service struct {
-	repository    ticketRepository
-	sessions      embedSessionStore
-	sub2api       sub2APIFetcher
-	storage       attachmentStorage
-	accounts      AdminAccountResolver
-	adminSessions adminSessionProvider
-	sub2apiAdmin  sub2APIAdminClient
-	newID         idGenerator
-	newToken      idGenerator
-	now           func() time.Time
+	store      Store
+	sessions   Sessions
+	verifier   Verifier
+	portals    Portals
+	workspaces Workspaces
+	files      Files
+	notifier   Notifier
+	limiter    *rateLimiter
+	now        func() time.Time
+	newID      func() string
 }
 
-func NewService(repository *Repository, sessions *EmbedSessionStore, sub2api *Sub2APIClient, storage *AttachmentStorage) *Service {
+// NewService 创建工单服务。files 为 nil 时不能上传图片；notifier 为 nil 时不推送。
+func NewService(store Store, sessions Sessions, verifier Verifier, portals Portals, workspaces Workspaces, files Files, notifier Notifier) *Service {
 	return &Service{
-		repository: repository,
-		sessions:   sessions,
-		sub2api:    sub2api,
-		storage:    storage,
-		newID:      randomID,
-		newToken:   randomToken,
-		now:        time.Now,
+		store: store, sessions: sessions, verifier: verifier, portals: portals, workspaces: workspaces, files: files, notifier: notifier,
+		// 换取会话会请求站点：每个专属链接每分钟最多 30 次，免得被拿来频繁请求站点。
+		limiter: newRateLimiter(30, time.Minute),
+		now:     time.Now,
+		newID:   randomID,
 	}
 }
 
-func (s *Service) EnsureSchema(ctx context.Context) error {
-	return s.repository.EnsureSchema(ctx)
+func randomID() string {
+	buffer := make([]byte, 16)
+	_, _ = rand.Read(buffer)
+	return hex.EncodeToString(buffer)
 }
 
-func (s *Service) SetAdminAccountResolver(accounts AdminAccountResolver) {
-	s.accounts = accounts
-}
+// ---- 用户（TransitLink） ----
 
-// SetAdminSessionProvider 注入当前 workspace 的 Sub2API admin 会话来源（my_sites.Service）。
-// 未注入时 GetSub2apiUserProfile 的实时字段一律降级为不可用，不会 panic。
-func (s *Service) SetAdminSessionProvider(provider adminSessionProvider) {
-	s.adminSessions = provider
-}
-
-// SetSub2APIAdminClient 注入 Sub2API admin 用户资料/余额历史只读查询能力（upstream.PlatformService）。
-func (s *Service) SetSub2APIAdminClient(client sub2APIAdminClient) {
-	s.sub2apiAdmin = client
-}
-
-func (s *Service) requireCurrentAdminAccountID(ctx context.Context, userID string) (string, error) {
-	if s.accounts == nil {
-		return "", requestError(ErrorNoCurrentAccount)
+// CreateSession 核实用户在站点上的身份，换一个工单会话。
+func (s *Service) CreateSession(ctx context.Context, code string, req CreateSessionRequest) (SessionResponse, error) {
+	code = strings.TrimSpace(code)
+	if code == "" || !s.limiter.Allow(code) {
+		return SessionResponse{}, requestError(ErrorTooManyRequests)
 	}
-	return s.accounts.RequireCurrentID(ctx, userID)
-}
-
-// ---- 公开 iframe 接口 ----
-
-// CreateEmbedSession 实现文档 POST /api/embed/tickets/session 的完整校验链路：
-//  1. 按 embedToken 找到 workspace 配置，不存在/禁用一律 403（ErrorEmbedConfigNotFound/ErrorEmbedDisabled）。
-//  2. allowedSrcHost 非空时必须与请求 srcHost 规范化后完全匹配，否则拒绝（防止 iframe 被嵌入到未授权域名）。
-//  3. 用请求携带的 sub2apiToken 向 srcHost 请求 Sub2API 当前用户，只信任这个接口返回的身份，
-//     不解析/信任 JWT payload，也不直接信任 URL 里的 user_id。
-//  4. URL user_id（如果非空）必须与 Sub2API 返回的用户 ID 一致，不一致视为伪造，拒绝。
-//  5. 签发一个不含任何 Sub2API token 的短期 embed session token，交给前端后续请求使用。
-func (s *Service) CreateEmbedSession(ctx context.Context, req CreateSessionRequest) (CreateSessionResponse, error) {
-	embedToken := strings.TrimSpace(req.EmbedToken)
-	sub2apiToken := strings.TrimSpace(req.Sub2apiToken)
-	if embedToken == "" || sub2apiToken == "" {
-		return CreateSessionResponse{}, requestError(ErrorEmbedRequest)
-	}
-
-	config, err := s.repository.GetEmbedConfigByToken(ctx, embedToken)
+	portal, err := s.portals.Lookup(ctx, code)
 	if err != nil {
-		return CreateSessionResponse{}, err
+		return SessionResponse{}, err
 	}
-	if config == nil {
-		return CreateSessionResponse{}, requestError(ErrorEmbedConfigNotFound)
+	if portal == nil || !portal.Enabled {
+		return SessionResponse{}, requestError(ErrorDisabled)
 	}
-	// 第二阶段取消了"启用嵌入工单"和"允许来源域名"两项配置能力：不再依据 config.Enabled/
-	// config.AllowedSrcHost 拒绝会话请求，避免历史上被关闭或限制过来源的旧数据继续导致 iframe
-	// 无法访问。字段本身保留在数据库和结构体中用于兼容，只是不再参与这里的判定。
-
-	normalizedSrcHost, err := normalizeSrcHost(req.SrcHost)
+	user, err := s.verifier.Verify(ctx, portal.Platform, portal.BaseURL, req.Credential)
 	if err != nil {
-		return CreateSessionResponse{}, err
+		return SessionResponse{}, err
 	}
-
-	user, err := s.sub2api.FetchCurrentUser(normalizedSrcHost, sub2apiToken)
+	session := ClientSession{
+		Workspace:  portal.Workspace,
+		User:       user,
+		ClientInfo: clip(req.ClientInfo, maxClientInfoRunes),
+		ExpiresAt:  s.now().Add(sessionTTL),
+	}
+	token, err := s.sessions.Create(ctx, session)
 	if err != nil {
-		var sub2apiErr *sub2APIError
-		if errors.As(err, &sub2apiErr) && sub2apiErr.unauthorized {
-			return CreateSessionResponse{}, requestError(ErrorEmbedSub2apiAuth)
-		}
-		return CreateSessionResponse{}, requestError(ErrorEmbedSub2apiRequest)
+		return SessionResponse{}, err
 	}
-
-	urlUserID := strings.TrimSpace(req.UrlUserID)
-	if urlUserID != "" && urlUserID != user.ID {
-		return CreateSessionResponse{}, requestError(ErrorEmbedUserMismatch)
-	}
-
-	sessionToken, err := s.newToken()
-	if err != nil {
-		return CreateSessionResponse{}, err
-	}
-	template := normalizeEmbedTemplate(config.Template)
-	normalizedOptions := withDefaultTicketOptions(*config)
-	session := EmbedSession{
-		UserID:             config.UserID,
-		AdminAccountID:     config.AdminAccountID,
-		EmbedToken:         config.EmbedToken,
-		SrcHost:            normalizedSrcHost,
-		SrcURL:             strings.TrimSpace(req.SrcURL),
-		Sub2apiUserID:      user.ID,
-		Sub2apiEmail:       user.Email,
-		Sub2apiRole:        user.Role,
-		Template:           template,
-		MaxImagesPerTicket: config.MaxImagesPerTicket,
-		CategoryOptions:    normalizedOptions.CategoryOptions,
-		PriorityOptions:    normalizedOptions.PriorityOptions,
-	}
-	if err := s.sessions.Save(ctx, sessionToken, session); err != nil {
-		return CreateSessionResponse{}, err
-	}
-	return CreateSessionResponse{
-		SessionToken:       sessionToken,
-		Template:           template,
-		MaxImagesPerTicket: config.MaxImagesPerTicket,
-		CategoryOptions:    normalizedOptions.CategoryOptions,
-		PriorityOptions:    normalizedOptions.PriorityOptions,
+	return SessionResponse{
+		SessionToken: token,
+		ExpiresAt:    session.ExpiresAt,
+		User:         SessionUser{ID: user.ID, Name: user.Username, Email: user.Email},
+		Categories:   categoriesOrDefault(portal.Categories),
+		Limits:       UploadLimits{Enabled: s.files != nil, MaxImages: maxImagesPerMessage, MaxImageBytes: maxImageBytes},
 	}, nil
 }
 
-// requireSession 解析 Authorization: Bearer <embedSessionToken>，会话不存在/过期一律视为
-// 未认证。embed_token 本身只用于定位 iframe 归属的 workspace，真正的用户身份鉴权始终依赖这个
-// 会话（而会话的建立又依赖 Sub2API token 校验），不会把 embed_token 当成后台鉴权凭证。
-func (s *Service) requireSession(ctx context.Context, sessionToken string) (*EmbedSession, error) {
-	sessionToken = strings.TrimSpace(sessionToken)
-	if sessionToken == "" {
-		return nil, requestError(ErrorEmbedSessionInvalid)
-	}
-	session, err := s.sessions.Get(ctx, sessionToken)
+// Session 按令牌读取会话；没有或过期时返回 ErrorSessionExpired（客户端重新换取）。
+func (s *Service) Session(ctx context.Context, token string) (*ClientSession, error) {
+	session, err := s.sessions.Get(ctx, token)
 	if err != nil {
 		return nil, err
 	}
 	if session == nil {
-		return nil, requestError(ErrorEmbedSessionInvalid)
+		return nil, requestError(ErrorSessionExpired)
 	}
 	return session, nil
 }
 
-func (s *Service) ListMyTickets(ctx context.Context, sessionToken string) (EmbedTicketListResponse, error) {
-	session, err := s.requireSession(ctx, sessionToken)
+// ListMine 列出用户自己的工单，和有新回复的工单数。
+func (s *Service) ListMine(ctx context.Context, session *ClientSession) (ClientListResponse, error) {
+	tickets, err := s.store.ListForUser(ctx, session.Workspace, session.User, clientListLimit)
 	if err != nil {
-		return EmbedTicketListResponse{}, err
+		return ClientListResponse{}, err
 	}
-	tickets, err := s.repository.ListEmbedTickets(ctx, session.UserID, session.AdminAccountID, session.SrcHost, session.Sub2apiUserID)
-	if err != nil {
-		return EmbedTicketListResponse{}, err
+	response := ClientListResponse{Items: make([]ClientTicketView, 0, len(tickets))}
+	for _, ticket := range tickets {
+		view := clientView(ticket)
+		if view.Unread {
+			response.Unread++
+		}
+		response.Items = append(response.Items, view)
 	}
-	items := make([]EmbedTicketListItem, 0, len(tickets))
-	for _, t := range tickets {
-		items = append(items, toEmbedTicketListItem(t))
-	}
-	return EmbedTicketListResponse{Items: items}, nil
+	return response, nil
 }
 
-// CreateTicket 创建工单，可选携带图片附件（新建工单场景是第一版唯一支持上传图片的入口，
-// 见文档"新建工单时可上传图片"）。上传数量上限来自当前 workspace 的实时配置（不是 embed
-// session 建立时刻的快照，配置随时可能被后台改动），因此这里重新查一次 embed config。
-//
-// 附件处理顺序：先校验（数量/大小/content-type），再写磁盘，最后写数据库；数据库事务失败时
-// 主动删除刚写入的文件，避免留下没有对应记录的孤儿文件（磁盘写入本身失败也不会污染数据库，
-// 因为这一步永远在数据库写入之前）。
-func (s *Service) CreateTicket(ctx context.Context, sessionToken string, req CreateTicketRequest, uploads []AttachmentUpload) (EmbedTicketDetail, error) {
-	session, err := s.requireSession(ctx, sessionToken)
+// CreateMine 新建工单。
+func (s *Service) CreateMine(ctx context.Context, session *ClientSession, req CreateTicketRequest, uploads []AttachmentUpload) (ClientTicketDetail, error) {
+	categories, err := s.enabledCategories(ctx, session.Workspace)
 	if err != nil {
-		return EmbedTicketDetail{}, err
+		return ClientTicketDetail{}, err
 	}
-
-	manualEmail := strings.TrimSpace(req.ManualEmail)
-	title := strings.TrimSpace(req.Title)
-	body := strings.TrimSpace(req.Body)
-	if manualEmail == "" || !emailPattern.MatchString(manualEmail) {
-		return EmbedTicketDetail{}, requestError(ErrorEmbedInvalidEmail)
-	}
-	if title == "" {
-		return EmbedTicketDetail{}, requestError(ErrorEmbedTitleRequired)
-	}
-	if body == "" {
-		return EmbedTicketDetail{}, requestError(ErrorEmbedBodyRequired)
-	}
-
-	// 分类/优先级必须按当前 workspace 的实时配置校验（不是 embed session 建立时刻的快照，
-	// 配置随时可能被后台改动），因此和 maxImages 一起复用同一次 GetEmbedConfigByWorkspace 查询。
-	// config 为 nil（理论上不应该发生，embed session 存在意味着 embed config 存在）时退回默认
-	// 选项组，与 withDefaultTicketOptions 的兜底语义保持一致，不让整个创建流程 panic。
-	maxImages := 0
-	categoryOptions := append([]string(nil), DefaultCategoryOptions...)
-	priorityOptions := append([]string(nil), DefaultPriorityOptions...)
-	config, err := s.repository.GetEmbedConfigByWorkspace(ctx, session.UserID, session.AdminAccountID)
-	if err != nil {
-		return EmbedTicketDetail{}, err
-	}
-	if config != nil {
-		maxImages = config.MaxImagesPerTicket
-		normalized := withDefaultTicketOptions(*config)
-		categoryOptions = normalized.CategoryOptions
-		priorityOptions = normalized.PriorityOptions
-	}
-
+	title, titleOK := limited(req.Title, maxTitleRunes)
+	body, bodyOK := limited(req.Body, maxBodyRunes)
+	contact, contactOK := limited(req.Contact, maxContactRunes)
 	category := strings.TrimSpace(req.Category)
 	if category == "" {
-		return EmbedTicketDetail{}, requestError(ErrorEmbedCategoryRequired)
+		category = categories[0]
 	}
-	if !containsTicketOption(categoryOptions, category) {
-		return EmbedTicketDetail{}, requestError(ErrorEmbedInvalidCategory)
-	}
-	priority := strings.TrimSpace(req.Priority)
-	if priority == "" {
-		return EmbedTicketDetail{}, requestError(ErrorEmbedPriorityRequired)
-	}
-	if !containsTicketOption(priorityOptions, priority) {
-		return EmbedTicketDetail{}, requestError(ErrorEmbedInvalidPriority)
-	}
-
-	validatedUploads, err := validateAttachmentUploads(uploads, maxImages)
-	if err != nil {
-		return EmbedTicketDetail{}, err
-	}
-
-	ticketID, err := s.newID()
-	if err != nil {
-		return EmbedTicketDetail{}, err
-	}
-	messageID, err := s.newID()
-	if err != nil {
-		return EmbedTicketDetail{}, err
+	if !titleOK || !bodyOK || !contactOK || title == "" || body == "" || !contains(categories, category) {
+		return ClientTicketDetail{}, requestError(ErrorInvalid)
 	}
 	now := s.now()
-
 	ticket := Ticket{
-		ID:             ticketID,
-		UserID:         session.UserID,
-		AdminAccountID: session.AdminAccountID,
-		Sub2apiSrcHost: session.SrcHost,
-		Sub2apiSrcURL:  session.SrcURL,
-		Sub2apiUserID:  session.Sub2apiUserID,
-		Sub2apiEmail:   session.Sub2apiEmail,
-		Sub2apiRole:    session.Sub2apiRole,
-		ManualEmail:    manualEmail,
-		Title:          title,
-		Status:         StatusOpen,
-		Category:       category,
-		Priority:       priority,
-		LastMessageAt:  now,
+		ID: s.newID(), Workspace: session.Workspace, User: session.User, Contact: contact, ClientInfo: session.ClientInfo,
+		Title: title, Category: category, Status: StatusOpen, LastAuthor: AuthorCustomer, LastMessageAt: now, CreatedAt: now, UpdatedAt: now,
 	}
-	message := TicketMessage{
-		ID:             messageID,
-		TicketID:       ticketID,
-		UserID:         session.UserID,
-		AdminAccountID: session.AdminAccountID,
-		AuthorType:     AuthorCustomer,
-		AuthorName:     manualEmail,
-		Body:           body,
-	}
-
-	attachments, savedPaths, err := s.saveAttachments(validatedUploads, ticketID, messageID, session.UserID, session.AdminAccountID, AuthorCustomer)
+	message, err := s.newMessage(ticket.ID, AuthorCustomer, session.User.Username, body, uploads, now)
 	if err != nil {
-		return EmbedTicketDetail{}, err
+		return ClientTicketDetail{}, err
 	}
-	if err := s.repository.InsertTicketWithMessage(ctx, ticket, message, attachments); err != nil {
-		s.cleanupAttachmentFiles(savedPaths)
-		return EmbedTicketDetail{}, err
+	if err := s.store.CreateTicket(ctx, ticket, message); err != nil {
+		s.discard(message)
+		return ClientTicketDetail{}, err
 	}
-	return s.GetMyTicket(ctx, sessionToken, ticketID)
+	s.notify(func(ctx context.Context) { s.notifier.TicketCreated(ctx, ticket, message) })
+	return s.DetailMine(ctx, session, ticket.ID)
 }
 
-// saveAttachments 把已校验的图片依次写入磁盘，并构造对应的 TicketAttachment 记录。
-// 任意一张图片写盘失败都会清理掉本次已经成功写入的文件后返回错误，不留下部分文件。
-func (s *Service) saveAttachments(uploads []AttachmentUpload, ticketID, messageID, userID, adminAccountID, authorType string) ([]TicketAttachment, []string, error) {
-	if len(uploads) == 0 {
-		return nil, nil, nil
+// DetailMine 返回用户自己的一个工单（含消息），并记下已看过。
+func (s *Service) DetailMine(ctx context.Context, session *ClientSession, id string) (ClientTicketDetail, error) {
+	ticket, err := s.ownTicket(ctx, session, id)
+	if err != nil {
+		return ClientTicketDetail{}, err
 	}
-	attachments := make([]TicketAttachment, 0, len(uploads))
-	savedPaths := make([]string, 0, len(uploads))
-	for _, upload := range uploads {
-		storagePath, err := s.storage.Save(upload.ContentType, upload.Data)
-		if err != nil {
-			s.cleanupAttachmentFiles(savedPaths)
-			return nil, nil, err
-		}
-		savedPaths = append(savedPaths, storagePath)
-
-		id, err := s.newID()
-		if err != nil {
-			s.cleanupAttachmentFiles(savedPaths)
-			return nil, nil, err
-		}
-		attachments = append(attachments, TicketAttachment{
-			ID:             id,
-			TicketID:       ticketID,
-			MessageID:      messageID,
-			UserID:         userID,
-			AdminAccountID: adminAccountID,
-			AuthorType:     authorType,
-			OriginalName:   sanitizeAttachmentName(upload.OriginalName),
-			ContentType:    upload.ContentType,
-			SizeBytes:      int64(len(upload.Data)),
-			StoragePath:    storagePath,
-		})
+	messages, err := s.store.ListMessages(ctx, ticket.ID)
+	if err != nil {
+		return ClientTicketDetail{}, err
 	}
-	return attachments, savedPaths, nil
+	now := s.now()
+	if err := s.store.MarkCustomerSeen(ctx, session.Workspace, ticket.ID, now); err != nil {
+		return ClientTicketDetail{}, err
+	}
+	ticket.CustomerSeenAt = &now
+	return ClientTicketDetail{ClientTicketView: clientView(*ticket), Messages: messageViews(messages)}, nil
 }
 
-// cleanupAttachmentFiles 是数据库写入失败后的补偿清理，逐个删除已经落盘的文件；
-// 删除本身失败只忽略（最坏情况是留下极少数孤儿文件，不影响正确性和安全边界)。
-func (s *Service) cleanupAttachmentFiles(storagePaths []string) {
-	for _, path := range storagePaths {
-		_ = s.storage.Delete(path)
+// ReplyMine 用户追问。已关闭的工单不能再回复。
+func (s *Service) ReplyMine(ctx context.Context, session *ClientSession, id string, req ReplyRequest, uploads []AttachmentUpload) (ClientTicketDetail, error) {
+	if _, err := s.enabledCategories(ctx, session.Workspace); err != nil {
+		return ClientTicketDetail{}, err
 	}
-}
-
-// sanitizeAttachmentName 只保留原始文件名用于展示，裁剪长度并去除首尾空白；
-// 该值绝不参与磁盘路径拼接（见 AttachmentStorage.Save 使用服务端生成的文件名），因此这里
-// 不需要过滤路径穿越字符，只是防止界面被异常长的文件名撑破。
-func sanitizeAttachmentName(name string) string {
-	trimmed := strings.TrimSpace(name)
-	if trimmed == "" {
-		return "image"
-	}
-	const maxNameLength = 200
-	if len(trimmed) > maxNameLength {
-		return trimmed[:maxNameLength]
-	}
-	return trimmed
-}
-
-func (s *Service) GetMyTicket(ctx context.Context, sessionToken string, id string) (EmbedTicketDetail, error) {
-	session, err := s.requireSession(ctx, sessionToken)
+	ticket, err := s.ownTicket(ctx, session, id)
 	if err != nil {
-		return EmbedTicketDetail{}, err
-	}
-	ticket, err := s.repository.GetEmbedTicket(ctx, session.UserID, session.AdminAccountID, session.SrcHost, session.Sub2apiUserID, id)
-	if err != nil {
-		return EmbedTicketDetail{}, err
-	}
-	if ticket == nil {
-		return EmbedTicketDetail{}, requestError(ErrorNotFound)
-	}
-	messages, attachmentsByMessage, err := s.loadMessagesWithAttachments(ctx, id)
-	if err != nil {
-		return EmbedTicketDetail{}, err
-	}
-	return toEmbedTicketDetail(*ticket, messages, attachmentsByMessage), nil
-}
-
-// loadMessagesWithAttachments 一次性拉取一个工单的全部消息和全部附件，并把附件按 message_id
-// 分组，避免逐条消息单独查询附件（N+1）。
-func (s *Service) loadMessagesWithAttachments(ctx context.Context, ticketID string) ([]TicketMessage, map[string][]TicketAttachment, error) {
-	messages, err := s.repository.ListMessages(ctx, ticketID)
-	if err != nil {
-		return nil, nil, err
-	}
-	attachments, err := s.repository.ListAttachmentsByTicket(ctx, ticketID)
-	if err != nil {
-		return nil, nil, err
-	}
-	byMessage := make(map[string][]TicketAttachment, len(attachments))
-	for _, a := range attachments {
-		byMessage[a.MessageID] = append(byMessage[a.MessageID], a)
-	}
-	return messages, byMessage, nil
-}
-
-// ReadEmbedAttachment 供公开 iframe 接口下载附件：先校验 embed session，再校验该附件所属的
-// 工单确实匹配当前会话的四段过滤条件（workspace + src_host + sub2api_user_id），复用
-// GetEmbedTicket 已有的归属校验逻辑，避免重复实现一遍同样的判断。
-func (s *Service) ReadEmbedAttachment(ctx context.Context, sessionToken string, attachmentID string) (TicketAttachment, []byte, error) {
-	session, err := s.requireSession(ctx, sessionToken)
-	if err != nil {
-		return TicketAttachment{}, nil, err
-	}
-	attachment, err := s.repository.GetAttachmentByID(ctx, attachmentID)
-	if err != nil {
-		return TicketAttachment{}, nil, err
-	}
-	if attachment == nil {
-		return TicketAttachment{}, nil, requestError(ErrorNotFound)
-	}
-	ticket, err := s.repository.GetEmbedTicket(ctx, session.UserID, session.AdminAccountID, session.SrcHost, session.Sub2apiUserID, attachment.TicketID)
-	if err != nil {
-		return TicketAttachment{}, nil, err
-	}
-	if ticket == nil {
-		return TicketAttachment{}, nil, requestError(ErrorNotFound)
-	}
-	data, err := s.storage.Read(attachment.StoragePath)
-	if err != nil {
-		return TicketAttachment{}, nil, err
-	}
-	return *attachment, data, nil
-}
-
-// AddCustomerMessage 追加一条 iframe 用户回复。已关闭工单直接拒绝（409），
-// 否则按状态流转规则把工单标记为 pending（等待后台再次处理）。
-func (s *Service) AddCustomerMessage(ctx context.Context, sessionToken string, id string, req CreateMessageRequest) (EmbedTicketDetail, error) {
-	session, err := s.requireSession(ctx, sessionToken)
-	if err != nil {
-		return EmbedTicketDetail{}, err
-	}
-	ticket, err := s.repository.GetEmbedTicket(ctx, session.UserID, session.AdminAccountID, session.SrcHost, session.Sub2apiUserID, id)
-	if err != nil {
-		return EmbedTicketDetail{}, err
-	}
-	if ticket == nil {
-		return EmbedTicketDetail{}, requestError(ErrorNotFound)
+		return ClientTicketDetail{}, err
 	}
 	if ticket.Status == StatusClosed {
-		return EmbedTicketDetail{}, requestError(ErrorTicketClosed)
+		return ClientTicketDetail{}, requestError(ErrorClosed)
 	}
-	body := strings.TrimSpace(req.Body)
-	if body == "" {
-		return EmbedTicketDetail{}, requestError(ErrorEmbedBodyRequired)
+	body, ok := limited(req.Body, maxBodyRunes)
+	if !ok || (body == "" && len(uploads) == 0) {
+		return ClientTicketDetail{}, requestError(ErrorInvalid)
 	}
-
-	messageID, err := s.newID()
+	message, err := s.newMessage(ticket.ID, AuthorCustomer, session.User.Username, body, uploads, s.now())
 	if err != nil {
-		return EmbedTicketDetail{}, err
+		return ClientTicketDetail{}, err
 	}
-	message := TicketMessage{
-		ID:             messageID,
-		TicketID:       id,
-		UserID:         session.UserID,
-		AdminAccountID: session.AdminAccountID,
-		AuthorType:     AuthorCustomer,
-		AuthorName:     ticket.ManualEmail,
-		Body:           body,
+	// 站长回复过以后用户再追问：重新变成「待处理」。
+	status := ticket.Status
+	if status == StatusReplied {
+		status = StatusPending
 	}
-	if err := s.repository.InsertMessage(ctx, message); err != nil {
-		return EmbedTicketDetail{}, err
+	if found, err := s.store.AddMessage(ctx, session.Workspace, ticket.ID, message, status); err != nil || !found {
+		s.discard(message)
+		if err == nil {
+			err = requestError(ErrorNotFound)
+		}
+		return ClientTicketDetail{}, err
 	}
-	if err := s.repository.TouchTicket(ctx, id, StatusPending, s.now()); err != nil {
-		return EmbedTicketDetail{}, err
-	}
-	return s.GetMyTicket(ctx, sessionToken, id)
+	ticket.Status = status
+	s.notify(func(ctx context.Context) { s.notifier.CustomerReplied(ctx, *ticket, message) })
+	return s.DetailMine(ctx, session, ticket.ID)
 }
 
-// ---- TransitHub 后台接口 ----
-
-func (s *Service) ListTickets(ctx context.Context, userID string, query AdminListQuery) (AdminTicketListResponse, error) {
-	adminAccountID, err := s.requireCurrentAdminAccountID(ctx, userID)
+// CloseMine 用户关闭自己的工单（问题解决了）。
+func (s *Service) CloseMine(ctx context.Context, session *ClientSession, id string) (ClientTicketDetail, error) {
+	ticket, err := s.ownTicket(ctx, session, id)
 	if err != nil {
-		return AdminTicketListResponse{}, err
+		return ClientTicketDetail{}, err
 	}
-	query = normalizeAdminListQuery(query)
-	tickets, total, err := s.repository.ListAdminTickets(ctx, userID, adminAccountID, query.Status, query.Page, query.PageSize)
-	if err != nil {
-		return AdminTicketListResponse{}, err
+	if _, err := s.store.SetStatus(ctx, session.Workspace, ticket.ID, StatusClosed); err != nil {
+		return ClientTicketDetail{}, err
 	}
-	items := make([]AdminTicketListItem, 0, len(tickets))
-	for _, t := range tickets {
-		items = append(items, toAdminTicketListItem(t))
-	}
-	return AdminTicketListResponse{
-		Items:      items,
-		Total:      total,
-		Page:       query.Page,
-		PageSize:   query.PageSize,
-		TotalPages: totalPages(total, query.PageSize),
-	}, nil
+	return s.DetailMine(ctx, session, ticket.ID)
 }
 
-func (s *Service) GetTicket(ctx context.Context, userID string, id string) (AdminTicketDetail, error) {
-	adminAccountID, err := s.requireCurrentAdminAccountID(ctx, userID)
+// AttachmentMine 返回用户自己工单里的一张图片。
+func (s *Service) AttachmentMine(ctx context.Context, session *ClientSession, attachmentID string, thumb bool) (*Attachment, []byte, error) {
+	attachment, err := s.store.GetAttachment(ctx, session.Workspace, attachmentID)
 	if err != nil {
-		return AdminTicketDetail{}, err
-	}
-	ticket, err := s.repository.GetAdminTicket(ctx, userID, adminAccountID, id)
-	if err != nil {
-		return AdminTicketDetail{}, err
-	}
-	if ticket == nil {
-		return AdminTicketDetail{}, requestError(ErrorNotFound)
-	}
-	messages, attachmentsByMessage, err := s.loadMessagesWithAttachments(ctx, id)
-	if err != nil {
-		return AdminTicketDetail{}, err
-	}
-	return toAdminTicketDetail(*ticket, messages, attachmentsByMessage), nil
-}
-
-// ReadAdminAttachment 供后台接口下载附件：先校验 TransitHub 登录态和当前 workspace，
-// 再校验该附件所属的工单确实属于 user_id + admin_account_id，复用 GetAdminTicket 已有的
-// 归属校验逻辑，不允许跨 workspace 读取附件。
-func (s *Service) ReadAdminAttachment(ctx context.Context, userID string, attachmentID string) (TicketAttachment, []byte, error) {
-	adminAccountID, err := s.requireCurrentAdminAccountID(ctx, userID)
-	if err != nil {
-		return TicketAttachment{}, nil, err
-	}
-	attachment, err := s.repository.GetAttachmentByID(ctx, attachmentID)
-	if err != nil {
-		return TicketAttachment{}, nil, err
+		return nil, nil, err
 	}
 	if attachment == nil {
-		return TicketAttachment{}, nil, requestError(ErrorNotFound)
+		return nil, nil, requestError(ErrorNotFound)
 	}
-	ticket, err := s.repository.GetAdminTicket(ctx, userID, adminAccountID, attachment.TicketID)
-	if err != nil {
-		return TicketAttachment{}, nil, err
+	if _, err := s.ownTicket(ctx, session, attachment.TicketID); err != nil {
+		return nil, nil, err
 	}
-	if ticket == nil {
-		return TicketAttachment{}, nil, requestError(ErrorNotFound)
-	}
-	data, err := s.storage.Read(attachment.StoragePath)
-	if err != nil {
-		return TicketAttachment{}, nil, err
-	}
-	return *attachment, data, nil
+	return s.readAttachment(attachment, thumb)
 }
 
-// GetSub2apiUserProfile 返回后台"Sub2API 用户资料"只读弹窗的数据。先校验该工单属于当前
-// workspace（不属于则 404，不做任何远程查询——这一条是唯一会让接口整体失败的情况），
-// 再尽量用当前 workspace 的 Sub2API admin 会话实时查询用户详情与余额历史来补全展示字段。
-// 会话缺失/非 admin/远程查询失败等情况都只把对应字段标记为不可用并返回 200，不影响已经
-// 成功获取的快照字段，也不会把 token 暴露给前端或写进日志。
-func (s *Service) GetSub2apiUserProfile(ctx context.Context, userID string, ticketID string) (Sub2apiUserProfileResponse, error) {
-	adminAccountID, err := s.requireCurrentAdminAccountID(ctx, userID)
+func (s *Service) ownTicket(ctx context.Context, session *ClientSession, id string) (*Ticket, error) {
+	ticket, err := s.store.GetTicket(ctx, session.Workspace, strings.TrimSpace(id))
 	if err != nil {
-		return Sub2apiUserProfileResponse{}, err
+		return nil, err
 	}
-	ticket, err := s.repository.GetAdminTicket(ctx, userID, adminAccountID, ticketID)
-	if err != nil {
-		return Sub2apiUserProfileResponse{}, err
+	if ticket == nil || ticket.User.Platform != session.User.Platform || ticket.User.ID != session.User.ID {
+		return nil, requestError(ErrorNotFound)
 	}
-	if ticket == nil {
-		return Sub2apiUserProfileResponse{}, requestError(ErrorNotFound)
-	}
-
-	profile := Sub2apiUserProfileResponse{
-		Sub2apiUserID:  ticket.Sub2apiUserID,
-		Sub2apiEmail:   ticket.Sub2apiEmail,
-		Sub2apiRole:    ticket.Sub2apiRole,
-		Sub2apiSrcHost: ticket.Sub2apiSrcHost,
-		Sub2apiSrcURL:  ticket.Sub2apiSrcURL,
-	}
-
-	sub2apiUserID := strings.TrimSpace(ticket.Sub2apiUserID)
-	if sub2apiUserID == "" {
-		profile.RemoteUnavailableReason = Sub2apiRemoteUnavailableNoUserID
-		return profile, nil
-	}
-	if s.adminSessions == nil || s.sub2apiAdmin == nil {
-		profile.RemoteUnavailableReason = Sub2apiRemoteUnavailableNoAdminSession
-		return profile, nil
-	}
-	session, err := s.adminSessions.RequireSession(ctx, userID, adminAccountID)
-	if err != nil {
-		profile.RemoteUnavailableReason = Sub2apiRemoteUnavailableNoAdminSession
-		return profile, nil
-	}
-
-	s.enrichSub2apiUserProfile(&profile, session, sub2apiUserID)
-	return profile, nil
+	return ticket, nil
 }
 
-// enrichSub2apiUserProfile 用当前 workspace 的 Sub2API admin 会话查询用户详情与余额历史，
-// 把结果合并进 profile。用户详情查询失败（网络错误、非 2xx、远端用户不存在等）只标记
-// RemoteUnavailableReason 并直接返回，不再继续查询余额历史；用户详情成功但余额历史失败时，
-// 已经解析出的用户详情字段依然保留，只是余额历史相关字段维持不可用。
-func (s *Service) enrichSub2apiUserProfile(profile *Sub2apiUserProfileResponse, session upstream.Session, sub2apiUserID string) {
-	user, err := s.sub2apiAdmin.FetchSub2APIAdminUser(session, sub2apiUserID)
+func (s *Service) enabledCategories(ctx context.Context, ws Workspace) ([]string, error) {
+	enabled, categories, err := s.portals.Settings(ctx, ws)
 	if err != nil {
-		profile.RemoteUnavailableReason = Sub2apiRemoteUnavailableUserNotFound
-		return
+		return nil, err
 	}
-	profile.Username = user.Username
-	profile.Status = user.Status
-	profile.FrozenBalance = user.FrozenBalance
-	profile.Concurrency = user.Concurrency
-	profile.RPMLimit = user.RPMLimit
-	profile.LastUsedAt = user.LastUsedAt
-	if user.Balance != nil {
-		profile.BalanceAvailable = true
-		profile.Balance = user.Balance
+	if !enabled {
+		return nil, requestError(ErrorDisabled)
 	}
-	if user.CreatedAt != nil {
-		profile.RegisteredAtAvailable = true
-		profile.RegisteredAt = user.CreatedAt
-	}
+	return categoriesOrDefault(categories), nil
+}
 
-	const rechargeHistoryPageSize = 20
-	history, err := s.sub2apiAdmin.FetchSub2APIAdminUserBalanceHistory(session, sub2apiUserID, 1, rechargeHistoryPageSize, "balance")
+// ---- 站长（TransitHub） ----
+
+func (s *Service) adminWorkspace(ctx context.Context, userID string) (Workspace, error) {
+	accountID, err := s.workspaces.RequireCurrentID(ctx, userID)
+	if err != nil || accountID == "" {
+		return Workspace{}, requestError(ErrorNoCurrentAccount)
+	}
+	return Workspace{UserID: userID, AdminAccountID: accountID}, nil
+}
+
+// AdminList 分页列出当前工作区的工单和各状态数量。
+func (s *Service) AdminList(ctx context.Context, userID string, status string, page int, pageSize int) (AdminListResponse, error) {
+	ws, err := s.adminWorkspace(ctx, userID)
 	if err != nil {
-		return
+		return AdminListResponse{}, err
 	}
-	if history.TotalRecharged != nil {
-		profile.TotalRechargedAvailable = true
-		profile.TotalRecharged = history.TotalRecharged
+	if status != "" && !validStatus(status) {
+		return AdminListResponse{}, requestError(ErrorInvalid)
 	}
-	profile.RechargeHistoryAvailable = true
-	profile.RechargeHistory = make([]Sub2apiRechargeHistoryItem, 0, len(history.Items))
-	for _, item := range history.Items {
-		profile.RechargeHistory = append(profile.RechargeHistory, Sub2apiRechargeHistoryItem{
-			ID:        item.ID,
-			Type:      item.Type,
-			Amount:    item.Amount,
-			Note:      item.Note,
-			CreatedAt: item.CreatedAt,
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = defaultAdminPageSize
+	}
+	if pageSize > maxAdminPageSize {
+		pageSize = maxAdminPageSize
+	}
+	tickets, total, err := s.store.ListForAdmin(ctx, ws, status, page, pageSize)
+	if err != nil {
+		return AdminListResponse{}, err
+	}
+	counts, err := s.store.CountByStatus(ctx, ws)
+	if err != nil {
+		return AdminListResponse{}, err
+	}
+	response := AdminListResponse{Items: make([]AdminTicketView, 0, len(tickets)), Total: total, Page: page, PageSize: pageSize, Counts: counts}
+	response.TotalPages = (total + pageSize - 1) / pageSize
+	for _, ticket := range tickets {
+		response.Items = append(response.Items, adminView(ticket))
+	}
+	return response, nil
+}
+
+// AdminCounts 返回当前工作区各状态的工单数（菜单上的提醒用）。
+func (s *Service) AdminCounts(ctx context.Context, userID string) (StatusCounts, error) {
+	ws, err := s.adminWorkspace(ctx, userID)
+	if err != nil {
+		return StatusCounts{}, err
+	}
+	return s.store.CountByStatus(ctx, ws)
+}
+
+// AdminDetail 返回一个工单和全部消息。
+func (s *Service) AdminDetail(ctx context.Context, userID string, id string) (AdminTicketDetail, error) {
+	ws, err := s.adminWorkspace(ctx, userID)
+	if err != nil {
+		return AdminTicketDetail{}, err
+	}
+	return s.adminDetail(ctx, ws, id)
+}
+
+func (s *Service) adminDetail(ctx context.Context, ws Workspace, id string) (AdminTicketDetail, error) {
+	ticket, err := s.store.GetTicket(ctx, ws, strings.TrimSpace(id))
+	if err != nil {
+		return AdminTicketDetail{}, err
+	}
+	if ticket == nil {
+		return AdminTicketDetail{}, requestError(ErrorNotFound)
+	}
+	messages, err := s.store.ListMessages(ctx, ticket.ID)
+	if err != nil {
+		return AdminTicketDetail{}, err
+	}
+	return AdminTicketDetail{AdminTicketView: adminView(*ticket), Messages: messageViews(messages)}, nil
+}
+
+// AdminReply 站长回复：工单变成「已回复」（已关闭的工单回复后也重新打开）。
+func (s *Service) AdminReply(ctx context.Context, userID string, id string, req ReplyRequest) (AdminTicketDetail, error) {
+	ws, err := s.adminWorkspace(ctx, userID)
+	if err != nil {
+		return AdminTicketDetail{}, err
+	}
+	body, ok := limited(req.Body, maxBodyRunes)
+	if !ok || body == "" {
+		return AdminTicketDetail{}, requestError(ErrorInvalid)
+	}
+	message, err := s.newMessage(strings.TrimSpace(id), AuthorAdmin, "", body, nil, s.now())
+	if err != nil {
+		return AdminTicketDetail{}, err
+	}
+	found, err := s.store.AddMessage(ctx, ws, message.TicketID, message, StatusReplied)
+	if err != nil {
+		return AdminTicketDetail{}, err
+	}
+	if !found {
+		return AdminTicketDetail{}, requestError(ErrorNotFound)
+	}
+	return s.adminDetail(ctx, ws, message.TicketID)
+}
+
+// AdminSetStatus 站长修改工单状态。
+func (s *Service) AdminSetStatus(ctx context.Context, userID string, id string, status string) (AdminTicketDetail, error) {
+	ws, err := s.adminWorkspace(ctx, userID)
+	if err != nil {
+		return AdminTicketDetail{}, err
+	}
+	if !validStatus(status) {
+		return AdminTicketDetail{}, requestError(ErrorInvalid)
+	}
+	found, err := s.store.SetStatus(ctx, ws, strings.TrimSpace(id), status)
+	if err != nil {
+		return AdminTicketDetail{}, err
+	}
+	if !found {
+		return AdminTicketDetail{}, requestError(ErrorNotFound)
+	}
+	return s.adminDetail(ctx, ws, id)
+}
+
+// AdminAttachment 返回当前工作区工单里的一张图片。
+func (s *Service) AdminAttachment(ctx context.Context, userID string, attachmentID string, thumb bool) (*Attachment, []byte, error) {
+	ws, err := s.adminWorkspace(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	attachment, err := s.store.GetAttachment(ctx, ws, attachmentID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if attachment == nil {
+		return nil, nil, requestError(ErrorNotFound)
+	}
+	return s.readAttachment(attachment, thumb)
+}
+
+// ---- 公共 ----
+
+// newMessage 检查并保存图片，组成一条消息（保存失败时删掉已保存的图片）。
+func (s *Service) newMessage(ticketID string, author string, authorName string, body string, uploads []AttachmentUpload, at time.Time) (Message, error) {
+	message := Message{ID: s.newID(), TicketID: ticketID, AuthorType: author, AuthorName: authorName, Body: body, CreatedAt: at, Attachments: []Attachment{}}
+	if len(uploads) == 0 {
+		return message, nil
+	}
+	if s.files == nil {
+		return Message{}, requestError(ErrorUploadsDisabled)
+	}
+	validated, err := validateUploads(uploads)
+	if err != nil {
+		return Message{}, err
+	}
+	for _, upload := range validated {
+		name, err := s.files.Save(upload.ContentType, upload.Data)
+		if err != nil {
+			s.discard(message)
+			return Message{}, err
+		}
+		message.Attachments = append(message.Attachments, Attachment{
+			ID: s.newID(), TicketID: ticketID, MessageID: message.ID, AuthorType: author, OriginalName: upload.OriginalName,
+			ContentType: upload.ContentType, SizeBytes: int64(len(upload.Data)), StoragePath: name, CreatedAt: at,
 		})
 	}
+	return message, nil
 }
 
-// AddAdminMessage 后台回复工单：插入一条 admin 消息，并把状态置为 replied（无条件，
-// 已关闭工单后台仍可回复用于说明关闭原因，文档只限制了 iframe 用户不能回复已关闭工单）。
-func (s *Service) AddAdminMessage(ctx context.Context, userID string, id string, req CreateMessageRequest) (AdminTicketDetail, error) {
-	adminAccountID, err := s.requireCurrentAdminAccountID(ctx, userID)
-	if err != nil {
-		return AdminTicketDetail{}, err
+// discard 删除一条没能保存的消息已经写到磁盘的图片。
+func (s *Service) discard(message Message) {
+	if s.files == nil {
+		return
 	}
-	ticket, err := s.repository.GetAdminTicket(ctx, userID, adminAccountID, id)
-	if err != nil {
-		return AdminTicketDetail{}, err
-	}
-	if ticket == nil {
-		return AdminTicketDetail{}, requestError(ErrorNotFound)
-	}
-	body := strings.TrimSpace(req.Body)
-	if body == "" {
-		return AdminTicketDetail{}, requestError(ErrorBodyRequired)
-	}
-
-	messageID, err := s.newID()
-	if err != nil {
-		return AdminTicketDetail{}, err
-	}
-	message := TicketMessage{
-		ID:             messageID,
-		TicketID:       id,
-		UserID:         userID,
-		AdminAccountID: adminAccountID,
-		AuthorType:     AuthorAdmin,
-		Body:           body,
-	}
-	if err := s.repository.InsertMessage(ctx, message); err != nil {
-		return AdminTicketDetail{}, err
-	}
-	if err := s.repository.TouchTicket(ctx, id, StatusReplied, s.now()); err != nil {
-		return AdminTicketDetail{}, err
-	}
-	return s.GetTicket(ctx, userID, id)
-}
-
-func (s *Service) UpdateStatus(ctx context.Context, userID string, id string, req UpdateStatusRequest) (AdminTicketDetail, error) {
-	status := strings.TrimSpace(req.Status)
-	if !isValidTicketStatus(status) {
-		return AdminTicketDetail{}, requestError(ErrorInvalidStatus)
-	}
-	adminAccountID, err := s.requireCurrentAdminAccountID(ctx, userID)
-	if err != nil {
-		return AdminTicketDetail{}, err
-	}
-	ticket, err := s.repository.GetAdminTicket(ctx, userID, adminAccountID, id)
-	if err != nil {
-		return AdminTicketDetail{}, err
-	}
-	if ticket == nil {
-		return AdminTicketDetail{}, requestError(ErrorNotFound)
-	}
-	if err := s.repository.UpdateStatus(ctx, id, status); err != nil {
-		return AdminTicketDetail{}, err
-	}
-	return s.GetTicket(ctx, userID, id)
-}
-
-// GetEmbedConfig 返回当前 workspace 的嵌入配置；不存在时自动创建一条默认配置
-// （enabled=true，未限制来源域名），满足"后台首次打开工单页面即可复制嵌入地址"的体验要求。
-func (s *Service) GetEmbedConfig(ctx context.Context, userID string) (EmbedConfig, error) {
-	adminAccountID, err := s.requireCurrentAdminAccountID(ctx, userID)
-	if err != nil {
-		return EmbedConfig{}, err
-	}
-	return s.ensureEmbedConfig(ctx, userID, adminAccountID)
-}
-
-func (s *Service) ensureEmbedConfig(ctx context.Context, userID string, adminAccountID string) (EmbedConfig, error) {
-	config, err := s.repository.GetEmbedConfigByWorkspace(ctx, userID, adminAccountID)
-	if err != nil {
-		return EmbedConfig{}, err
-	}
-	if config != nil {
-		return withDefaultTicketOptions(*config), nil
-	}
-	token, err := s.newToken()
-	if err != nil {
-		return EmbedConfig{}, err
-	}
-	// 新建 config 必须显式带上默认分类/优先级，不能只依赖数据库列的 DEFAULT 子句：
-	// fakeTicketRepository 等内存假实现不会执行真实 DDL，只有这里显式赋值才能让单测和生产行为一致。
-	created := EmbedConfig{
-		UserID: userID, AdminAccountID: adminAccountID, EmbedToken: token, Enabled: true, Template: TemplateDefault,
-		CategoryOptions: append([]string(nil), DefaultCategoryOptions...),
-		PriorityOptions: append([]string(nil), DefaultPriorityOptions...),
-	}
-	if err := s.repository.InsertEmbedConfig(ctx, created); err != nil {
-		return EmbedConfig{}, err
-	}
-	// 并发场景下 InsertEmbedConfig 可能因为唯一索引 ON CONFLICT DO NOTHING 而实际没有插入这条，
-	// 重新读一次保证返回的是数据库中真实生效的那一条（可能是另一个并发请求创建的）。
-	config, err = s.repository.GetEmbedConfigByWorkspace(ctx, userID, adminAccountID)
-	if err != nil {
-		return EmbedConfig{}, err
-	}
-	if config == nil {
-		return EmbedConfig{}, errors.New("embed config missing after insert")
-	}
-	return withDefaultTicketOptions(*config), nil
-}
-
-// UpdateEmbedConfig 保存当前 workspace 的嵌入配置。第二阶段起只有 Template 真正生效；
-// 第三阶段新增 MaxImagesPerTicket。req.Enabled/req.AllowedSrcHost 仅为兼容旧前端请求体保留在
-// DTO 上，这里显式忽略，不再用它们关闭功能或限制来源（repository.UpdateEmbedConfig 还会顺带
-// 把底层 enabled/allowed_src_host 修正为 true/空字符串，修复历史遗留数据）。
-func (s *Service) UpdateEmbedConfig(ctx context.Context, userID string, req UpdateEmbedConfigRequest) (EmbedConfig, error) {
-	adminAccountID, err := s.requireCurrentAdminAccountID(ctx, userID)
-	if err != nil {
-		return EmbedConfig{}, err
-	}
-	template, err := normalizeEmbedTemplateInput(req.Template)
-	if err != nil {
-		return EmbedConfig{}, err
-	}
-	existing, err := s.ensureEmbedConfig(ctx, userID, adminAccountID)
-	if err != nil {
-		return EmbedConfig{}, err
-	}
-	maxImages, err := normalizeMaxImagesInput(existing.MaxImagesPerTicket, req.MaxImagesPerTicket)
-	if err != nil {
-		return EmbedConfig{}, err
-	}
-	// req.CategoryOptions/PriorityOptions 为 nil 表示未传，保留已有配置（existing 已经过
-	// withDefaultTicketOptions 兜底，一定是合法非空选项组）；非 nil（包括空数组）一律校验，
-	// 不合法直接拒绝，不静默丢弃用户的修改意图。
-	categoryOptions := existing.CategoryOptions
-	if req.CategoryOptions != nil {
-		normalized, ok := normalizeTicketOptions(req.CategoryOptions)
-		if !ok {
-			return EmbedConfig{}, requestError(ErrorInvalidCategoryOptions)
+	for _, attachment := range message.Attachments {
+		if err := s.files.Delete(attachment.StoragePath); err != nil {
+			log.Printf("[tickets] remove unsaved attachment: %v", err)
 		}
-		categoryOptions = normalized
 	}
-	priorityOptions := existing.PriorityOptions
-	if req.PriorityOptions != nil {
-		normalized, ok := normalizeTicketOptions(req.PriorityOptions)
-		if !ok {
-			return EmbedConfig{}, requestError(ErrorInvalidPriorityOptions)
+}
+
+// readAttachment 读取图片。thumb 时给缩略图（JPEG），做不了缩略图就给原图。
+func (s *Service) readAttachment(attachment *Attachment, thumb bool) (*Attachment, []byte, error) {
+	if s.files == nil {
+		return nil, nil, requestError(ErrorNotFound)
+	}
+	if thumb {
+		if data, err := s.files.Thumbnail(attachment.StoragePath); err == nil {
+			small := *attachment
+			small.ContentType = "image/jpeg"
+			return &small, data, nil
 		}
-		priorityOptions = normalized
 	}
-	if err := s.repository.UpdateEmbedConfig(ctx, userID, adminAccountID, template, maxImages, categoryOptions, priorityOptions); err != nil {
-		return EmbedConfig{}, err
-	}
-	return s.GetEmbedConfig(ctx, userID)
-}
-
-// normalizeMaxImagesInput 写入路径使用：nil 表示未传，保留现有值；传了但超出 0-9 范围则报错拒绝。
-func normalizeMaxImagesInput(current int, input *int) (int, error) {
-	if input == nil {
-		return current, nil
-	}
-	if !isValidMaxImagesPerTicket(*input) {
-		return 0, requestError(ErrorInvalidMaxImages)
-	}
-	return *input, nil
-}
-
-// RotateEmbedToken 轮换当前 workspace 的 embed_token，旧 iframe 地址（含旧 token）随之失效。
-func (s *Service) RotateEmbedToken(ctx context.Context, userID string) (EmbedConfig, error) {
-	adminAccountID, err := s.requireCurrentAdminAccountID(ctx, userID)
+	data, err := s.files.Read(attachment.StoragePath)
 	if err != nil {
-		return EmbedConfig{}, err
+		return nil, nil, requestError(ErrorNotFound)
 	}
-	if _, err := s.ensureEmbedConfig(ctx, userID, adminAccountID); err != nil {
-		return EmbedConfig{}, err
-	}
-	newToken, err := s.newToken()
-	if err != nil {
-		return EmbedConfig{}, err
-	}
-	if err := s.repository.RotateEmbedToken(ctx, userID, adminAccountID, newToken); err != nil {
-		return EmbedConfig{}, err
-	}
-	return s.GetEmbedConfig(ctx, userID)
+	return attachment, data, nil
 }
 
-// ---- 映射 / 工具函数 ----
+// notify 在后台推送通知（不影响用户的请求）。
+func (s *Service) notify(send func(ctx context.Context)) {
+	if s.notifier == nil {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		send(ctx)
+	}()
+}
 
-func toEmbedTicketListItem(t Ticket) EmbedTicketListItem {
-	return EmbedTicketListItem{
-		ID:            t.ID,
-		Title:         t.Title,
-		Status:        t.Status,
-		ManualEmail:   t.ManualEmail,
-		Category:      t.Category,
-		Priority:      t.Priority,
-		LastMessageAt: t.LastMessageAt,
-		CreatedAt:     t.CreatedAt,
-		UpdatedAt:     t.UpdatedAt,
+func clientView(ticket Ticket) ClientTicketView {
+	unread := ticket.LastAuthor == AuthorAdmin && (ticket.CustomerSeenAt == nil || ticket.LastMessageAt.After(*ticket.CustomerSeenAt))
+	return ClientTicketView{
+		ID: ticket.ID, Title: ticket.Title, Category: ticket.Category, Status: ticket.Status, Contact: ticket.Contact,
+		Unread: unread, LastMessageAt: ticket.LastMessageAt, CreatedAt: ticket.CreatedAt,
 	}
 }
 
-func toEmbedTicketDetail(t Ticket, messages []TicketMessage, attachmentsByMessage map[string][]TicketAttachment) EmbedTicketDetail {
-	return EmbedTicketDetail{
-		EmbedTicketListItem: toEmbedTicketListItem(t),
-		Messages:            toMessageViews(messages, attachmentsByMessage),
+func adminView(ticket Ticket) AdminTicketView {
+	return AdminTicketView{
+		ID: ticket.ID, Title: ticket.Title, Category: ticket.Category, Status: ticket.Status, Contact: ticket.Contact,
+		Platform: ticket.User.Platform, SiteUserID: ticket.User.ID, SiteUsername: ticket.User.Username, SiteEmail: ticket.User.Email,
+		ClientInfo: ticket.ClientInfo, LastAuthor: ticket.LastAuthor, LastMessageAt: ticket.LastMessageAt,
+		CreatedAt: ticket.CreatedAt, UpdatedAt: ticket.UpdatedAt,
 	}
 }
 
-func toAdminTicketListItem(t Ticket) AdminTicketListItem {
-	return AdminTicketListItem{
-		ID:             t.ID,
-		Title:          t.Title,
-		Status:         t.Status,
-		ManualEmail:    t.ManualEmail,
-		Category:       t.Category,
-		Priority:       t.Priority,
-		Sub2apiUserID:  t.Sub2apiUserID,
-		Sub2apiEmail:   t.Sub2apiEmail,
-		Sub2apiRole:    t.Sub2apiRole,
-		Sub2apiSrcHost: t.Sub2apiSrcHost,
-		LastMessageAt:  t.LastMessageAt,
-		CreatedAt:      t.CreatedAt,
-	}
-}
-
-func toAdminTicketDetail(t Ticket, messages []TicketMessage, attachmentsByMessage map[string][]TicketAttachment) AdminTicketDetail {
-	return AdminTicketDetail{
-		AdminTicketListItem: toAdminTicketListItem(t),
-		Sub2apiSrcURL:       t.Sub2apiSrcURL,
-		Messages:            toMessageViews(messages, attachmentsByMessage),
-	}
-}
-
-func toMessageViews(messages []TicketMessage, attachmentsByMessage map[string][]TicketAttachment) []TicketMessageView {
-	views := make([]TicketMessageView, 0, len(messages))
+func messageViews(messages []Message) []MessageView {
+	views := make([]MessageView, 0, len(messages))
 	for _, m := range messages {
-		views = append(views, TicketMessageView{
-			ID:          m.ID,
-			AuthorType:  m.AuthorType,
-			AuthorName:  m.AuthorName,
-			Body:        m.Body,
-			CreatedAt:   m.CreatedAt,
-			Attachments: toAttachmentViews(attachmentsByMessage[m.ID]),
-		})
+		attachments := make([]AttachmentView, 0, len(m.Attachments))
+		for _, a := range m.Attachments {
+			attachments = append(attachments, AttachmentView{ID: a.ID, OriginalName: a.OriginalName, ContentType: a.ContentType, SizeBytes: a.SizeBytes, CreatedAt: a.CreatedAt})
+		}
+		views = append(views, MessageView{ID: m.ID, AuthorType: m.AuthorType, AuthorName: m.AuthorName, Body: m.Body, CreatedAt: m.CreatedAt, Attachments: attachments})
 	}
 	return views
 }
 
-func toAttachmentViews(attachments []TicketAttachment) []TicketAttachmentView {
-	views := make([]TicketAttachmentView, 0, len(attachments))
-	for _, a := range attachments {
-		views = append(views, TicketAttachmentView{
-			ID:           a.ID,
-			OriginalName: a.OriginalName,
-			ContentType:  a.ContentType,
-			SizeBytes:    a.SizeBytes,
-			CreatedAt:    a.CreatedAt,
-		})
+func validStatus(status string) bool {
+	switch status {
+	case StatusOpen, StatusPending, StatusReplied, StatusClosed:
+		return true
 	}
-	return views
+	return false
 }
 
-// normalizeEmbedTemplate 读取路径使用：兼容历史数据中可能存在的空模板值（列有 DEFAULT，正常
-// 不会为空，这里只是兜底），不认识的值一律回退到 default，不返回错误——展示层不应该因为一个
-// 意外的模板值就整体失败。
-func normalizeEmbedTemplate(template string) string {
-	if isValidEmbedTemplate(template) {
-		return template
+func categoriesOrDefault(categories []string) []string {
+	if len(categories) == 0 {
+		return append([]string(nil), DefaultCategories...)
 	}
-	return TemplateDefault
+	return categories
 }
 
-// normalizeEmbedTemplateInput 写入路径使用：区分"未传/空值 -> 默认 default"和"传了但不合法 ->
-// 报错拒绝"，避免用户提交了拼写错误的模板名却被静默改成 default。
-func normalizeEmbedTemplateInput(template string) (string, error) {
-	trimmed := strings.TrimSpace(template)
-	if trimmed == "" {
-		return TemplateDefault, nil
+func contains(values []string, value string) bool {
+	for _, item := range values {
+		if item == value {
+			return true
+		}
 	}
-	if !isValidEmbedTemplate(trimmed) {
-		return "", requestError(ErrorInvalidTemplate)
-	}
-	return trimmed, nil
+	return false
 }
 
-func normalizeAdminListQuery(q AdminListQuery) AdminListQuery {
-	if q.Page < 1 {
-		q.Page = 1
-	}
-	if q.PageSize < 1 {
-		q.PageSize = 20
-	}
-	if q.PageSize > 100 {
-		q.PageSize = 100
-	}
-	q.Status = strings.TrimSpace(q.Status)
-	return q
+// limited 去掉首尾空白，并检查长度。
+func limited(value string, maxRunes int) (string, bool) {
+	value = strings.TrimSpace(value)
+	return value, utf8.RuneCountInString(value) <= maxRunes
 }
 
-func totalPages(total int, pageSize int) int {
-	if total == 0 || pageSize <= 0 {
-		return 0
+func clip(value string, maxRunes int) string {
+	value = strings.TrimSpace(value)
+	if utf8.RuneCountInString(value) <= maxRunes {
+		return value
 	}
-	pages := total / pageSize
-	if total%pageSize != 0 {
-		pages++
+	return string([]rune(value)[:maxRunes])
+}
+
+// rateLimiter 是按 key 的固定窗口限流。
+type rateLimiter struct {
+	mu     sync.Mutex
+	limit  int
+	window time.Duration
+	counts map[string]windowCount
+	now    func() time.Time
+}
+
+type windowCount struct {
+	start time.Time
+	count int
+}
+
+func newRateLimiter(limit int, window time.Duration) *rateLimiter {
+	return &rateLimiter{limit: limit, window: window, counts: map[string]windowCount{}, now: time.Now}
+}
+
+func (l *rateLimiter) Allow(key string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := l.now()
+	current := l.counts[key]
+	if now.Sub(current.start) >= l.window {
+		current = windowCount{start: now}
 	}
-	return pages
+	if current.count >= l.limit {
+		return false
+	}
+	current.count++
+	l.counts[key] = current
+	// 顺手清掉过期的窗口，免得 map 无限变大。
+	if len(l.counts) > 1000 {
+		for k, v := range l.counts {
+			if now.Sub(v.start) >= l.window {
+				delete(l.counts, k)
+			}
+		}
+	}
+	return true
 }

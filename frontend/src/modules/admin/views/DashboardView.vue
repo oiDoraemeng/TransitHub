@@ -5,7 +5,6 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { EChartsCoreOption } from 'echarts/core'
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
   CircleCheckBig,
@@ -26,6 +25,7 @@ import AdminLoginModal from '../components/dashboard/AdminLoginModal.vue'
 import BalanceFilterModal from '../components/dashboard/BalanceFilterModal.vue'
 import DashboardEChart from '../components/dashboard/DashboardEChart.vue'
 import GroupUsageTodayModal from '../components/dashboard/GroupUsageTodayModal.vue'
+import SitePricingModal from '../components/dashboard/SitePricingModal.vue'
 import StatCard from '../components/dashboard/StatCard.vue'
 import UpstreamBalanceBreakdownModal from '../components/dashboard/UpstreamBalanceBreakdownModal.vue'
 import UpstreamKeyUsageTodayModal from '../components/dashboard/UpstreamKeyUsageTodayModal.vue'
@@ -34,10 +34,10 @@ import {
   getDashboardTrends,
   getGroupUsageToday,
   getUpstreamBalanceBreakdown,
+  type DashboardMetricsResponse,
   type GroupUsageTodayResponse,
   type UpstreamBalanceBreakdownResponse,
 } from '../api/dashboardAdmin'
-import { getConnectionHealthStoredSummary } from '../api/connectionHealth'
 import { useDashboardAdmin } from '../composables/useDashboardAdmin'
 import { useDashboardChartTheme } from '../composables/useDashboardChartTheme'
 import {
@@ -48,10 +48,10 @@ import {
 } from '../composables/useDashboardDataCache'
 import { useDashboardMetrics } from '../composables/useDashboardMetrics'
 import { useAdminAccounts } from '../composables/useAdminAccounts'
-import type { ConnectionHealthStoredSummary } from '../types/connectionHealth'
 import type { DashboardColorToken, DashboardMetricData, DashboardMetricKey, DashboardPeriod } from '../types/dashboard'
 import type { DashboardAdminPlatform, Sub2apiAuthMethod } from '../types/dashboardAdmin'
 import { computeDelta, formatCny, formatDateTime } from '../utils/dashboard'
+import { columnHighlightPointer } from '../utils/chartTooltip'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -83,6 +83,7 @@ const adminLoginInitialValue = computed(() => ({
 }))
 
 const balanceFilterOpen = ref(false)
+const pricingOpen = ref(false)
 const groupUsageTodayOpen = ref(false)
 const upstreamKeyUsageTodayOpen = ref(false)
 const upstreamBalanceBreakdownOpen = ref(false)
@@ -90,13 +91,15 @@ const upstreamBalanceBreakdownOpen = ref(false)
 const openBalanceFilter = () => { balanceFilterOpen.value = true }
 const closeBalanceFilter = () => { balanceFilterOpen.value = false }
 const onBalanceFilterSaved = () => { void loadAllData({ skipStatusCheck: true }) }
+const openPricing = () => { pricingOpen.value = true }
+const closePricing = () => { pricingOpen.value = false }
+const onPricingSaved = () => { void loadAllData({ skipStatusCheck: true }) }
 const openGroupUsageToday = () => { groupUsageTodayOpen.value = true }
 const closeGroupUsageToday = () => { groupUsageTodayOpen.value = false }
 const openUpstreamKeyUsageToday = () => { upstreamKeyUsageTodayOpen.value = true }
 const closeUpstreamKeyUsageToday = () => { upstreamKeyUsageTodayOpen.value = false }
 const openUpstreamBalanceBreakdown = () => { upstreamBalanceBreakdownOpen.value = true }
 const closeUpstreamBalanceBreakdown = () => { upstreamBalanceBreakdownOpen.value = false }
-const openGroupList = () => { void router.push({ name: 'AdminGroupAssociations' }) }
 
 const handleMetricCardClick = (key: string) => {
   switch (key) {
@@ -116,14 +119,28 @@ const handleMetricCardClick = (key: string) => {
 }
 
 const groupCount = ref<number | null>(null)
+// 今日成本的数据来源说明：计入的站点数、今天未同步成功的站点数、最早同步时间；以及营收换算用的售价。
+interface CostMeta {
+  siteUnitPrice: number
+  costSites: number
+  costStaleSites: number
+  costSyncedAt: number | null
+}
+const costMeta = ref<CostMeta | null>(null)
+const applyCostMeta = (live: DashboardMetricsResponse) => {
+  costMeta.value = {
+    siteUnitPrice: live.siteUnitPrice ?? 1,
+    costSites: live.costSites ?? 0,
+    costStaleSites: live.costStaleSites ?? 0,
+    costSyncedAt: live.costSyncedAt ?? null,
+  }
+}
 const groupUsage = ref<GroupUsageTodayResponse | null>(null)
 const balanceBreakdown = ref<UpstreamBalanceBreakdownResponse | null>(null)
-const healthSummary = ref<ConnectionHealthStoredSummary | null>(null)
 const operationalLoading = ref(false)
 const operationalLoadError = ref(false)
 const groupUsageLoadError = ref(false)
 const balanceLoadError = ref(false)
-const healthLoadError = ref(false)
 const initialLoading = ref(true)
 const isRefreshingData = ref(false)
 const refreshDataFailed = ref(false)
@@ -133,9 +150,9 @@ const hydrateSnapshot = (snapshot: DashboardDataSnapshot | null): boolean => {
   if (!snapshot) return false
   adminStatus.value = snapshot.adminStatus
   groupCount.value = snapshot.live.groupCount ?? null
+  applyCostMeta(snapshot.live)
   groupUsage.value = snapshot.groupUsage ?? null
   balanceBreakdown.value = snapshot.balanceBreakdown ?? null
-  healthSummary.value = snapshot.healthSummary ?? null
   applyRawData(snapshot.live, snapshot.trends)
   lastUpdatedAt.value = snapshot.updatedAt
   initialLoading.value = false
@@ -145,22 +162,19 @@ const hydrateSnapshot = (snapshot: DashboardDataSnapshot | null): boolean => {
 const initialSnapshot = getDashboardDataSnapshot(workspaceID.value)
 hydrateSnapshot(initialSnapshot)
 
-// 次要面板失败不阻断五项核心指标。三个请求都只读，其中健康摘要和余额明细只读本地缓存。
+// 次要面板失败不阻断五项核心指标。两个请求都只读，其中余额明细只读本地缓存。
 const loadOperationalData = async () => {
   operationalLoading.value = true
   operationalLoadError.value = false
-  const [groupResult, balanceResult, healthResult] = await Promise.allSettled([
+  const [groupResult, balanceResult] = await Promise.allSettled([
     getGroupUsageToday(),
     getUpstreamBalanceBreakdown(),
-    getConnectionHealthStoredSummary(),
   ])
   groupUsageLoadError.value = groupResult.status === 'rejected'
   balanceLoadError.value = balanceResult.status === 'rejected'
-  healthLoadError.value = healthResult.status === 'rejected'
   if (groupResult.status === 'fulfilled') groupUsage.value = groupResult.value
   if (balanceResult.status === 'fulfilled') balanceBreakdown.value = balanceResult.value
-  if (healthResult.status === 'fulfilled') healthSummary.value = healthResult.value
-  operationalLoadError.value = groupUsageLoadError.value || balanceLoadError.value || healthLoadError.value
+  operationalLoadError.value = groupUsageLoadError.value || balanceLoadError.value
   operationalLoading.value = false
 
   const key = workspaceID.value
@@ -168,7 +182,6 @@ const loadOperationalData = async () => {
     updateDashboardOperationalSnapshot(key, {
       ...(groupResult.status === 'fulfilled' ? { groupUsage: groupResult.value } : {}),
       ...(balanceResult.status === 'fulfilled' ? { balanceBreakdown: balanceResult.value } : {}),
-      ...(healthResult.status === 'fulfilled' ? { healthSummary: healthResult.value } : {}),
     })
   }
 }
@@ -193,6 +206,7 @@ const loadAllData = async (options: { skipStatusCheck?: boolean } = {}) => {
       getDashboardTrends(30),
     ])
     groupCount.value = liveData.groupCount ?? null
+    applyCostMeta(liveData)
     applyRawData(liveData, trendsData)
     const updatedAt = Date.now()
     lastUpdatedAt.value = updatedAt
@@ -206,7 +220,6 @@ const loadAllData = async (options: { skipStatusCheck?: boolean } = {}) => {
         updatedAt,
         groupUsage: previous?.groupUsage,
         balanceBreakdown: previous?.balanceBreakdown,
-        healthSummary: previous?.healthSummary,
       })
     }
     void loadOperationalData()
@@ -245,7 +258,6 @@ watch(workspaceID, (next, previous) => {
   if (!next || next === previous || isRefreshingData.value) return
   groupUsage.value = null
   balanceBreakdown.value = null
-  healthSummary.value = null
   metrics.value = []
   const restored = hydrateSnapshot(getDashboardDataSnapshot(next))
   if (!restored) initialLoading.value = true
@@ -292,7 +304,26 @@ interface DashboardCoreCard {
   deltaText: string
   clickable: boolean
   negativeWhenUp: boolean
+  note?: string
+  noteTone?: 'muted' | 'warning'
 }
+
+const priceFormatter = computed(() => new Intl.NumberFormat(locale.value, { maximumFractionDigits: 4 }))
+const formatClock = (value: number): string => new Intl.DateTimeFormat(locale.value, { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value))
+
+// 今日成本卡片的说明：有站点今天还没同步成功时给出警示（它们没有计入），否则显示计入站点数与最早同步时间。
+const costNote = computed<{ text: string; tone: 'muted' | 'warning' } | null>(() => {
+  const meta = costMeta.value
+  if (!meta) return null
+  if (meta.costStaleSites > 0) {
+    return { text: t('admin.dashboard.cost.staleSites', { count: meta.costStaleSites }), tone: 'warning' }
+  }
+  if (meta.costSites > 0 && meta.costSyncedAt) {
+    return { text: t('admin.dashboard.cost.syncedAt', { count: meta.costSites, time: formatClock(meta.costSyncedAt) }), tone: 'muted' }
+  }
+  return null
+})
+const revenueNote = computed(() => (costMeta.value ? t('admin.dashboard.pricing.cardNote', { price: priceFormatter.value.format(costMeta.value.siteUnitPrice) }) : ''))
 
 const cards = computed<DashboardCoreCard[]>(() => {
   const result: DashboardCoreCard[] = (['todayProfit', 'todayPurchase', 'netProfit'] as DashboardMetricKey[]).flatMap((key) => {
@@ -309,6 +340,8 @@ const cards = computed<DashboardCoreCard[]>(() => {
       deltaText: formatCny(Math.abs(delta.amount)),
       clickable: key === 'todayProfit' || key === 'todayPurchase',
       negativeWhenUp: key === 'todayPurchase',
+      note: key === 'todayPurchase' ? costNote.value?.text : key === 'todayProfit' ? revenueNote.value : undefined,
+      noteTone: key === 'todayPurchase' ? costNote.value?.tone : 'muted',
     }]
   })
   const marginDelta = computeDelta(marginSeries.value)
@@ -364,7 +397,7 @@ const performanceChartOption = computed<EChartsCoreOption>(() => {
       backgroundColor: theme.card,
       borderColor: theme.border,
       textStyle: { color: theme.foreground },
-      axisPointer: { type: 'shadow', shadowStyle: { color: theme.border } },
+      axisPointer: columnHighlightPointer(theme.border),
     },
     legend: {
       top: 0,
@@ -488,8 +521,7 @@ const coverageTone = computed(() => {
 const upstreamIssueCount = computed(() => (balanceBreakdown.value?.sites ?? []).filter(
   site => site.balance == null || site.status === 'error',
 ).length)
-const healthRiskCount = computed(() => (healthSummary.value?.attentionTargets ?? 0) + (healthSummary.value?.suspendedTargets ?? 0))
-const attentionDataUnavailable = computed(() => healthLoadError.value || balanceLoadError.value)
+const attentionDataUnavailable = computed(() => balanceLoadError.value)
 
 const attentionItems = computed(() => {
   const items: Array<{
@@ -501,31 +533,6 @@ const attentionItems = computed(() => {
     tone: string
     routeName: string
   }> = []
-  if (healthRiskCount.value > 0) {
-    items.push({
-      key: 'health',
-      icon: Activity,
-      title: t('admin.dashboard.attention.healthTitle'),
-      description: t('admin.dashboard.attention.healthDescription', {
-        attention: healthSummary.value?.attentionTargets ?? 0,
-        suspended: healthSummary.value?.suspendedTargets ?? 0,
-      }),
-      count: healthRiskCount.value,
-      tone: 'text-warning bg-warning/10',
-      routeName: 'AdminConnectionHealth',
-    })
-  }
-  if ((healthSummary.value?.recentFailureEvents ?? 0) > 0) {
-    items.push({
-      key: 'events',
-      icon: AlertTriangle,
-      title: t('admin.dashboard.attention.failuresTitle'),
-      description: t('admin.dashboard.attention.failuresDescription'),
-      count: healthSummary.value?.recentFailureEvents ?? 0,
-      tone: 'text-destructive bg-destructive/10',
-      routeName: 'AdminConnectionHealth',
-    })
-  }
   if (upstreamIssueCount.value > 0) {
     items.push({
       key: 'upstream',
@@ -540,11 +547,6 @@ const attentionItems = computed(() => {
   return items
 })
 
-const lastProbeLabel = computed(() => {
-  const value = healthSummary.value?.lastProbeAt
-  if (!value) return t('admin.dashboard.attention.neverProbed')
-  return formatDateTime(Date.parse(value), locale.value) ?? t('admin.dashboard.attention.neverProbed')
-})
 </script>
 
 <template>
@@ -681,9 +683,17 @@ const lastProbeLabel = computed(() => {
             :delta-caption="deltaCaption"
             :clickable="card.clickable"
             :negative-when-up="card.negativeWhenUp"
+            :note="card.note"
+            :note-tone="card.noteTone"
             @click="handleMetricCardClick(card.key)"
           />
         </section>
+        <p v-if="costMeta" class="-mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span>{{ t('admin.dashboard.pricing.basis', { price: priceFormatter.format(costMeta.siteUnitPrice) }) }}</span>
+          <button type="button" class="font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" @click="openPricing">
+            {{ t('admin.dashboard.pricing.edit') }}
+          </button>
+        </p>
 
         <section class="grid gap-4 xl:grid-cols-12">
           <article class="min-w-0 rounded-lg border border-border/60 bg-card p-4 shadow-sm sm:p-5 xl:col-span-8">
@@ -792,7 +802,7 @@ const lastProbeLabel = computed(() => {
               <button
                 type="button"
                 class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
-                @click="openGroupList"
+                @click="openGroupUsageToday"
               >
                 <Layers3 class="h-4 w-4" />
                 {{ t('admin.dashboard.groups.total', { count: groupCount ?? 0 }) }}
@@ -840,7 +850,7 @@ const lastProbeLabel = computed(() => {
               </button>
             </div>
 
-            <div v-if="operationalLoading && !healthSummary && !balanceBreakdown" class="flex h-[260px] items-center justify-center text-muted-foreground">
+            <div v-if="operationalLoading && !balanceBreakdown" class="flex h-[260px] items-center justify-center text-muted-foreground">
               <Loader2 class="h-5 w-5 animate-spin" />
             </div>
             <div v-else-if="attentionItems.length > 0" class="mt-5 divide-y divide-border/60 border-y border-border/60">
@@ -882,9 +892,8 @@ const lastProbeLabel = computed(() => {
               <p class="mt-1 max-w-xs text-sm leading-6 text-muted-foreground">{{ t('admin.dashboard.attention.allClearDescription') }}</p>
             </div>
 
-            <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-4 text-xs text-muted-foreground">
-              <span>{{ t('admin.dashboard.attention.lastProbe', { time: lastProbeLabel }) }}</span>
-              <span v-if="operationalLoadError" class="text-destructive">{{ t('admin.dashboard.attention.partialLoadError') }}</span>
+            <div v-if="operationalLoadError" class="mt-4 border-t border-border/60 pt-4 text-xs text-destructive">
+              {{ t('admin.dashboard.attention.partialLoadError') }}
             </div>
           </aside>
         </section>
@@ -921,6 +930,7 @@ const lastProbeLabel = computed(() => {
       @close="closeAdminModal"
     />
     <BalanceFilterModal :open="balanceFilterOpen" @close="closeBalanceFilter" @saved="onBalanceFilterSaved" />
+    <SitePricingModal :open="pricingOpen" @close="closePricing" @saved="onPricingSaved" />
     <GroupUsageTodayModal :open="groupUsageTodayOpen" @close="closeGroupUsageToday" />
     <UpstreamKeyUsageTodayModal :open="upstreamKeyUsageTodayOpen" @close="closeUpstreamKeyUsageToday" />
     <UpstreamBalanceBreakdownModal :open="upstreamBalanceBreakdownOpen" @close="closeUpstreamBalanceBreakdown" />

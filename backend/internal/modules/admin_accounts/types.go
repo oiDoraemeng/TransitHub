@@ -49,32 +49,33 @@ type DeleteResponse struct {
 }
 
 type DeleteResult struct {
-	CleanupJobID           string
-	DeletedID              string
-	WasCurrent             bool
-	CurrentAdminAccountID  string
-	AttachmentStoragePaths []string
-	UpstreamSiteIDs        []string
+	CleanupJobID          string
+	DeletedID             string
+	WasCurrent            bool
+	CurrentAdminAccountID string
+	UpstreamSiteIDs       []string
+	AttachmentPaths       []string
 }
 
 type CleanupJob struct {
-	ID                     string
-	UserID                 string
-	AdminAccountID         string
-	AttachmentStoragePaths []string
-	UpstreamSiteIDs        []string
-	Attempts               int
-	NextAttemptAt          time.Time
-	LastError              string
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	ID              string
+	UserID          string
+	AdminAccountID  string
+	UpstreamSiteIDs []string
+	AttachmentPaths []string
+	Attempts        int
+	NextAttemptAt   time.Time
+	LastError       string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type WorkspaceCleanupPayload struct {
-	UserID                 string
-	AdminAccountID         string
-	AttachmentStoragePaths []string
-	UpstreamSiteIDs        []string
+	UserID          string
+	AdminAccountID  string
+	UpstreamSiteIDs []string
+	// AttachmentPaths 是工作区工单附件的文件名（数据目录 ticket-uploads 里），清理时删除文件。
+	AttachmentPaths []string
 }
 
 type requestError string

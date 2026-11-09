@@ -2,244 +2,165 @@ package tickets
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"os"
+	"strings"
 	"testing"
 
 	"transithub/backend/internal/shared/authctx"
 )
 
-// withIsolatedTempDir 把 TMPDIR/TMP/TEMP 都指向一个专属临时目录（t.TempDir() 会在测试结束后
-// 自动整体清理，不触碰真实系统临时目录），并返回该目录路径供测试断言其内容。
-// mime/multipart.ReadForm 在文件部分超过 maxMemory 时会调用 os.CreateTemp("", "multipart-")，
-// 也就是写入 os.TempDir()；三个环境变量分别对应 Unix（TMPDIR）和 Windows（TMP/TEMP）下
-// os.TempDir() 的取值来源，同时设置以保证测试在任意平台都能命中隔离目录。
-func withIsolatedTempDir(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	t.Setenv("TMPDIR", dir)
-	t.Setenv("TMP", dir)
-	t.Setenv("TEMP", dir)
-	return dir
+type httpCase struct {
+	t   *testing.T
+	mux *http.ServeMux
 }
 
-func assertDirEmpty(t *testing.T, dir string) {
+func (c httpCase) do(request *http.Request) *httptest.ResponseRecorder {
+	recorder := httptest.NewRecorder()
+	c.mux.ServeHTTP(recorder, request)
+	return recorder
+}
+
+func jsonBody(t *testing.T, value any) *bytes.Reader {
 	t.Helper()
-	entries, err := os.ReadDir(dir)
+	data, err := json.Marshal(value)
 	if err != nil {
-		t.Fatalf("read temp dir: %v", err)
+		t.Fatal(err)
 	}
-	if len(entries) != 0 {
-		names := make([]string, 0, len(entries))
-		for _, e := range entries {
-			names = append(names, e.Name())
+	return bytes.NewReader(data)
+}
+
+func decode[T any](t *testing.T, recorder *httptest.ResponseRecorder) T {
+	t.Helper()
+	var value T
+	if err := json.Unmarshal(recorder.Body.Bytes(), &value); err != nil {
+		t.Fatalf("decode %s: %v", recorder.Body.String(), err)
+	}
+	return value
+}
+
+func multipartTicket(t *testing.T, fields map[string]string, images map[string][]byte) (*bytes.Buffer, string) {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for key, value := range fields {
+		_ = writer.WriteField(key, value)
+	}
+	for name, data := range images {
+		part, err := writer.CreateFormFile("images", name)
+		if err != nil {
+			t.Fatal(err)
 		}
-		t.Fatalf("expected multipart temp files to be cleaned up, found leftover entries: %v", names)
+		_, _ = part.Write(data)
 	}
+	_ = writer.Close()
+	return &body, writer.FormDataContentType()
 }
 
-// buildOversizedMultipartRequest 构造一个 manualEmail/title/body + 单张超过 maxMultipartMemory
-// 的图片字段的 multipart 请求，确保 mime/multipart 在解析时会把图片部分溢出写入磁盘临时文件
-// （不为了测试而调低 maxMultipartMemory，用真实的生产阈值触发溢出路径）。
-func buildOversizedMultipartRequest(t *testing.T) *http.Request {
-	t.Helper()
-	oversizedImage := gifSignatureBytes(maxMultipartMemory + 1<<20)
-
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	if err := writer.WriteField("manualEmail", "user@example.com"); err != nil {
-		t.Fatalf("write field manualEmail: %v", err)
-	}
-	if err := writer.WriteField("title", "help"); err != nil {
-		t.Fatalf("write field title: %v", err)
-	}
-	if err := writer.WriteField("body", "see attached"); err != nil {
-		t.Fatalf("write field body: %v", err)
-	}
-	part, err := writer.CreateFormFile("images", "big.gif")
-	if err != nil {
-		t.Fatalf("create form file: %v", err)
-	}
-	if _, err := part.Write(oversizedImage); err != nil {
-		t.Fatalf("write file part: %v", err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close multipart writer: %v", err)
-	}
-
-	req := httptest.NewRequest(http.MethodPost, "/api/embed/tickets", body)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	return req
-}
-
-// TestParseMultipartTicketRequest_CleansUpTempFiles 覆盖整改要求一的成功路径：图片字段超过
-// maxMultipartMemory 触发 mime/multipart 把内容溢出写入系统临时目录后，
-// parseMultipartTicketRequest 返回时必须已经清理掉这些临时文件。
-func TestParseMultipartTicketRequest_CleansUpTempFiles(t *testing.T) {
-	spillDir := withIsolatedTempDir(t)
-	req := buildOversizedMultipartRequest(t)
-	recorder := httptest.NewRecorder()
-
-	parsedReq, uploads, err := parseMultipartTicketRequest(recorder, req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if parsedReq.ManualEmail != "user@example.com" || parsedReq.Title != "help" || parsedReq.Body != "see attached" {
-		t.Fatalf("expected form fields to be parsed, got %+v", parsedReq)
-	}
-	if len(uploads) != 1 {
-		t.Fatalf("expected 1 upload, got %d", len(uploads))
-	}
-
-	assertDirEmpty(t, spillDir)
-}
-
-// TestCreateEmbedTicket_CleansUpTempFilesOnValidationFailure 覆盖整改要求一的失败路径：
-// 走完整的 HTTP handler（不是直接调用 parser），workspace 配置为 0（关闭图片上传），
-// Service 层会以"图片数量超限"拒绝请求；即便业务校验失败，multipart 临时文件也必须已经
-// 在 parseMultipartTicketRequest 返回时被清理（不会因为后续 Service 拒绝而遗留）。
-// 不依赖真实 PostgreSQL/Redis/Sub2API：Service 由内存假实现（fakeTicketRepository 等，定义在
-// service_test.go，同包共用）构造。
-func TestCreateEmbedTicket_CleansUpTempFilesOnValidationFailure(t *testing.T) {
-	spillDir := withIsolatedTempDir(t)
-
-	repo := newFakeTicketRepository()
-	svc := newTestService(repo, newFakeSessionStore(), &fakeSub2API{}, nil)
-	sessionToken := establishedSessionWithConfig(repo, svc, t, 0)
-
-	req := buildOversizedMultipartRequest(t)
-	req.Header.Set("Authorization", "Bearer "+sessionToken)
-	recorder := httptest.NewRecorder()
-
-	handler := &Handler{service: svc}
-	handler.createEmbedTicket(recorder, req)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 when image uploads are disabled, got %d: %s", recorder.Code, recorder.Body.String())
-	}
-
-	assertDirEmpty(t, spillDir)
-}
-
-// TestCreateEmbedTicket_MultipartPersistsCategoryAndPriority 覆盖 multipart 创建路径：
-// category/priority 必须和 manualEmail/title/body 一样作为表单字段被解析并落库返回。
-func TestCreateEmbedTicket_MultipartPersistsCategoryAndPriority(t *testing.T) {
-	repo := newFakeTicketRepository()
-	svc := newTestService(repo, newFakeSessionStore(), &fakeSub2API{}, nil)
-	sessionToken := establishedSessionWithConfig(repo, svc, t, 3)
-
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	if err := writer.WriteField("manualEmail", "user@example.com"); err != nil {
-		t.Fatalf("write field manualEmail: %v", err)
-	}
-	if err := writer.WriteField("title", "help"); err != nil {
-		t.Fatalf("write field title: %v", err)
-	}
-	if err := writer.WriteField("body", "see attached"); err != nil {
-		t.Fatalf("write field body: %v", err)
-	}
-	if err := writer.WriteField("category", "通用问题"); err != nil {
-		t.Fatalf("write field category: %v", err)
-	}
-	if err := writer.WriteField("priority", "普通"); err != nil {
-		t.Fatalf("write field priority: %v", err)
-	}
-	part, err := writer.CreateFormFile("images", "a.gif")
-	if err != nil {
-		t.Fatalf("create form file: %v", err)
-	}
-	if _, err := part.Write(gifSignatureBytes(16)); err != nil {
-		t.Fatalf("write file part: %v", err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close multipart writer: %v", err)
-	}
-
-	req := httptest.NewRequest(http.MethodPost, "/api/embed/tickets", body)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("Authorization", "Bearer "+sessionToken)
-	recorder := httptest.NewRecorder()
-
-	handler := &Handler{service: svc}
-	handler.createEmbedTicket(recorder, req)
-
-	if recorder.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", recorder.Code, recorder.Body.String())
-	}
-	var detail EmbedTicketDetail
-	if err := json.NewDecoder(recorder.Body).Decode(&detail); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if detail.Category != "通用问题" || detail.Priority != "普通" {
-		t.Fatalf("expected category/priority to be parsed and persisted, got %+v", detail)
-	}
-}
-
-// TestCreateEmbedTicket_JSONPersistsCategoryAndPriority 覆盖旧的 JSON 创建路径：新增的
-// category/priority 字段必须和其余字段一样通过 json 标签被解析并落库返回。
-func TestCreateEmbedTicket_JSONPersistsCategoryAndPriority(t *testing.T) {
-	repo := newFakeTicketRepository()
-	svc := newTestService(repo, newFakeSessionStore(), &fakeSub2API{}, nil)
-	sessionToken := establishedSession(svc, t)
-
-	payload := `{"manualEmail":"user@example.com","title":"help","body":"body","category":"通用问题","priority":"普通"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/embed/tickets", bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+sessionToken)
-	recorder := httptest.NewRecorder()
-
-	handler := &Handler{service: svc}
-	handler.createEmbedTicket(recorder, req)
-
-	if recorder.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", recorder.Code, recorder.Body.String())
-	}
-	var detail EmbedTicketDetail
-	if err := json.NewDecoder(recorder.Body).Decode(&detail); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if detail.Category != "通用问题" || detail.Priority != "普通" {
-		t.Fatalf("expected category/priority to be parsed and persisted, got %+v", detail)
-	}
-}
-
-func TestRegisterRoutes_AdminTicketSub2apiProfileDoesNotConflictWithAttachments(t *testing.T) {
-	repo := newFakeTicketRepository()
-	repo.tickets["t1"] = &Ticket{
-		ID:             "t1",
-		UserID:         "user1",
-		AdminAccountID: "account1",
-		ManualEmail:    "a@example.com",
-		Title:          "help",
-		Sub2apiUserID:  "42",
-		Sub2apiEmail:   "sub2api@example.com",
-		Sub2apiRole:    "member",
-		Sub2apiSrcHost: "https://web.example.com",
-		Sub2apiSrcURL:  "https://web.example.com/custom/abc",
-	}
-	svc := newTestService(repo, newFakeSessionStore(), &fakeSub2API{}, &fakeAccountResolver{id: "account1"})
+func TestTicketRoutesEndToEnd(t *testing.T) {
+	env := newTestEnv()
 	mux := http.NewServeMux()
+	RegisterRoutes(mux, env.service)
+	c := httpCase{t: t, mux: mux}
 
-	RegisterRoutes(mux, svc)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/tickets/t1/sub2api-user-profile", nil)
-	req = req.WithContext(authctx.WithUserID(req.Context(), "user1"))
-	recorder := httptest.NewRecorder()
-
-	mux.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected profile route to return 200, got %d: %s", recorder.Code, recorder.Body.String())
+	// 换取会话
+	response := c.do(httptest.NewRequest(http.MethodPost, "/api/client/v1/sites/abcdefghij/tickets/session",
+		jsonBody(t, CreateSessionRequest{Credential: Credential{Kind: "bearer", Token: "user-token"}, ClientInfo: "TransitLink 0.2.0"})))
+	if response.Code != http.StatusOK {
+		t.Fatalf("session: %d %s", response.Code, response.Body)
 	}
-	var profile Sub2apiUserProfileResponse
-	if err := json.NewDecoder(recorder.Body).Decode(&profile); err != nil {
-		t.Fatalf("decode profile response: %v", err)
+	token := decode[SessionResponse](t, response).SessionToken
+
+	// 没有会话
+	if response := c.do(httptest.NewRequest(http.MethodGet, "/api/client/v1/tickets", nil)); response.Code != http.StatusUnauthorized ||
+		!strings.Contains(response.Body.String(), ErrorSessionExpired) {
+		t.Fatalf("missing session: %d %s", response.Code, response.Body)
 	}
-	if profile.Sub2apiUserID != "42" || profile.Sub2apiEmail != "sub2api@example.com" {
-		t.Fatalf("unexpected profile response: %+v", profile)
+	authorized := func(request *http.Request) *http.Request {
+		request.Header.Set("Authorization", "Bearer "+token)
+		return request
+	}
+
+	// 带图片新建工单（multipart）
+	body, contentType := multipartTicket(t, map[string]string{"title": "截图问题", "body": "见附件", "category": "接口调用"},
+		map[string][]byte{"screen.png": pngImage(t)})
+	request := authorized(httptest.NewRequest(http.MethodPost, "/api/client/v1/tickets", body))
+	request.Header.Set("Content-Type", contentType)
+	response = c.do(request)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("create: %d %s", response.Code, response.Body)
+	}
+	env.waitEvent(t)
+	created := decode[ClientTicketDetail](t, response)
+	if created.Category != "接口调用" || len(created.Messages) != 1 || len(created.Messages[0].Attachments) != 1 {
+		t.Fatalf("created: %+v", created)
+	}
+
+	// 下载附件：类型固定、禁止猜测
+	attachmentID := created.Messages[0].Attachments[0].ID
+	response = c.do(authorized(httptest.NewRequest(http.MethodGet, "/api/client/v1/tickets/attachments/"+attachmentID, nil)))
+	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "image/png" ||
+		response.Header().Get("X-Content-Type-Options") != "nosniff" || !strings.Contains(response.Header().Get("Content-Disposition"), "screen.png") {
+		t.Fatalf("attachment: %d %v", response.Code, response.Header())
+	}
+	response = c.do(authorized(httptest.NewRequest(http.MethodGet, "/api/client/v1/tickets/attachments/"+attachmentID+"?size=thumb", nil)))
+	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("thumbnail: %d %v", response.Code, response.Header())
+	}
+
+	// JSON 回复、不存在的工单、太大的图片
+	response = c.do(authorized(httptest.NewRequest(http.MethodPost, "/api/client/v1/tickets/"+created.ID+"/messages", jsonBody(t, ReplyRequest{Body: "补充"}))))
+	if response.Code != http.StatusOK || len(decode[ClientTicketDetail](t, response).Messages) != 2 {
+		t.Fatalf("reply: %d %s", response.Code, response.Body)
+	}
+	env.waitEvent(t)
+	if response := c.do(authorized(httptest.NewRequest(http.MethodGet, "/api/client/v1/tickets/missing", nil))); response.Code != http.StatusNotFound {
+		t.Fatalf("missing ticket: %d", response.Code)
+	}
+	big, bigType := multipartTicket(t, map[string]string{"body": "大图"}, map[string][]byte{"big.png": append(pngImage(t), make([]byte, maxImageBytes)...)})
+	request = authorized(httptest.NewRequest(http.MethodPost, "/api/client/v1/tickets/"+created.ID+"/messages", big))
+	request.Header.Set("Content-Type", bigType)
+	if response := c.do(request); response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), ErrorImageTooLarge) {
+		t.Fatalf("big image: %d %s", response.Code, response.Body)
+	}
+
+	// 站长：登录的用户来自 authctx（由受保护路径的中间件设置）
+	admin := func(request *http.Request) *http.Request {
+		return request.WithContext(authctx.WithUserID(context.Background(), "owner-1"))
+	}
+	// 用户在站长回复前追问，工单仍是「待回复」(open)。
+	response = c.do(admin(httptest.NewRequest(http.MethodGet, "/api/tickets?status=open&page=1", nil)))
+	if response.Code != http.StatusOK || decode[AdminListResponse](t, response).Total != 1 {
+		t.Fatalf("admin list: %d %s", response.Code, response.Body)
+	}
+	if response := c.do(admin(httptest.NewRequest(http.MethodGet, "/api/tickets/counts", nil))); response.Code != http.StatusOK ||
+		decode[StatusCounts](t, response) != (StatusCounts{Open: 1}) {
+		t.Fatalf("counts: %d %s", response.Code, response.Body)
+	}
+	response = c.do(admin(httptest.NewRequest(http.MethodPost, "/api/tickets/"+created.ID+"/messages", jsonBody(t, ReplyRequest{Body: "已处理"}))))
+	if response.Code != http.StatusOK || decode[AdminTicketDetail](t, response).Status != StatusReplied {
+		t.Fatalf("admin reply: %d %s", response.Code, response.Body)
+	}
+	response = c.do(admin(httptest.NewRequest(http.MethodPut, "/api/tickets/"+created.ID+"/status", jsonBody(t, StatusRequest{Status: StatusClosed}))))
+	if response.Code != http.StatusOK || decode[AdminTicketDetail](t, response).Status != StatusClosed {
+		t.Fatalf("admin status: %d %s", response.Code, response.Body)
+	}
+	if response := c.do(admin(httptest.NewRequest(http.MethodGet, "/api/tickets/attachments/"+attachmentID, nil))); response.Code != http.StatusOK {
+		t.Fatalf("admin attachment: %d", response.Code)
+	}
+	if response := c.do(admin(httptest.NewRequest(http.MethodGet, "/api/tickets/attachments/"+attachmentID+"?size=thumb", nil))); response.Code != http.StatusOK ||
+		response.Header().Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("admin thumbnail: %d %v", response.Code, response.Header())
+	}
+	if response := c.do(httptest.NewRequest(http.MethodGet, "/api/tickets", nil)); response.Code != http.StatusUnauthorized {
+		t.Fatalf("admin routes need a login: %d", response.Code)
+	}
+	// 用户追问已关闭的工单
+	response = c.do(authorized(httptest.NewRequest(http.MethodPost, "/api/client/v1/tickets/"+created.ID+"/messages", jsonBody(t, ReplyRequest{Body: "?"}))))
+	if response.Code != http.StatusConflict {
+		t.Fatalf("closed: %d %s", response.Code, response.Body)
 	}
 }

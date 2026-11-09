@@ -55,15 +55,36 @@ type batchRepository interface {
 	FinalizeBatch(ctx context.Context, batchID string) error
 }
 
+// suppressionStore 是退订名单的存储（*Repository 实现）。仓储不支持时退订功能关闭，群发行为与之前一致。
+type suppressionStore interface {
+	GetItemByID(ctx context.Context, id string) (BatchItem, error)
+	IsSuppressed(ctx context.Context, userID string, adminAccountID string, normalizedEmail string) (bool, error)
+	SuppressedAmong(ctx context.Context, userID string, adminAccountID string, normalizedEmails []string) (map[string]struct{}, error)
+	AddSuppressions(ctx context.Context, userID string, adminAccountID string, normalizedEmails []string, reason string) (int, error)
+	RemoveSuppression(ctx context.Context, userID string, adminAccountID string, normalizedEmail string) (bool, error)
+	ListSuppressions(ctx context.Context, userID string, adminAccountID string, search string, page int, pageSize int) ([]Suppression, int, error)
+}
+
 type Service struct {
-	repository batchRepository
-	sessions   AdminSessionProvider
-	users      Sub2APIUsersClient
-	settings   SettingsProvider
+	repository   batchRepository
+	sessions     AdminSessionProvider
+	users        Sub2APIUsersClient
+	settings     SettingsProvider
+	segments     SegmentRecipientResolver
+	suppressions suppressionStore
 }
 
 func NewService(repository batchRepository, sessions AdminSessionProvider, users Sub2APIUsersClient, settingsProvider SettingsProvider) *Service {
-	return &Service{repository: repository, sessions: sessions, users: users, settings: settingsProvider}
+	service := &Service{repository: repository, sessions: sessions, users: users, settings: settingsProvider}
+	if store, ok := repository.(suppressionStore); ok {
+		service.suppressions = store
+	}
+	return service
+}
+
+// SetSegmentResolver 注入按活跃分群解析收件人的能力（user_activity 模块）。
+func (s *Service) SetSegmentResolver(resolver SegmentRecipientResolver) {
+	s.segments = resolver
 }
 
 func (s *Service) EnsureSchema(ctx context.Context) error {
@@ -96,6 +117,21 @@ func (s *Service) ListUsers(ctx context.Context, userID string, adminAccountID s
 }
 
 func (s *Service) CreateBatch(ctx context.Context, userID string, adminAccountID string, req CreateBatchRequest) (BatchDTO, error) {
+	if req.SelectionMode == SelectionModeLeads {
+		// 线索的收件人只能由线索模块给出（CreateLeadBatch），不接受接口直接传。
+		return BatchDTO{}, ErrInvalidSelection
+	}
+	return s.createBatch(ctx, userID, adminAccountID, req, nil)
+}
+
+// CreateLeadBatch 给线索群发：收件人由线索模块给出，这里照常做幂等、模板、SMTP 检查、去重和退订过滤，
+// 每个收件人记下对应的线索。
+func (s *Service) CreateLeadBatch(ctx context.Context, userID string, adminAccountID string, req CreateBatchRequest, recipients []LeadRecipient) (BatchDTO, error) {
+	req.SelectionMode = SelectionModeLeads
+	return s.createBatch(ctx, userID, adminAccountID, req, recipients)
+}
+
+func (s *Service) createBatch(ctx context.Context, userID string, adminAccountID string, req CreateBatchRequest, leads []LeadRecipient) (BatchDTO, error) {
 	req, err := normalizeCreateRequest(req)
 	if err != nil {
 		return BatchDTO{}, err
@@ -114,9 +150,19 @@ func (s *Service) CreateBatch(ctx context.Context, userID string, adminAccountID
 	if hasActive {
 		return BatchDTO{}, ErrActiveBatchExists
 	}
-	session, err := s.sessions.RequireSession(ctx, userID, adminAccountID)
-	if err != nil {
-		return BatchDTO{}, mapUpstreamError(err)
+	// segment 方式的收件人来自本地同步的用户快照、leads 方式来自线索，都不需要访问站点；其它方式实时读取 sub2api 用户。
+	var session upstream.Session
+	switch req.SelectionMode {
+	case SelectionModeSegment:
+		if s.segments == nil {
+			return BatchDTO{}, ErrSegmentUnavailable
+		}
+	case SelectionModeLeads:
+	default:
+		session, err = s.sessions.RequireSession(ctx, userID, adminAccountID)
+		if err != nil {
+			return BatchDTO{}, mapUpstreamError(err)
+		}
 	}
 	template, err := s.settings.SnapshotEmailTemplateForWorkspace(ctx, userID, adminAccountID, req.TemplateID)
 	if err != nil {
@@ -125,10 +171,21 @@ func (s *Service) CreateBatch(ctx context.Context, userID string, adminAccountID
 	if err := s.settings.ValidateSMTPReadyForWorkspace(ctx, userID, adminAccountID); err != nil {
 		return BatchDTO{}, mapSettingsError(err)
 	}
-	recipients, skipped, err := s.resolveRecipients(ctx, session, req)
+	var recipients []recipientCandidate
+	var skipped int
+	if req.SelectionMode == SelectionModeLeads {
+		recipients, skipped, err = leadCandidates(leads)
+	} else {
+		recipients, skipped, err = s.resolveRecipients(ctx, userID, adminAccountID, session, req)
+	}
 	if err != nil {
 		return BatchDTO{}, err
 	}
+	recipients, suppressed, err := s.excludeSuppressed(ctx, userID, adminAccountID, recipients)
+	if err != nil {
+		return BatchDTO{}, err
+	}
+	skipped += suppressed
 	batchID, err := newID()
 	if err != nil {
 		return BatchDTO{}, ErrPersistence
@@ -137,6 +194,10 @@ func (s *Service) CreateBatch(ctx context.Context, userID string, adminAccountID
 	if len(recipients) == 0 {
 		status = BatchStatusFailed
 	}
+	subject := template.Subject
+	if req.AdLabel {
+		subject = withAdLabel(subject)
+	}
 	batch := Batch{
 		ID:              batchID,
 		UserID:          userID,
@@ -144,10 +205,11 @@ func (s *Service) CreateBatch(ctx context.Context, userID string, adminAccountID
 		RequestID:       req.RequestID,
 		TemplateID:      template.ID,
 		TemplateName:    template.Name,
-		TemplateSubject: template.Subject,
+		TemplateSubject: subject,
 		TemplateHTML:    template.HTMLBody,
 		SelectionMode:   req.SelectionMode,
 		Filters:         req.Filters,
+		PublicBaseURL:   req.PublicBaseURL,
 		Status:          status,
 		RecipientCount:  len(recipients),
 		SkippedCount:    skipped,
@@ -164,6 +226,7 @@ func (s *Service) CreateBatch(ctx context.Context, userID string, adminAccountID
 			UserID:          userID,
 			AdminAccountID:  adminAccountID,
 			UpstreamUserID:  recipient.UpstreamUserID,
+			LeadID:          recipient.LeadID,
 			RecipientEmail:  recipient.Email,
 			NormalizedEmail: normalizeEmailKey(recipient.Email),
 			Username:        recipient.Username,
@@ -179,6 +242,19 @@ func (s *Service) CreateBatch(ctx context.Context, userID string, adminAccountID
 		return BatchDTO{}, ErrPersistence
 	}
 	return batchDTO(created), nil
+}
+
+// BatchForRequest 找这个请求 ID 已经建好的批次（线索发送重试时直接返回它，不再重复检查发送上限）。
+func (s *Service) BatchForRequest(ctx context.Context, userID string, adminAccountID string, requestID string) (BatchDTO, bool) {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return BatchDTO{}, false
+	}
+	batch, err := s.repository.GetByRequestID(ctx, userID, adminAccountID, requestID)
+	if err != nil {
+		return BatchDTO{}, false
+	}
+	return batchDTO(batch), true
 }
 
 func (s *Service) ListBatches(ctx context.Context, userID string, adminAccountID string, page int, pageSize int) (BatchPage, error) {
@@ -252,7 +328,25 @@ func (s *Service) processOne(ctx context.Context, item BatchItem) {
 		_ = s.repository.CompleteItem(ctx, item.ID, ItemStatusCancelled, "")
 		return
 	}
-	if err := s.settings.SendSavedSMTPEmailForWorkspace(ctx, item.UserID, item.AdminAccountID, item.RecipientEmail, batch.TemplateSubject, batch.TemplateHTML); err != nil {
+	if s.suppressions != nil {
+		// 批次排队期间收件人可能刚退订（例如点了上一封邮件里的退订链接），发送前再确认一次。
+		suppressed, err := s.suppressions.IsSuppressed(ctx, item.UserID, item.AdminAccountID, normalizeEmailKey(item.RecipientEmail))
+		if err != nil {
+			_ = s.repository.CompleteItem(ctx, item.ID, ItemStatusFailed, string(ErrPersistence))
+			return
+		}
+		if suppressed {
+			_ = s.repository.CompleteItem(ctx, item.ID, ItemStatusCancelled, string(ErrSuppressed))
+			return
+		}
+	}
+	htmlBody := renderEmailHTML(batch.TemplateHTML, unsubscribeURL(batch.PublicBaseURL, item.ID))
+	if err := s.settings.SendSavedSMTPEmailForWorkspace(ctx, item.UserID, item.AdminAccountID, item.RecipientEmail, batch.TemplateSubject, htmlBody); err != nil {
+		if errors.Is(err, settings.ErrSMTPRecipientRejected) {
+			// 收件服务器在发正文之前就拒收了这个地址：肯定没发出去，记为失败（线索里显示为退信）。
+			_ = s.repository.CompleteItem(ctx, item.ID, ItemStatusFailed, string(ErrRecipientRejected))
+			return
+		}
 		// 发送调用已经发起后无法可靠判断远端是否投递成功，因此统一落入 uncertain，不做自动重试。
 		_ = s.repository.CompleteItem(ctx, item.ID, ItemStatusUncertain, string(ErrSendFailed))
 		return
@@ -260,11 +354,107 @@ func (s *Service) processOne(ctx context.Context, item BatchItem) {
 	_ = s.repository.CompleteItem(ctx, item.ID, ItemStatusSent, "")
 }
 
-func (s *Service) resolveRecipients(ctx context.Context, session upstream.Session, req CreateBatchRequest) ([]recipientCandidate, int, error) {
-	if req.SelectionMode == SelectionModeSelected {
+func (s *Service) resolveRecipients(ctx context.Context, userID string, adminAccountID string, session upstream.Session, req CreateBatchRequest) ([]recipientCandidate, int, error) {
+	switch req.SelectionMode {
+	case SelectionModeSelected:
 		return s.resolveSelectedRecipients(ctx, session, req.UserIDs)
+	case SelectionModeSegment:
+		return s.resolveSegmentRecipients(ctx, userID, adminAccountID, req.Filters)
+	default:
+		return s.resolveAllRecipients(ctx, session, req.Filters)
 	}
-	return s.resolveAllRecipients(ctx, session, req.Filters)
+}
+
+func (s *Service) resolveSegmentRecipients(ctx context.Context, userID string, adminAccountID string, filters BatchFilters) ([]recipientCandidate, int, error) {
+	resolved, err := s.segments.ResolveSegmentRecipients(ctx, userID, adminAccountID, filters, maxBatchRecipients)
+	if err != nil {
+		if errors.Is(err, ErrRecipientLimitReached) || errors.Is(err, ErrSegmentNotSynced) || errors.Is(err, ErrInvalidSelection) {
+			return nil, 0, err
+		}
+		log.Printf("[mass-email] resolve segment recipients failed user_id=%s admin_account_id=%s err=%v", userID, adminAccountID, err)
+		return nil, 0, ErrPersistence
+	}
+	recipients := make([]recipientCandidate, 0, len(resolved))
+	seen := map[string]struct{}{}
+	skipped := 0
+	for _, item := range resolved {
+		candidate, ok := candidateFromAddress(item.UpstreamUserID, item.Email, item.Username)
+		if !ok {
+			skipped++
+			continue
+		}
+		key := normalizeEmailKey(candidate.Email)
+		if _, exists := seen[key]; exists {
+			skipped++
+			continue
+		}
+		seen[key] = struct{}{}
+		recipients = append(recipients, candidate)
+	}
+	return recipients, skipped, nil
+}
+
+// leadCandidates 把线索模块给出的收件人整理成候选：地址不合法的、重复的算跳过。
+func leadCandidates(leads []LeadRecipient) ([]recipientCandidate, int, error) {
+	if len(leads) > maxBatchRecipients {
+		return nil, 0, ErrRecipientLimitReached
+	}
+	recipients := make([]recipientCandidate, 0, len(leads))
+	seen := map[string]struct{}{}
+	skipped := 0
+	for _, lead := range leads {
+		candidate, ok := candidateFromAddress("", lead.Email, "")
+		if !ok || strings.TrimSpace(lead.LeadID) == "" {
+			skipped++
+			continue
+		}
+		key := normalizeEmailKey(candidate.Email)
+		if _, exists := seen[key]; exists {
+			skipped++
+			continue
+		}
+		seen[key] = struct{}{}
+		candidate.LeadID = strings.TrimSpace(lead.LeadID)
+		recipients = append(recipients, candidate)
+	}
+	return recipients, skipped, nil
+}
+
+// withAdLabel 在标题前加「【广告】」；已经带了（【广告】、[AD]、AD 开头）就不重复加。
+func withAdLabel(subject string) string {
+	trimmed := strings.TrimSpace(subject)
+	upper := strings.ToUpper(trimmed)
+	if strings.HasPrefix(trimmed, AdLabel) || strings.HasPrefix(trimmed, "【AD】") || strings.HasPrefix(upper, "[AD]") || strings.HasPrefix(upper, "AD ") || strings.HasPrefix(upper, "AD:") || strings.HasPrefix(upper, "AD：") {
+		return subject
+	}
+	return AdLabel + trimmed
+}
+
+// excludeSuppressed 去掉退订名单中的地址（适用于所有选择方式），返回剩余收件人和被跳过的数量。
+func (s *Service) excludeSuppressed(ctx context.Context, userID string, adminAccountID string, recipients []recipientCandidate) ([]recipientCandidate, int, error) {
+	if s.suppressions == nil || len(recipients) == 0 {
+		return recipients, 0, nil
+	}
+	keys := make([]string, 0, len(recipients))
+	for _, recipient := range recipients {
+		keys = append(keys, normalizeEmailKey(recipient.Email))
+	}
+	suppressed, err := s.suppressions.SuppressedAmong(ctx, userID, adminAccountID, keys)
+	if err != nil {
+		log.Printf("[mass-email] load suppressions failed user_id=%s admin_account_id=%s err=%v", userID, adminAccountID, err)
+		return nil, 0, ErrPersistence
+	}
+	if len(suppressed) == 0 {
+		return recipients, 0, nil
+	}
+	kept := make([]recipientCandidate, 0, len(recipients))
+	for _, recipient := range recipients {
+		if _, skip := suppressed[normalizeEmailKey(recipient.Email)]; skip {
+			continue
+		}
+		kept = append(kept, recipient)
+	}
+	return kept, len(recipients) - len(kept), nil
 }
 
 func (s *Service) resolveSelectedRecipients(ctx context.Context, session upstream.Session, ids []string) ([]recipientCandidate, int, error) {
@@ -336,9 +526,15 @@ func normalizeCreateRequest(req CreateBatchRequest) (CreateBatchRequest, error) 
 	req.Filters.Status = strings.TrimSpace(req.Filters.Status)
 	req.Filters.Role = strings.TrimSpace(req.Filters.Role)
 	req.Filters.Search = normalizeUserSearch(req.Filters.Search)
+	req.Filters.Segment = strings.TrimSpace(req.Filters.Segment)
 	if req.TemplateID == "" || req.RequestID == "" {
 		return CreateBatchRequest{}, ErrInvalidRequest
 	}
+	publicBaseURL, err := normalizePublicBaseURL(req.PublicBaseURL)
+	if err != nil {
+		return CreateBatchRequest{}, err
+	}
+	req.PublicBaseURL = publicBaseURL
 	switch req.SelectionMode {
 	case SelectionModeSelected:
 		if len(req.UserIDs) == 0 || len(req.UserIDs) > maxSelectedUserIDs {
@@ -360,6 +556,16 @@ func normalizeCreateRequest(req CreateBatchRequest) (CreateBatchRequest, error) 
 		req.UserIDs = ids
 	case SelectionModeAll:
 		req.UserIDs = nil
+		req.Filters.Segment = ""
+		req.Filters.InactiveDays = 0
+	case SelectionModeSegment:
+		req.UserIDs = nil
+		if req.Filters.Segment == "" {
+			return CreateBatchRequest{}, ErrInvalidSelection
+		}
+	case SelectionModeLeads:
+		req.UserIDs = nil
+		req.Filters = BatchFilters{}
 	default:
 		return CreateBatchRequest{}, ErrInvalidSelection
 	}
@@ -376,7 +582,11 @@ func normalizeUserSearch(value string) string {
 }
 
 func candidateFromUser(user upstream.Sub2APIAdminUser) (recipientCandidate, bool) {
-	email := strings.TrimSpace(user.Email)
+	return candidateFromAddress(user.ID, user.Email, user.Username)
+}
+
+func candidateFromAddress(id string, rawEmail string, username string) (recipientCandidate, bool) {
+	email := strings.TrimSpace(rawEmail)
 	if email == "" || strings.ContainsAny(email, "\r\n") {
 		return recipientCandidate{}, false
 	}
@@ -384,7 +594,7 @@ func candidateFromUser(user upstream.Sub2APIAdminUser) (recipientCandidate, bool
 	if err != nil || parsed.Name != "" || parsed.Address != email {
 		return recipientCandidate{}, false
 	}
-	return recipientCandidate{UpstreamUserID: strings.TrimSpace(user.ID), Email: parsed.Address, Username: strings.TrimSpace(user.Username)}, true
+	return recipientCandidate{UpstreamUserID: strings.TrimSpace(id), Email: parsed.Address, Username: strings.TrimSpace(username)}, true
 }
 
 func normalizeEmailKey(email string) string {
@@ -402,9 +612,11 @@ func mapSettingsError(err error) error {
 	}
 }
 
+// mapUpstreamError 把站点会话和站点请求的错误归成两类：需要重新登录站点（会话缺失、过期或不是管理员），
+// 以及其他请求失败。前者提示用户去仪表盘重新登录自己的站点。
 func mapUpstreamError(err error) error {
 	message := err.Error()
-	if strings.Contains(message, upstream.ErrorAuth) {
+	if strings.Contains(message, upstream.ErrorAuth) || strings.Contains(message, "authRequired") || strings.Contains(message, "adminOnly") {
 		return ErrUpstreamAuth
 	}
 	return fmt.Errorf("%w", ErrUpstreamRequest)
@@ -425,7 +637,7 @@ func batchDTO(batch Batch) BatchDTO {
 	return BatchDTO{
 		ID: batch.ID, RequestID: batch.RequestID, TemplateID: batch.TemplateID, TemplateName: batch.TemplateName,
 		TemplateSubject: batch.TemplateSubject, SelectionMode: batch.SelectionMode, Filters: batch.Filters,
-		Status: batch.Status, RecipientCount: batch.RecipientCount, SkippedCount: batch.SkippedCount,
+		UnsubscribeLink: batch.PublicBaseURL != "", Status: batch.Status, RecipientCount: batch.RecipientCount, SkippedCount: batch.SkippedCount,
 		SentCount: batch.SentCount, FailedCount: batch.FailedCount, UncertainCount: batch.UncertainCount,
 		CancelledCount: batch.CancelledCount, CreatedAt: batch.CreatedAt, UpdatedAt: batch.UpdatedAt,
 		StartedAt: batch.StartedAt, FinishedAt: batch.FinishedAt, CancelledAt: batch.CancelledAt,

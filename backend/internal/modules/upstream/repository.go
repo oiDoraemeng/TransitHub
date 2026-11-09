@@ -7,14 +7,27 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"transithub/backend/internal/shared/secretbox"
 )
 
 type Repository struct {
-	db *pgxpool.Pool
+	db      *pgxpool.Pool
+	secrets *secretbox.Box
 }
 
 func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
+}
+
+// SetSecretBox 设置加密上游登录状态用的密钥（nil 表示不加密）。要在读写之前设置。
+func (r *Repository) SetSecretBox(box *secretbox.Box) {
+	r.secrets = box
+}
+
+// sessionAAD 把密文绑定到上游站点（id 不会变）。
+func sessionAAD(siteID string) string {
+	return "upstream_sites/" + siteID
 }
 
 func (r *Repository) EnsureSchema(ctx context.Context) error {
@@ -102,7 +115,7 @@ func (r *Repository) ListSites(ctx context.Context) ([]Site, error) {
 	if err != nil {
 		return nil, err
 	}
-	return scanSites(rows)
+	return r.scanSites(rows)
 }
 
 func (r *Repository) ListSitesForUser(ctx context.Context, userID string) ([]Site, error) {
@@ -116,7 +129,7 @@ func (r *Repository) ListSitesForUser(ctx context.Context, userID string) ([]Sit
 	if err != nil {
 		return nil, err
 	}
-	return scanSites(rows)
+	return r.scanSites(rows)
 }
 
 func (r *Repository) SaveSite(ctx context.Context, site Site) error {
@@ -128,6 +141,10 @@ func (r *Repository) SaveSite(ctx context.Context, site Site) error {
 	var sessionJSON []byte
 	if site.Session != nil {
 		sessionJSON, err = json.Marshal(site.Session)
+		if err != nil {
+			return err
+		}
+		sessionJSON, err = r.secrets.SealJSON(sessionJSON, sessionAAD(site.ID))
 		if err != nil {
 			return err
 		}
@@ -196,7 +213,7 @@ func (r *Repository) DeleteSite(ctx context.Context, userID string, id string) e
 	return tx.Commit(ctx)
 }
 
-func scanSites(rows pgx.Rows) ([]Site, error) {
+func (r *Repository) scanSites(rows pgx.Rows) ([]Site, error) {
 	defer rows.Close()
 
 	sites := make([]Site, 0)
@@ -234,11 +251,17 @@ func scanSites(rows pgx.Rows) ([]Site, error) {
 			return nil, err
 		}
 		if len(sessionJSON) > 0 {
-			var session Session
-			if err := json.Unmarshal(sessionJSON, &session); err != nil {
-				return nil, err
+			plain, err := r.secrets.OpenJSON(sessionJSON, sessionAAD(site.ID))
+			if err != nil {
+				// 读不出来（例如密钥丢了）：当作未登录，需要重新登录这个上游。
+				secretbox.LogUnreadable(sessionAAD(site.ID), err)
+			} else {
+				var session Session
+				if err := json.Unmarshal(plain, &session); err != nil {
+					return nil, err
+				}
+				site.Session = &session
 			}
-			site.Session = &session
 		}
 		if len(settingsJSON) > 0 {
 			_ = json.Unmarshal(settingsJSON, &site.Settings)
@@ -263,4 +286,44 @@ func nullableString(value string) any {
 		return nil
 	}
 	return value
+}
+
+// EncryptLegacySessions 把加密之前保存的明文登录状态改成加密保存，返回改了几个站点。
+// 只改仍是明文、且期间没被改过的行（同时有同步写入时以新写入为准）。
+func (r *Repository) EncryptLegacySessions(ctx context.Context) (int, error) {
+	if r.secrets == nil {
+		return 0, nil
+	}
+	rows, err := r.db.Query(ctx, `SELECT id, session::text FROM upstream_sites WHERE jsonb_typeof(session) = 'object'`)
+	if err != nil {
+		return 0, err
+	}
+	type legacyRow struct{ id, session string }
+	var legacy []legacyRow
+	for rows.Next() {
+		var row legacyRow
+		if err := rows.Scan(&row.id, &row.session); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		legacy = append(legacy, row)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	changed := 0
+	for _, row := range legacy {
+		sealed, err := r.secrets.SealJSON([]byte(row.session), sessionAAD(row.id))
+		if err != nil {
+			return changed, err
+		}
+		tag, err := r.db.Exec(ctx, `UPDATE upstream_sites SET session = $1::jsonb WHERE id = $2 AND session = $3::jsonb`,
+			string(sealed), row.id, row.session)
+		if err != nil {
+			return changed, err
+		}
+		changed += int(tag.RowsAffected())
+	}
+	return changed, nil
 }

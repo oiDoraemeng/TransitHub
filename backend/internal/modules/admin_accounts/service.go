@@ -118,11 +118,11 @@ func (s *Service) DeleteWorkspace(ctx context.Context, userID string, accountID 
 	}
 	if s.cleanup != nil {
 		err := s.runCleanupJob(ctx, CleanupJob{
-			ID:                     result.CleanupJobID,
-			UserID:                 userID,
-			AdminAccountID:         result.DeletedID,
-			AttachmentStoragePaths: append([]string(nil), result.AttachmentStoragePaths...),
-			UpstreamSiteIDs:        append([]string(nil), result.UpstreamSiteIDs...),
+			ID:              result.CleanupJobID,
+			UserID:          userID,
+			AdminAccountID:  result.DeletedID,
+			UpstreamSiteIDs: append([]string(nil), result.UpstreamSiteIDs...),
+			AttachmentPaths: append([]string(nil), result.AttachmentPaths...),
 		})
 		if err != nil {
 			response.CleanupComplete = false
@@ -175,10 +175,10 @@ func (s *Service) runCleanupJob(ctx context.Context, job CleanupJob) error {
 		return nil
 	}
 	err := s.cleanup.CleanupDeletedWorkspace(ctx, WorkspaceCleanupPayload{
-		UserID:                 job.UserID,
-		AdminAccountID:         job.AdminAccountID,
-		AttachmentStoragePaths: append([]string(nil), job.AttachmentStoragePaths...),
-		UpstreamSiteIDs:        append([]string(nil), job.UpstreamSiteIDs...),
+		UserID:          job.UserID,
+		AdminAccountID:  job.AdminAccountID,
+		UpstreamSiteIDs: append([]string(nil), job.UpstreamSiteIDs...),
+		AttachmentPaths: append([]string(nil), job.AttachmentPaths...),
 	})
 	if err != nil {
 		log.Printf("admin account workspace cleanup failed job_id=%s user_id=%s admin_account_id=%s err=%v", job.ID, job.UserID, job.AdminAccountID, err)

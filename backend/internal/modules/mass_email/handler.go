@@ -31,6 +31,9 @@ func RegisterRoutes(mux *http.ServeMux, service *Service, accounts AdminAccountR
 	mux.HandleFunc("GET /api/mass-email/batches", handler.listBatches)
 	mux.HandleFunc("GET /api/mass-email/batches/", handler.getBatch)
 	mux.HandleFunc("POST /api/mass-email/batches/", handler.batchAction)
+	mux.HandleFunc("GET /api/mass-email/suppressions", handler.listSuppressions)
+	mux.HandleFunc("POST /api/mass-email/suppressions", handler.addSuppressions)
+	mux.HandleFunc("DELETE /api/mass-email/suppressions", handler.removeSuppression)
 }
 
 func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
@@ -161,7 +164,9 @@ func writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrNotFound):
 		status = http.StatusNotFound
 	case errors.Is(err, ErrUpstreamAuth):
-		status = http.StatusUnauthorized
+		// 自己站点的管理员会话失效，需要在仪表盘重新登录站点。不能用 401：前端把任何 401 都当作
+		// TransitHub 登录过期并直接登出。
+		status = http.StatusConflict
 	case errors.Is(err, ErrActiveBatchExists):
 		status = http.StatusConflict
 	case errors.Is(err, ErrPersistence):

@@ -1,6 +1,10 @@
 package settings
 
-import "time"
+import (
+	"strconv"
+	"strings"
+	"time"
+)
 
 type NotificationChannel string
 
@@ -39,9 +43,9 @@ type NotificationChannelSettings struct {
 }
 
 type StrategySettings struct {
+	EnableRefreshInterval                 bool                       `json:"enableRefreshInterval"`
 	RecoveryProbeFirstTimeoutSeconds      int                        `json:"recoveryProbeFirstTimeoutSeconds"`
 	RecoveryProbeSubsequentTimeoutSeconds int                        `json:"recoveryProbeSubsequentTimeoutSeconds"`
-	EnableRefreshInterval                 bool                       `json:"enableRefreshInterval"`
 	RefreshInterval                       int                        `json:"refreshInterval"`
 	EnableBalanceWarning                  bool                       `json:"enableBalanceWarning"`
 	DefaultBalanceThreshold               float64                    `json:"defaultBalanceThreshold"`
@@ -53,6 +57,36 @@ type StrategySettings struct {
 	MultiplierTemplate                    string                     `json:"multiplierTemplate"`
 	MultiplierTemplateFormat              NotificationTemplateFormat `json:"multiplierTemplateFormat,omitempty"`
 	EnableAutoChangeMultiplier            bool                       `json:"enableAutoChangeMultiplier"`
+	// 经营日报：每天在 DailyReportTime（北京时间 HH:MM）把昨天的经营、销售、用户和上游数据发给 DailyReportBotIDs。
+	EnableDailyReport bool     `json:"enableDailyReport"`
+	DailyReportTime   string   `json:"dailyReportTime"`
+	DailyReportBotIDs []string `json:"dailyReportBotIds"`
+	// 工单：TransitLink 用户新建工单或追问时，推送给 TicketNotifyBotIDs（为空时不推送）。
+	TicketNotifyBotIDs []string `json:"ticketNotifyBotIds"`
+}
+
+// DefaultDailyReportTime 是经营日报的默认发送时间（北京时间）。
+const DefaultDailyReportTime = "09:00"
+
+// ParseDailyReportTime 解析 HH:MM（00:00–23:59），返回当天的分钟数。
+func ParseDailyReportTime(value string) (int, bool) {
+	value = strings.TrimSpace(value)
+	if len(value) != 5 || value[2] != ':' {
+		return 0, false
+	}
+	hours, errHours := strconv.Atoi(value[:2])
+	minutes, errMinutes := strconv.Atoi(value[3:])
+	if errHours != nil || errMinutes != nil || hours < 0 || hours > 23 || minutes < 0 || minutes > 59 {
+		return 0, false
+	}
+	return hours*60 + minutes, true
+}
+
+// WorkspaceStrategy 是某个工作区保存的策略设置。
+type WorkspaceStrategy struct {
+	UserID         string
+	AdminAccountID string
+	Settings       StrategySettings
 }
 
 // NotificationTemplateFormat 描述预警模板的源格式。空值和未知值都会在保存及发送前

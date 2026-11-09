@@ -12,7 +12,8 @@ const (
 	defaultPort       = "10621"
 	defaultRedisURL   = "redis://127.0.0.1:6379/0"
 	defaultPublicDir  = "/app/public"
-	defaultAppVersion = "v0.1.15"
+	defaultDataDir    = "/app/data"
+	defaultAppVersion = "v1.6.0"
 )
 
 type Config struct {
@@ -22,6 +23,9 @@ type Config struct {
 	RedisURL    string
 	CORSOrigins []string
 	PublicDir   string // 前端静态文件目录，生产默认 /app/public
+	// 应用自己的数据目录，生产默认 /app/data：在线更新下载的新版本放在这里，需要挂载成持久卷，
+	// 否则重建容器后会回到镜像自带的版本。
+	DataDir string
 
 	// 初始化管理员
 	AdminEmail    string
@@ -30,23 +34,9 @@ type Config struct {
 	// 公开注册开关，false 时禁用 /api/auth/register 和 /api/auth/email-code
 	AllowPublicRegister bool
 
-	// 抽奖模块本地调试开关。默认禁止访问回环和私网 Sub2API，避免公开嵌入接口被用于 SSRF；
-	// 仅在受控的本地开发环境中临时开启。
-	LotteryAllowPrivateSub2APITargets bool
-
-	// 版本展示：开源版仅用于系统信息 API 和前端纯展示，不依赖任何远程授权/更新服务。
-	// 发布版本号由代码内置，不能由部署环境变量覆盖，避免部署用户随意修改后台展示版本。
+	// 版本号由代码内置，不能由部署环境变量覆盖，避免部署用户随意修改后台展示版本。
+	// 检查更新和在线更新时用它和 GitHub 上最新的正式版比较（不涉及任何授权服务）。
 	AppVersion string
-
-	// 活动调价（group_rate_campaigns）默认值，仅作为创建活动时未填字段的兜底，不强制覆盖用户在页面上的选择。
-	GroupRateCampaignNotifyEnabled     bool
-	GroupRateCampaignDefaultNotifyBots []string
-	GroupRateCampaignStartTemplate     string
-	GroupRateCampaignEndTemplate       string
-	GroupRateCampaignSchedulerInterval time.Duration
-
-	// 工单图片附件本地存储目录：只存文件本身，metadata 落库；目录不存在时自动创建。
-	TicketUploadDir string
 
 	// SMTP 密码加密密钥：base64 编码的 32 字节 AES-256-GCM key，由 settings 模块解析和校验。
 	// 应用启动时是可选项，缺失不影响启动；这里只原样读取环境变量原值，不做任何解析或校验。
@@ -56,6 +46,9 @@ type Config struct {
 	ProxyKeyEncryptionKey string
 	ProxyMaxRequestBytes  int64
 	ProxyModelRefresh     time.Duration
+	// 登录凭据（站点会话、上游登录状态、机器人密钥、代理密码）的加密密钥：base64 编码的 32 字节。
+	// 可选：不设置时用数据目录里自动生成的 credential.key（数据目录需要是持久卷）。由 secretbox 解析。
+	CredentialEncryptionKey string
 }
 
 func Load() Config {
@@ -72,29 +65,21 @@ func Load() Config {
 		RedisURL:    envOrDefault("REDIS_URL", defaultRedisURL),
 		CORSOrigins: splitOrigins(os.Getenv("CORS_ORIGINS")),
 		PublicDir:   envOrDefault("PUBLIC_DIR", defaultPublicDir),
+		DataDir:     envOrDefault("DATA_DIR", defaultDataDir),
 
 		AdminEmail:    os.Getenv("ADMIN_EMAIL"),
 		AdminPassword: os.Getenv("ADMIN_PASSWORD"),
 
 		AllowPublicRegister: envOrDefault("ALLOW_PUBLIC_REGISTER", "true") == "true",
 
-		LotteryAllowPrivateSub2APITargets: envOrDefault("LOTTERY_ALLOW_PRIVATE_SUB2API_TARGETS", "false") == "true",
-
 		AppVersion: defaultAppVersion,
-
-		GroupRateCampaignNotifyEnabled:     envOrDefault("GROUP_RATE_CAMPAIGN_NOTIFY_ENABLED", "false") == "true",
-		GroupRateCampaignDefaultNotifyBots: splitOrigins(os.Getenv("GROUP_RATE_CAMPAIGN_DEFAULT_NOTIFY_BOT_IDS")),
-		GroupRateCampaignStartTemplate:     os.Getenv("GROUP_RATE_CAMPAIGN_START_NOTIFY_TEMPLATE"),
-		GroupRateCampaignEndTemplate:       os.Getenv("GROUP_RATE_CAMPAIGN_END_NOTIFY_TEMPLATE"),
-		GroupRateCampaignSchedulerInterval: envDuration("GROUP_RATE_CAMPAIGN_SCHEDULER_INTERVAL", 60*time.Second),
-
-		TicketUploadDir: envOrDefault("TICKET_UPLOAD_DIR", "data/ticket-uploads"),
 
 		SMTPEncryptionKey: os.Getenv("SMTP_ENCRYPTION_KEY"),
 
-		ProxyKeyEncryptionKey: os.Getenv("PROXY_KEY_ENCRYPTION_KEY"),
-		ProxyMaxRequestBytes:  envInt64("PROXY_MAX_REQUEST_BYTES", 64<<20),
-		ProxyModelRefresh:     envDuration("PROXY_MODEL_REFRESH_INTERVAL", 5*time.Minute),
+		ProxyKeyEncryptionKey:   os.Getenv("PROXY_KEY_ENCRYPTION_KEY"),
+		ProxyMaxRequestBytes:    envInt64("PROXY_MAX_REQUEST_BYTES", 64<<20),
+		ProxyModelRefresh:       envDuration("PROXY_MODEL_REFRESH_INTERVAL", 5*time.Minute),
+		CredentialEncryptionKey: os.Getenv("CREDENTIAL_ENCRYPTION_KEY"),
 	}
 }
 

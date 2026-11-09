@@ -24,21 +24,6 @@ const routes = [
     redirect: '/login'
   },
   {
-    path: '/embed/tickets',
-    name: 'EmbedTickets',
-    component: () => import('./modules/embed/tickets/TicketEmbedPage.vue')
-  },
-  {
-    path: '/embed/leaderboard',
-    name: 'EmbedLeaderboard',
-    component: () => import('./modules/embed/leaderboard/LeaderboardEmbedPage.vue')
-  },
-  {
-    path: '/embed/lottery',
-    name: 'EmbedLottery',
-    component: () => import('./modules/embed/lottery/LotteryEmbedPage.vue')
-  },
-  {
     path: '/admin',
     component: () => import('./modules/admin/layout/AdminLayout.vue'),
     meta: { requiresAuth: true },
@@ -68,28 +53,40 @@ const routes = [
         component: () => import('./modules/admin/views/GroupRatesView.vue')
       },
       {
-        path: 'group-associations',
-        name: 'AdminGroupAssociations',
-        meta: { requiresWorkspace: true },
-        component: () => import('./modules/admin/views/GroupAssociationsView.vue')
-      },
-      {
-        path: 'connection-health',
-        name: 'AdminConnectionHealth',
-        meta: { requiresWorkspace: true },
-        component: () => import('./modules/admin/views/ConnectionHealthView.vue')
-      },
-      {
-        path: 'group-rate-campaigns',
-        name: 'AdminGroupRateCampaigns',
-        meta: { requiresWorkspace: true },
-        component: () => import('./modules/admin/views/GroupRateCampaignsView.vue')
-      },
-      {
         path: 'settings',
         name: 'AdminSettings',
         meta: { requiresWorkspace: true },
         component: () => import('./modules/admin/views/SettingsView.vue')
+      },
+      {
+        path: 'user-activity',
+        name: 'AdminUserActivity',
+        meta: { requiresWorkspace: true },
+        component: () => import('./modules/admin/views/UserActivityView.vue')
+      },
+      {
+        path: 'sales',
+        name: 'AdminSales',
+        meta: { requiresWorkspace: true },
+        component: () => import('./modules/admin/views/SalesView.vue')
+      },
+      {
+        path: 'vip',
+        name: 'AdminVip',
+        meta: { requiresWorkspace: true },
+        component: () => import('./modules/admin/views/VipView.vue')
+      },
+      {
+        path: 'profit',
+        name: 'AdminProfit',
+        meta: { requiresWorkspace: true },
+        component: () => import('./modules/admin/views/ProfitView.vue')
+      },
+      {
+        path: 'client',
+        name: 'AdminClient',
+        meta: { requiresWorkspace: true },
+        component: () => import('./modules/admin/views/ClientView.vue')
       },
       {
         path: 'tickets',
@@ -98,22 +95,16 @@ const routes = [
         component: () => import('./modules/admin/views/TicketsView.vue')
       },
       {
-        path: 'leaderboard',
-        name: 'AdminLeaderboard',
-        meta: { requiresWorkspace: true },
-        component: () => import('./modules/leaderboard/LeaderboardAdminPage.vue')
-      },
-      {
-        path: 'lottery',
-        name: 'AdminLottery',
-        meta: { requiresWorkspace: true },
-        component: () => import('./modules/lottery/LotteryAdminPage.vue')
-      },
-      {
         path: 'mass-email',
         name: 'AdminMassEmail',
         meta: { requiresWorkspace: true },
         component: () => import('./modules/admin/views/MassEmailView.vue')
+      },
+      {
+        path: 'leads',
+        name: 'AdminLeads',
+        meta: { requiresWorkspace: true },
+        component: () => import('./modules/admin/views/LeadsView.vue')
       },
       {
         path: 'accounts',
