@@ -21,7 +21,7 @@ local paused = 0
 local modelPaused = 0
 local compact = ARGV[7] == '1'
 for index, route in ipairs(routes) do
-  local offset = 3 + (index - 1) * 5
+  local offset = 3 + (index - 1) * 6
   local untilMS = resumeExpired(KEYS[offset + 2], KEYS[2], route.id, now)
   local isolated = route.modelRemoved or (route.modelHealthID ~= '' and redis.call('HGET', KEYS[offset + 3], 'isolated') == '1'
     and (not route.neverAutoPause or redis.call('HGET', KEYS[offset + 3], 'probe_disabled') == '1'))
@@ -39,15 +39,25 @@ for index, route in ipairs(routes) do
       if not route.provided and active < math.min(route.limit, tonumber(ARGV[4])) then tier = 0 end
       if route.provided and active < math.min(route.limit, tonumber(ARGV[5])) then tier = 1 end
       local latency = tonumber(redis.call('GET', KEYS[offset + 1]) or '-1')
+      local quality = redis.call('HMGET', KEYS[offset + 5], 'latency_ms', 'success_rate', 'consecutive_errors')
+      latency = tonumber(quality[1]) or latency
+      local successRate = tonumber(quality[2]) or 1000
+      local failures = tonumber(quality[3]) or 0
+      local credentialFailed = tonumber(redis.call('HGET', KEYS[offset + 2], 'credential_failed_at') or '0')
+      local degraded = successRate < 600 or failures >= 2 or (credentialFailed > 0 and now - credentialFailed < tonumber(ARGV[6]))
+      local healthTier = degraded and 1 or 0
       local lastSuccess = 0
       if compact then lastSuccess = tonumber(redis.call('HGET', KEYS[offset + 3], 'last_success_at') or '0') end
       local item = {index=index, offset=offset, priority=route.priority, tier=tier,
-                    active=active, remaining=remaining, latency=latency, id=route.id, lastSuccess=lastSuccess}
+                    active=active, remaining=remaining, latency=latency, id=route.id, lastSuccess=lastSuccess,
+                    healthTier=healthTier, successRate=successRate, failures=failures,
+                    softLimit=math.min(route.limit, route.provided and tonumber(ARGV[5]) or tonumber(ARGV[4]))}
       table.insert(eligible, item)
       local better = best == nil
       if best ~= nil then
         if compact and item.lastSuccess ~= best.lastSuccess then better = item.lastSuccess > best.lastSuccess
         elseif not compact and item.priority ~= best.priority then better = item.priority > best.priority
+        elseif item.healthTier ~= best.healthTier then better = item.healthTier < best.healthTier
         elseif item.tier ~= best.tier then better = item.tier < best.tier
         elseif tier == 2 then better = remaining > best.remaining
         elseif latency ~= best.latency then better = latency < best.latency
@@ -55,7 +65,7 @@ for index, route in ipairs(routes) do
         else better = item.id < best.id end
       end
       if better then best = item; tied = {item}
-      elseif (compact or best.priority == item.priority) and best.lastSuccess == item.lastSuccess and best.tier == 2 and tier == 2
+      elseif (compact or best.priority == item.priority) and best.healthTier == healthTier and best.lastSuccess == item.lastSuccess and best.tier == 2 and tier == 2
              and best.remaining == remaining then table.insert(tied, item) end
     end
   end
@@ -76,7 +86,7 @@ else
   local pool = {}
   local fastest = nil
   for _, item in ipairs(eligible) do
-    if (compact or item.priority == best.priority) and item.tier == best.tier then
+    if (compact or item.priority == best.priority) and item.healthTier == best.healthTier and item.tier == best.tier then
       table.insert(pool, item)
       if item.latency > 0 and (fastest == nil or item.latency < fastest) then
         fastest = item.latency
@@ -85,12 +95,17 @@ else
   end
   local totalWeight = 0
   for _, item in ipairs(pool) do
-    -- Inverse-latency weights are bounded to 1..2: slow but healthy routes
-    -- retain traffic, while unmeasured routes receive sampling opportunities.
-    item.weight = 2
+    -- Share healthy routes using latency, success rate and current occupancy.
+    -- Temporary keys retain their soft-tier preference only within the same
+    -- health tier. Never-auto-pause routes remain eligible when degraded.
+    local latencyFactor = 1
     if fastest ~= nil and item.latency > 0 then
-      item.weight = math.max(1, 2 * fastest / item.latency)
+      latencyFactor = math.max(0.1, math.sqrt(fastest / item.latency))
     end
+    local successFactor = (item.successRate / 1000) ^ 2
+    local failureFactor = math.max(0.02, 0.5 ^ math.min(item.failures, 6))
+    local loadFactor = math.max(0.1, 1 - item.active / item.softLimit)
+    item.weight = math.max(0.01, latencyFactor * successFactor * failureFactor * loadFactor)
     totalWeight = totalWeight + item.weight
   end
   local totalCredit = 0
@@ -150,7 +165,11 @@ func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID
 		if len(specs) > 0 {
 			modelID = modelHealthID(route, specs[0])
 		}
-		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID), healthKey(route.ID), modelHealthKey(modelID), schedulerBalanceKey(route.ID))
+		qualityID := modelID
+		if qualityID == "" {
+			qualityID = route.ID
+		}
+		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID), healthKey(route.ID), modelHealthKey(modelID), schedulerBalanceKey(route.ID), schedulerQualityKey(qualityID))
 		_, removed := route.RemovedModels[modelID]
 		input = append(input, schedulerRoute{route.ID, route.Priority, route.ConcurrencyLimit, route.UseProvidedKey, route.SchedulingPaused, modelID, removed, route.NeverAutoPause})
 	}

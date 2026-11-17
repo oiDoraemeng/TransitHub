@@ -38,12 +38,17 @@ const (
 	maxSmartGroupCustomKeys     = 32
 	maxSmartGroupCustomKeySize  = 2048
 	latencyObservationBuffer    = 4096
-	latencyObservationInterval  = 500 * time.Millisecond
+	latencyObservationInterval  = 200 * time.Millisecond
 )
 
 type routeLatencyObservation struct {
-	routeID string
-	latency time.Duration
+	routeID       string
+	modelHealthID string
+	routeEpoch    int64
+	modelEpoch    int64
+	latency       time.Duration
+	outcome       int
+	credential    int
 }
 
 type routeLatencyAggregate struct {
@@ -144,24 +149,32 @@ func (s *Service) latencyObservationLoop(ctx context.Context) {
 	ticker := time.NewTicker(latencyObservationInterval)
 	defer ticker.Stop()
 	pending := make(map[string]routeLatencyAggregate)
+	quality := make(map[string]schedulerQualityAggregate)
+	credentials := make(map[string]schedulerCredentialOutcome)
 	flush := func() {
-		if len(pending) == 0 || s.limiter == nil {
+		if (len(pending) == 0 && len(quality) == 0) || s.limiter == nil {
 			return
 		}
 		writeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 		_ = s.limiter.observeResponseHeaderLatencies(writeCtx, pending)
+		_ = s.limiter.observeSchedulerQuality(writeCtx, quality, credentials)
 		clear(pending)
+		clear(quality)
+		clear(credentials)
 	}
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case sample := <-s.latencySamples:
-			aggregate := pending[sample.routeID]
-			aggregate.total += sample.latency
-			aggregate.count++
-			pending[sample.routeID] = aggregate
+			if sample.latency > 0 {
+				aggregate := pending[sample.routeID]
+				aggregate.total += sample.latency
+				aggregate.count++
+				pending[sample.routeID] = aggregate
+			}
+			addSchedulerQualitySample(quality, credentials, sample)
 		case <-ticker.C:
 			flush()
 		}

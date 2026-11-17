@@ -25,6 +25,7 @@ const (
 	smartGroupAttempts                    = 2
 	smartGroupFirstResponseHeaderTimeout  = 90 * time.Second
 	smartGroupSecondResponseHeaderTimeout = 60 * time.Second
+	smartGroupStartupBudget               = smartGroupFirstResponseHeaderTimeout + smartGroupSecondResponseHeaderTimeout
 	firstSSEEventLimit                    = 1 << 20
 )
 
@@ -350,13 +351,24 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	requestSpec := routeProbeSpec{GroupID: group.ID, ModelID: modelID, Path: incoming.URL.Path}
 	var lastErr error
 	rateLimited := false
+	startupDeadline := time.Now().Add(smartGroupStartupBudget)
 	for len(remaining) > 0 {
+		if time.Until(startupDeadline) <= 0 {
+			lastErr = errSmartGroupStartupBudget
+			break
+		}
 		lease, route, acquireErr := s.limiter.AcquireBest(incoming.Context(), remaining, requestID, requestSpec)
 		if errors.Is(acquireErr, errModelPaused) {
+			if lastErr != nil {
+				break
+			}
 			writeModelPaused(w, incoming.URL.Path)
 			return
 		}
 		if errors.Is(acquireErr, errRoutePaused) {
+			if lastErr != nil {
+				break
+			}
 			writeRoutePaused(w)
 			return
 		}
@@ -392,7 +404,8 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		var lastResponse *http.Response
 		var lastAttemptErr error
 		probeSpec := requestSpec
-		response, attemptErr := attemptSmartGroupMember(incoming.Context(), func(responseHeaderTimeout time.Duration) (*http.Response, error) {
+		policy := smartGroupRetryPolicy{deadline: startupDeadline, hasAlternatives: len(remaining) > 0}
+		response, attemptErr := attemptSmartGroupMemberWithPolicy(incoming.Context(), policy, func(responseHeaderTimeout time.Duration) (*http.Response, error) {
 			if attempts > 0 {
 				allowed, err := s.limiter.routeRetryAllowed(incoming.Context(), lease)
 				if err != nil {
@@ -406,7 +419,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			started := time.Now()
 			response, _, err := s.performAttemptWithResponseHeaderTimeout(incoming, *route, replay.Open, route.ModelMapping, responseMapping, !streaming, responseHeaderTimeout)
 			lastResponse, lastAttemptErr = response, err
-			s.observeSmartGroupLatency(incoming.Context(), route.ID, time.Since(started), responseHeaderTimeout, response, err)
+			s.observeSmartGroupLatency(incoming.Context(), *route, lease, requestSpec, time.Since(started), responseHeaderTimeout, response, err)
 			status := 0
 			if response != nil {
 				status = response.StatusCode
@@ -417,7 +430,9 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		if attemptErr != nil {
 			// A member's first attempt and retry are one request outcome. Record
 			// it once before falling back to another member, which has its own health.
-			s.observeRouteRequest(incoming.Context(), lease, probeSpec, lastResponse, lastAttemptErr, *route)
+			if attempts > 0 {
+				s.observeRouteRequest(incoming.Context(), lease, probeSpec, lastResponse, lastAttemptErr, *route)
+			}
 			lastErr = fmt.Errorf("member %s failed after %d attempts: %w", route.Name, attempts, attemptErr)
 			lease.Release(context.Background())
 			if incoming.Context().Err() != nil {
@@ -468,13 +483,37 @@ func (s *Service) recordSuccessfulRouteRequest(ctx context.Context, routeID stri
 	return true
 }
 
-// attemptSmartGroupMember retries once after the selected member's first failure.
-// Any non-2xx response is an upstream failure here, including authentication
-// and request errors, because another member may accept the same request.
+var errSmartGroupStartupBudget = errors.New("smart group exhausted its 150-second startup budget")
+
+type smartGroupRetryPolicy struct {
+	deadline        time.Time
+	hasAlternatives bool
+}
+
 func attemptSmartGroupMember(ctx context.Context, attempt func(time.Duration) (*http.Response, error)) (*http.Response, error) {
+	return attemptSmartGroupMemberWithPolicy(ctx, smartGroupRetryPolicy{}, attempt)
+}
+
+// Retry transient failures once. Permanent request/credential failures and
+// quota errors should move to another member immediately. When alternatives
+// exist, a timed-out member must not consume another 60 seconds before failover.
+func attemptSmartGroupMemberWithPolicy(ctx context.Context, policy smartGroupRetryPolicy, attempt func(time.Duration) (*http.Response, error)) (*http.Response, error) {
 	var lastErr error
 	for attemptIndex := 0; attemptIndex < smartGroupAttempts; attemptIndex++ {
-		response, err := attempt(smartGroupResponseHeaderTimeout(attemptIndex))
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		timeout := smartGroupResponseHeaderTimeout(attemptIndex)
+		if !policy.deadline.IsZero() {
+			remaining := time.Until(policy.deadline)
+			if remaining <= 0 {
+				return nil, errSmartGroupStartupBudget
+			}
+			if remaining < timeout {
+				timeout = remaining
+			}
+		}
+		response, err := attempt(timeout)
 		if err == nil && response != nil && response.StatusCode >= 200 && response.StatusCode < 300 && !responseHealth(response).failed {
 			return response, nil
 		}
@@ -487,8 +526,11 @@ func attemptSmartGroupMember(ctx context.Context, attempt func(time.Duration) (*
 			default:
 				lastErr = fmt.Errorf("upstream returned %d", response.StatusCode)
 			}
-			response.Body.Close()
-			if responseHealth(response).modelMissing {
+			if response.Body != nil {
+				response.Body.Close()
+			}
+			if responseHealth(response).modelMissing || responseHealth(response).credentialError ||
+				response.StatusCode >= 400 && response.StatusCode < 500 && response.StatusCode != http.StatusRequestTimeout {
 				return nil, lastErr
 			}
 		} else if err != nil {
@@ -499,11 +541,25 @@ func attemptSmartGroupMember(ctx context.Context, attempt func(time.Duration) (*
 		if errors.Is(err, errRoutePaused) {
 			return nil, err
 		}
+		if policy.hasAlternatives && startupTimeout(err) {
+			return nil, lastErr
+		}
+		if !policy.deadline.IsZero() && time.Until(policy.deadline) <= 250*time.Millisecond {
+			return nil, errSmartGroupStartupBudget
+		}
 		if attemptIndex+1 < smartGroupAttempts && !waitForProxyRetry(ctx, attemptIndex) {
 			return nil, ctx.Err()
 		}
 	}
 	return nil, lastErr
+}
+
+func startupTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	var timeout interface{ Timeout() bool }
+	return errors.Is(err, context.DeadlineExceeded) || errors.As(err, &timeout) && timeout.Timeout()
 }
 
 func smartGroupResponseHeaderTimeout(attemptIndex int) time.Duration {
@@ -513,7 +569,7 @@ func smartGroupResponseHeaderTimeout(attemptIndex int) time.Duration {
 	return smartGroupSecondResponseHeaderTimeout
 }
 
-func (s *Service) observeSmartGroupLatency(ctx context.Context, routeID string, elapsed, failurePenalty time.Duration, response *http.Response, attemptErr error) {
+func (s *Service) observeSmartGroupLatency(ctx context.Context, route Route, lease *Lease, spec routeProbeSpec, elapsed, failurePenalty time.Duration, response *http.Response, attemptErr error) {
 	if s.limiter == nil || s.latencySamples == nil || ctx.Err() != nil {
 		return
 	}
@@ -523,7 +579,7 @@ func (s *Service) observeSmartGroupLatency(ctx context.Context, routeID string, 
 		}
 	}
 	select {
-	case s.latencySamples <- routeLatencyObservation{routeID: routeID, latency: elapsed}:
+	case s.latencySamples <- routeLatencyObservation{routeID: route.ID, modelHealthID: modelHealthID(route, spec), routeEpoch: lease.epoch, modelEpoch: lease.modelEpoch, latency: elapsed}:
 	default:
 	}
 }
@@ -613,6 +669,35 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 }
 
 func (s *Service) performAttemptWithResponseHeaderTimeout(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string, responseMapping mappedResponseContext, synchronousRequest bool, responseHeaderTimeout time.Duration) (*http.Response, bool, error) {
+	if responseHeaderTimeout <= 0 {
+		return s.performPreparedAttempt(incoming, route, bodyFactory, modelMapping, responseMapping, synchronousRequest, responseHeaderTimeout)
+	}
+	// Include key creation, protocol preparation and first useful SSE output in
+	// the startup deadline. Stop the timer before returning an accepted stream;
+	// the stream itself retains the downstream request's lifetime.
+	ctx, cancel := context.WithCancel(incoming.Context())
+	timer := time.AfterFunc(responseHeaderTimeout, cancel)
+	response, retryable, err := s.performPreparedAttempt(incoming.WithContext(ctx), route, bodyFactory, modelMapping, responseMapping, synchronousRequest, responseHeaderTimeout)
+	if !timer.Stop() && incoming.Context().Err() == nil {
+		if response != nil && response.Body != nil {
+			_ = response.Body.Close()
+		}
+		cancel()
+		return response, true, fmt.Errorf("upstream startup timeout after %s: %w", responseHeaderTimeout, context.DeadlineExceeded)
+	}
+	if err != nil || response == nil || response.Body == nil {
+		cancel()
+		return response, retryable, err
+	}
+	if health, ok := response.Body.(*healthResponseBody); ok {
+		health.ReadCloser = &cancelOnCloseBody{ReadCloser: health.ReadCloser, cancel: cancel}
+	} else {
+		response.Body = &cancelOnCloseBody{ReadCloser: response.Body, cancel: cancel}
+	}
+	return response, retryable, nil
+}
+
+func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string, responseMapping mappedResponseContext, synchronousRequest bool, responseHeaderTimeout time.Duration) (*http.Response, bool, error) {
 	client, err := s.dataClientForRoute(incoming.Context(), route)
 	if err != nil {
 		return nil, true, err

@@ -99,10 +99,10 @@ if redis.call('GET', KEYS[3]) ~= ARGV[2]
    or tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0') ~= tonumber(ARGV[3])
    or tonumber(redis.call('HGET', KEYS[6], 'epoch') or '0') ~= tonumber(ARGV[5])
    or (ARGV[6] ~= '' and tonumber(redis.call('HGET', KEYS[8], 'epoch') or '0') ~= tonumber(ARGV[7])) then return 0 end
-redis.call('DEL', KEYS[3], KEYS[5])
+redis.call('DEL', KEYS[3], KEYS[5], KEYS[9], KEYS[10], KEYS[11])
 redis.call('HINCRBY', KEYS[1], 'epoch', 1)
 redis.call('HSET', KEYS[1], 'failures', 0)
-redis.call('HDEL', KEYS[1], 'paused_until', 'probe_token', 'probe_spec')
+redis.call('HDEL', KEYS[1], 'paused_until', 'probe_token', 'probe_spec', 'credential_failed_at')
 redis.call('ZREM', KEYS[2], ARGV[1])
 if ARGV[4] ~= '' then
   redis.call('HINCRBY', KEYS[6], 'epoch', 1)
@@ -432,7 +432,7 @@ func (s *Service) RestoreRouteScheduling(ctx context.Context, userID, routeID st
 	stateCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	value, err := restoreManualRecoveryScript.Run(stateCtx, s.limiter.redis,
-		[]string{healthKey(routeID), probeDueKey(), proofKey, manualTestKey(routeID), latencyKey(routeID), modelHealthKey(proof.ModelHealthID), modelProbeDueKey(), modelHealthKey(proof.RequestedModelHealthID)},
+		[]string{healthKey(routeID), probeDueKey(), proofKey, manualTestKey(routeID), latencyKey(routeID), modelHealthKey(proof.ModelHealthID), modelProbeDueKey(), modelHealthKey(proof.RequestedModelHealthID), schedulerQualityKey(proof.ModelHealthID), schedulerQualityKey(proof.RequestedModelHealthID), schedulerQualityKey(routeID)},
 		routeID, encoded, proof.Epoch, proof.ModelHealthID, proof.ModelEpoch, proof.RequestedModelHealthID, proof.RequestedModelEpoch).Int64()
 	if err != nil {
 		return err

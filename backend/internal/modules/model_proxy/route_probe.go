@@ -48,6 +48,7 @@ func (s *Service) observeRouteRequest(ctx context.Context, lease *Lease, spec ro
 	if !observe {
 		return false
 	}
+	s.observeSchedulingOutcome(ctx, route, lease, spec, response, success)
 	stateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
 	var paused bool

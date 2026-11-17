@@ -152,7 +152,7 @@ func cleanupRedisTestRoutes(t *testing.T, client *redis.Client, routes []Route) 
 	t.Helper()
 	keys := make([]string, 0, len(routes)*2)
 	for _, route := range routes {
-		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID), healthKey(route.ID), schedulerBalanceKey(route.ID))
+		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID), healthKey(route.ID), schedulerBalanceKey(route.ID), schedulerQualityKey(route.ID))
 	}
 	t.Cleanup(func() {
 		_ = client.Del(context.Background(), keys...).Err()
@@ -161,6 +161,7 @@ func cleanupRedisTestRoutes(t *testing.T, client *redis.Client, routes []Route) 
 			ids, _ := client.SMembers(context.Background(), routeModelIndexKey(route.ID)).Result()
 			for _, id := range ids {
 				_ = client.Del(context.Background(), modelHealthKey(id)).Err()
+				_ = client.Del(context.Background(), schedulerQualityKey(id)).Err()
 				_ = client.ZRem(context.Background(), modelProbeDueKey(), id).Err()
 			}
 			_ = client.Del(context.Background(), routeModelIndexKey(route.ID)).Err()

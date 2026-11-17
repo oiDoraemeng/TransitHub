@@ -19,7 +19,7 @@ func TestSchedulerRedisBalancesSequentialRequestsAndFavorsLatency(t *testing.T) 
 			want    []int
 		}{
 			{"equal", []time.Duration{20 * time.Millisecond, 20 * time.Millisecond, 20 * time.Millisecond}, []int{40, 40, 40}},
-			{"weighted", []time.Duration{20 * time.Millisecond, 40 * time.Millisecond, 2 * time.Second}, []int{60, 30, 30}},
+			{"weighted", []time.Duration{20 * time.Millisecond, 40 * time.Millisecond, 2 * time.Second}, []int{66, 47, 7}},
 			{"unmeasured", []time.Duration{0, 0, 0}, []int{40, 40, 40}},
 		} {
 			t.Run(fmt.Sprintf("provided=%v/%s", provided, test.name), func(t *testing.T) {
@@ -158,7 +158,7 @@ func TestSchedulerRedisAdaptsLatencyAndEligibilityWithoutCatchup(t *testing.T) {
 			t.Fatal(err)
 		}
 		counts := run(routes, 60)
-		if counts[fast.ID] < 39 || counts[fast.ID] > 41 || counts[slow.ID] < 19 {
+		if counts[fast.ID] < 44 || counts[fast.ID] > 47 || counts[slow.ID] < 13 {
 			t.Fatalf("phase %d ignored new latency: %v", phase, counts)
 		}
 	}
@@ -169,7 +169,7 @@ func TestSchedulerRedisAdaptsLatencyAndEligibilityWithoutCatchup(t *testing.T) {
 	}
 	_ = run([]Route{a}, 100)
 	counts := run(routes, 60)
-	if counts[a.ID] < 18 || counts[b.ID] > 42 {
+	if counts[a.ID] < 13 || counts[b.ID] > 47 {
 		t.Fatalf("rejoining route monopolized catch-up traffic: %v", counts)
 	}
 	if err := limiter.removeRouteRuntime(ctx, b.ID); err != nil {

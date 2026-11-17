@@ -591,8 +591,8 @@ func TestWaitForProxyRetryHonorsCancellation(t *testing.T) {
 	}
 }
 
-func TestAttemptSmartGroupMemberRetriesAnyStatusOnce(t *testing.T) {
-	statuses := []int{http.StatusUnauthorized, http.StatusOK}
+func TestAttemptSmartGroupMemberRetriesTransientStatusOnce(t *testing.T) {
+	statuses := []int{http.StatusServiceUnavailable, http.StatusOK}
 	calls := 0
 	var timeouts []time.Duration
 	response, err := attemptSmartGroupMember(context.Background(), func(timeout time.Duration) (*http.Response, error) {
