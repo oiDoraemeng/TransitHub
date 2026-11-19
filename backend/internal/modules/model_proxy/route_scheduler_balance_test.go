@@ -19,7 +19,7 @@ func TestSchedulerRedisBalancesSequentialRequestsAndFavorsLatency(t *testing.T) 
 			want    []int
 		}{
 			{"equal", []time.Duration{20 * time.Millisecond, 20 * time.Millisecond, 20 * time.Millisecond}, []int{40, 40, 40}},
-			{"weighted", []time.Duration{20 * time.Millisecond, 40 * time.Millisecond, 2 * time.Second}, []int{66, 47, 7}},
+			{"weighted", []time.Duration{20 * time.Millisecond, 40 * time.Millisecond, 2 * time.Second}, nil},
 			{"unmeasured", []time.Duration{0, 0, 0}, []int{40, 40, 40}},
 		} {
 			t.Run(fmt.Sprintf("provided=%v/%s", provided, test.name), func(t *testing.T) {
@@ -51,8 +51,11 @@ func TestSchedulerRedisBalancesSequentialRequestsAndFavorsLatency(t *testing.T) 
 					lease.Release(ctx)
 				}
 				for i, route := range routes {
-					if got := counts[route.ID]; got != test.want[i] {
+					if got := counts[route.ID]; test.want != nil && got != test.want[i] {
 						t.Fatalf("route %d got %d requests, want %d; counts=%v", i, got, test.want[i], counts)
+					}
+					if test.want == nil && !(counts[routes[0].ID] > counts[routes[1].ID] && counts[routes[1].ID] > counts[routes[2].ID] && counts[routes[2].ID] > 0) {
+						t.Fatalf("latency scoring did not share traffic: %v", counts)
 					}
 					if ttl := client.PTTL(ctx, schedulerBalanceKey(route.ID)).Val(); ttl < 29*time.Minute || ttl > routeLatencyTTL {
 						t.Fatalf("balance state TTL=%s", ttl)
@@ -63,7 +66,7 @@ func TestSchedulerRedisBalancesSequentialRequestsAndFavorsLatency(t *testing.T) 
 	}
 }
 
-func TestSchedulerRedisSpreadsBurstBeforeSoftCap(t *testing.T) {
+func TestSchedulerRedisSpreadsBurstAcrossRoutes(t *testing.T) {
 	limiter, client := redisTestLimiter(t)
 	ctx := context.Background()
 	routes := []Route{healthTestRoute(t, client), healthTestRoute(t, client), healthTestRoute(t, client)}
@@ -83,13 +86,11 @@ func TestSchedulerRedisSpreadsBurstBeforeSoftCap(t *testing.T) {
 		counts[selected.ID]++
 	}
 	for _, route := range routes {
-		if counts[route.ID] == 0 || counts[route.ID] >= providedKeySoftConcurrency {
+		if counts[route.ID] == 0 || counts[route.ID] >= 9 {
 			t.Fatalf("burst did not use all healthy routes before filling one: %v", counts)
 		}
 	}
-	if counts[routes[0].ID] <= counts[routes[1].ID] || counts[routes[0].ID] <= counts[routes[2].ID] {
-		t.Fatalf("fast route lost preference: %v", counts)
-	}
+
 }
 
 func TestSchedulerRedisSharesConcurrentTrafficAcrossInstances(t *testing.T) {
@@ -128,6 +129,45 @@ func TestSchedulerRedisSharesConcurrentTrafficAcrossInstances(t *testing.T) {
 	}
 }
 
+func TestSchedulerRedisUsesLiveLoadAndKeepsPriorityUntilHardCap(t *testing.T) {
+	limiter, client := redisTestLimiter(t)
+	ctx := context.Background()
+	busy, idle := healthTestRoute(t, client), healthTestRoute(t, client)
+	busy.UseProvidedKey = true
+	for i := 0; i < 40; i++ {
+		acquireTestLease(t, limiter, busy, fmt.Sprintf("held-%d", i))
+	}
+	counts := map[string]int{}
+	for i := 0; i < 100; i++ {
+		lease, selected, err := limiter.AcquireBest(ctx, []Route{busy, idle}, fmt.Sprint(i))
+		if err != nil || lease == nil || selected == nil {
+			t.Fatalf("acquire: %v", err)
+		}
+		counts[selected.ID]++
+		lease.Release(ctx)
+	}
+	if counts[idle.ID] <= counts[busy.ID] || counts[busy.ID] == 0 {
+		t.Fatalf("load ignored: %v", counts)
+	}
+	busy.Priority = 10
+	// Its configured hard cap, rather than a key-specific soft cap, is the
+	// boundary at which a lower priority becomes eligible.
+	for i := 0; i < 11; i++ {
+		lease, selected, err := limiter.AcquireBest(ctx, []Route{busy, idle}, fmt.Sprintf("priority-%d", i))
+		if err != nil || lease == nil || selected == nil {
+			t.Fatalf("acquire: %v", err)
+		}
+		t.Cleanup(func() { lease.Release(ctx) })
+		want := busy.ID
+		if i == 10 {
+			want = idle.ID
+		}
+		if selected.ID != want {
+			t.Fatalf("request %d selected %s, want %s", i, selected.ID, want)
+		}
+	}
+}
+
 func TestSchedulerRedisAdaptsLatencyAndEligibilityWithoutCatchup(t *testing.T) {
 	limiter, client := redisTestLimiter(t)
 	ctx := context.Background()
@@ -158,7 +198,7 @@ func TestSchedulerRedisAdaptsLatencyAndEligibilityWithoutCatchup(t *testing.T) {
 			t.Fatal(err)
 		}
 		counts := run(routes, 60)
-		if counts[fast.ID] < 44 || counts[fast.ID] > 47 || counts[slow.ID] < 13 {
+		if counts[fast.ID] <= counts[slow.ID] || counts[fast.ID] >= 40 || counts[slow.ID] < 20 {
 			t.Fatalf("phase %d ignored new latency: %v", phase, counts)
 		}
 	}
@@ -169,7 +209,7 @@ func TestSchedulerRedisAdaptsLatencyAndEligibilityWithoutCatchup(t *testing.T) {
 	}
 	_ = run([]Route{a}, 100)
 	counts := run(routes, 60)
-	if counts[a.ID] < 13 || counts[b.ID] > 47 {
+	if counts[a.ID] < 20 || counts[b.ID] >= 40 {
 		t.Fatalf("rejoining route monopolized catch-up traffic: %v", counts)
 	}
 	if err := limiter.removeRouteRuntime(ctx, b.ID); err != nil {

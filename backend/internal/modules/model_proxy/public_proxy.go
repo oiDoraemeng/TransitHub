@@ -733,6 +733,16 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		cleanup()
 		return nil, true, errors.New("upstream site is unavailable")
 	}
+	// Apply after alias/protocol conversion so the final dora2api model decides
+	// the policy, including Gemini aliases converted to Chat Completions.
+	if !route.ModelMappingEnabled {
+		responseMapping = mappedResponseContext{}
+	}
+	body, responseMapping, err = forceDoraLunaReasoning(baseURL, protocolRequest.requestURI, body, responseMapping)
+	if err != nil {
+		cleanup()
+		return nil, true, err
+	}
 	request, err := http.NewRequestWithContext(incoming.Context(), incoming.Method, strings.TrimRight(baseURL, "/")+protocolRequest.requestURI, body)
 	if err != nil {
 		body.Close()
@@ -768,7 +778,7 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		return nil, true, err
 	}
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
-	if !retryable && responseMapping.Enabled && route.ModelMappingEnabled {
+	if !retryable && response.StatusCode >= 200 && response.StatusCode < 300 && responseMapping.Enabled {
 		if err := rewriteMappedResponse(response, responseMapping); err != nil {
 			response.Body.Close()
 			if deadlineCleanup == nil {

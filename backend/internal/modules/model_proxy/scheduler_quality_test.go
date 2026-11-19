@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestSchedulerRedisTemporaryPreferenceDependsOnModelSuccess(t *testing.T) {
+func TestSchedulerRedisScoresModelSuccessWithoutKeyPreference(t *testing.T) {
 	limiter, client := redisTestLimiter(t)
 	ctx := context.Background()
 	temporary, provided := healthTestRoute(t, client), healthTestRoute(t, client)
@@ -17,18 +17,23 @@ func TestSchedulerRedisTemporaryPreferenceDependsOnModelSuccess(t *testing.T) {
 	routes := []Route{provided, temporary}
 	spec := routeProbeSpec{ModelID: "model", Path: "/v1/responses"}
 	id := modelHealthID(temporary, spec)
-	selectRoute := func(want string) {
+	run := func(spec routeProbeSpec, n int) map[string]int {
 		t.Helper()
-		lease, selected, err := limiter.AcquireBest(ctx, routes, fmt.Sprint(time.Now().UnixNano()), spec)
-		if err != nil || lease == nil || selected == nil {
-			t.Fatalf("acquire: %v", err)
+		client.Del(ctx, schedulerBalanceKey(temporary.ID), schedulerBalanceKey(provided.ID))
+		counts := map[string]int{}
+		for i := 0; i < n; i++ {
+			lease, selected, err := limiter.AcquireBest(ctx, routes, fmt.Sprint(i), spec)
+			if err != nil || lease == nil || selected == nil {
+				t.Fatalf("acquire: %v", err)
+			}
+			counts[selected.ID]++
+			lease.Release(ctx)
 		}
-		defer lease.Release(ctx)
-		if selected.ID != want {
-			t.Fatalf("selected %s, want %s", selected.ID, want)
-		}
+		return counts
 	}
-	selectRoute(temporary.ID)
+	if counts := run(spec, 100); counts[temporary.ID] != 50 || counts[provided.ID] != 50 {
+		t.Fatalf("key type changed equal quality shares: %v", counts)
+	}
 	for i := 0; i < 2; i++ {
 		if err := limiter.observeSchedulerQuality(ctx, map[string]schedulerQualityAggregate{
 			id: {RouteID: temporary.ID, ModelID: id, Failures: 1, ConsecutiveFailures: 1},
@@ -36,36 +41,37 @@ func TestSchedulerRedisTemporaryPreferenceDependsOnModelSuccess(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for i := 0; i < 20; i++ {
-		selectRoute(provided.ID)
+	if counts := run(spec, 100); counts[provided.ID] < 90 || counts[temporary.ID] == 0 {
+		t.Fatalf("low success rate did not lower share: %v", counts)
 	}
-	// Never-auto-pause is a scheduling preference change, not a new circuit.
 	lease, selected, err := limiter.AcquireBest(ctx, []Route{temporary}, "degraded-only", spec)
 	if err != nil || selected == nil || lease == nil {
-		t.Fatalf("degraded member became paused: %v", err)
+		t.Fatalf("never-pause member became unavailable: %v", err)
 	}
 	lease.Release(ctx)
-	// Inference priorities still precede health and temporary-key preference.
+	// Priority remains a strict boundary, even for degraded never-pause members.
 	routes[1].Priority++
-	selectRoute(temporary.ID)
+	if counts := run(spec, 10); counts[temporary.ID] != 10 {
+		t.Fatalf("priority boundary: %v", counts)
+	}
 	routes[1].Priority--
-	// One broken model does not penalize another model or API protocol.
 	for _, other := range []routeProbeSpec{
-		{ModelID: "other", Path: spec.Path},
-		{ModelID: spec.ModelID, Path: "/v1/chat/completions"},
+		{ModelID: "other", Path: spec.Path}, {ModelID: spec.ModelID, Path: "/v1/chat/completions"},
 	} {
-		lease, selected, err := limiter.AcquireBest(ctx, routes, "different-model", other)
-		if err != nil || selected == nil || lease == nil || selected.ID != temporary.ID {
-			t.Fatalf("failure leaked across model/protocol: %v %v", selected, err)
+		if counts := run(other, 100); counts[temporary.ID] != 50 {
+			t.Fatalf("failure leaked across model/protocol: %v", counts)
 		}
-		lease.Release(ctx)
 	}
-	if err := limiter.observeSchedulerQuality(ctx, map[string]schedulerQualityAggregate{
-		id: {RouteID: temporary.ID, ModelID: id, Successes: 1},
-	}, nil); err != nil {
-		t.Fatal(err)
+	for i := 0; i < 12; i++ {
+		if err := limiter.observeSchedulerQuality(ctx, map[string]schedulerQualityAggregate{
+			id: {RouteID: temporary.ID, ModelID: id, Successes: 1},
+		}, nil); err != nil {
+			t.Fatal(err)
+		}
 	}
-	selectRoute(temporary.ID)
+	if counts := run(spec, 100); counts[temporary.ID] < 45 {
+		t.Fatalf("success did not recover share: %v", counts)
+	}
 	if ttl := client.PTTL(ctx, schedulerQualityKey(id)).Val(); ttl <= 0 || ttl > routeLatencyTTL {
 		t.Fatalf("quality TTL=%s", ttl)
 	}
@@ -73,7 +79,7 @@ func TestSchedulerRedisTemporaryPreferenceDependsOnModelSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	if client.Exists(ctx, schedulerQualityKey(id)).Val() != 0 {
-		t.Fatal("route deletion retained model quality")
+		t.Fatal("route deletion retained quality")
 	}
 	if err := limiter.observeSchedulerQuality(ctx, map[string]schedulerQualityAggregate{
 		id: {RouteID: temporary.ID, ModelID: id, Successes: 1},
@@ -81,7 +87,7 @@ func TestSchedulerRedisTemporaryPreferenceDependsOnModelSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	if client.Exists(ctx, schedulerQualityKey(id)).Val() != 0 {
-		t.Fatal("late observations recreated a deleted route")
+		t.Fatal("late observations recreated deleted quality")
 	}
 }
 
@@ -124,13 +130,13 @@ func TestSchedulerCredentialFailureChangesPreferenceAcrossModels(t *testing.T) {
 	provided.UseProvidedKey = true
 	service := &Service{latencySamples: make(chan routeLatencyObservation, 1)}
 	for _, test := range []struct {
-		status int
-		path   string
-		want   string
+		status   int
+		path     string
+		degraded bool
 	}{
-		{http.StatusUnauthorized, compactPath, temporary.ID},
-		{http.StatusUnauthorized, "/v1/responses", provided.ID},
-		{http.StatusOK, "/v1/responses", temporary.ID},
+		{http.StatusUnauthorized, compactPath, false},
+		{http.StatusUnauthorized, "/v1/responses", true},
+		{http.StatusOK, "/v1/responses", false},
 	} {
 		service.observeSchedulingOutcome(ctx, temporary, &Lease{}, routeProbeSpec{ModelID: "failed", Path: test.path}, &http.Response{StatusCode: test.status}, test.status == 200)
 		sample := <-service.latencySamples
@@ -139,11 +145,19 @@ func TestSchedulerCredentialFailureChangesPreferenceAcrossModels(t *testing.T) {
 		if err := limiter.observeSchedulerQuality(ctx, pending, credentials); err != nil {
 			t.Fatal(err)
 		}
-		lease, selected, err := limiter.AcquireBest(ctx, []Route{temporary, provided}, "other-model", routeProbeSpec{ModelID: "other", Path: "/v1/responses"})
-		if err != nil || selected == nil || lease == nil || selected.ID != test.want {
-			t.Fatalf("status=%d path=%s selected=%v err=%v", test.status, test.path, selected, err)
+		client.Del(ctx, schedulerBalanceKey(temporary.ID), schedulerBalanceKey(provided.ID))
+		counts := map[string]int{}
+		for i := 0; i < 100; i++ {
+			lease, selected, err := limiter.AcquireBest(ctx, []Route{temporary, provided}, fmt.Sprint(i), routeProbeSpec{ModelID: "other", Path: "/v1/responses"})
+			if err != nil || lease == nil || selected == nil {
+				t.Fatalf("acquire: %v", err)
+			}
+			counts[selected.ID]++
+			lease.Release(ctx)
 		}
-		lease.Release(ctx)
+		if test.degraded && counts[temporary.ID] > 5 || !test.degraded && counts[temporary.ID] != 50 {
+			t.Fatalf("status=%d path=%s shares=%v", test.status, test.path, counts)
+		}
 	}
 }
 

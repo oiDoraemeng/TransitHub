@@ -9,17 +9,16 @@ import (
 )
 
 // Selection, health filtering and capacity reservation are one operation. A
-// snapshot followed by per-route acquisitions can skip soft tiers or priority
+// snapshot followed by per-route acquisitions can skip capacity or priority
 // boundaries when another request releases capacity between the two calls.
 var acquireBestRouteScript = redis.NewScript(routeHealthLua + `
 local now = clockMS()
 local routes = cjson.decode(ARGV[1])
 local best = nil
-local tied = {}
 local eligible = {}
 local paused = 0
 local modelPaused = 0
-local compact = ARGV[7] == '1'
+local compact = ARGV[5] == '1'
 for index, route in ipairs(routes) do
   local offset = 3 + (index - 1) * 6
   local untilMS = resumeExpired(KEYS[offset + 2], KEYS[2], route.id, now)
@@ -35,38 +34,28 @@ for index, route in ipairs(routes) do
     local active = redis.call('ZCARD', KEYS[offset])
     local remaining = route.limit - active
     if remaining > 0 then
-      local tier = 2
-      if not route.provided and active < math.min(route.limit, tonumber(ARGV[4])) then tier = 0 end
-      if route.provided and active < math.min(route.limit, tonumber(ARGV[5])) then tier = 1 end
       local latency = tonumber(redis.call('GET', KEYS[offset + 1]) or '-1')
       local quality = redis.call('HMGET', KEYS[offset + 5], 'latency_ms', 'success_rate', 'consecutive_errors')
       latency = tonumber(quality[1]) or latency
       local successRate = tonumber(quality[2]) or 1000
       local failures = tonumber(quality[3]) or 0
       local credentialFailed = tonumber(redis.call('HGET', KEYS[offset + 2], 'credential_failed_at') or '0')
-      local degraded = successRate < 600 or failures >= 2 or (credentialFailed > 0 and now - credentialFailed < tonumber(ARGV[6]))
-      local healthTier = degraded and 1 or 0
+      local credentialBad = credentialFailed > 0 and now - credentialFailed < tonumber(ARGV[4])
       local lastSuccess = 0
       if compact then lastSuccess = tonumber(redis.call('HGET', KEYS[offset + 3], 'last_success_at') or '0') end
-      local item = {index=index, offset=offset, priority=route.priority, tier=tier,
+      local item = {index=index, offset=offset, priority=route.priority, limit=route.limit,
                     active=active, remaining=remaining, latency=latency, id=route.id, lastSuccess=lastSuccess,
-                    healthTier=healthTier, successRate=successRate, failures=failures,
-                    softLimit=math.min(route.limit, route.provided and tonumber(ARGV[5]) or tonumber(ARGV[4]))}
+                    credentialBad=credentialBad, successRate=successRate, failures=failures}
       table.insert(eligible, item)
       local better = best == nil
       if best ~= nil then
         if compact and item.lastSuccess ~= best.lastSuccess then better = item.lastSuccess > best.lastSuccess
         elseif not compact and item.priority ~= best.priority then better = item.priority > best.priority
-        elseif item.healthTier ~= best.healthTier then better = item.healthTier < best.healthTier
-        elseif item.tier ~= best.tier then better = item.tier < best.tier
-        elseif tier == 2 then better = remaining > best.remaining
         elseif latency ~= best.latency then better = latency < best.latency
         elseif active ~= best.active then better = active < best.active
         else better = item.id < best.id end
       end
-      if better then best = item; tied = {item}
-      elseif (compact or best.priority == item.priority) and best.healthTier == healthTier and best.lastSuccess == item.lastSuccess and best.tier == 2 and tier == 2
-             and best.remaining == remaining then table.insert(tied, item) end
+      if better then best = item end
     end
   end
 end
@@ -75,10 +64,6 @@ if compact and best.lastSuccess > 0 then
   -- Compact never sends recovery probes. Reuse the most recently successful
   -- actual model/endpoint across every priority, respecting exclusions and
   -- hard capacity. Inference requests retain strict priority boundaries.
-elseif best.tier == 2 then
-  table.sort(tied, function(a,b) return a.id < b.id end)
-  local cursor = redis.call('INCR', KEYS[1])
-  best = tied[(cursor - 1) % #tied + 1]
 else
   -- Smooth weighted round robin shares even sequential requests (whose leases
   -- may all finish before the next request). Latency alone or least-active
@@ -86,7 +71,7 @@ else
   local pool = {}
   local fastest = nil
   for _, item in ipairs(eligible) do
-    if (compact or item.priority == best.priority) and item.healthTier == best.healthTier and item.tier == best.tier then
+    if compact or item.priority == best.priority then
       table.insert(pool, item)
       if item.latency > 0 and (fastest == nil or item.latency < fastest) then
         fastest = item.latency
@@ -95,17 +80,21 @@ else
   end
   local totalWeight = 0
   for _, item in ipairs(pool) do
-    -- Share healthy routes using latency, success rate and current occupancy.
-    -- Temporary keys retain their soft-tier preference only within the same
-    -- health tier. Never-auto-pause routes remain eligible when degraded.
-    local latencyFactor = 1
+    -- Sub2API's score dimensions: success (0.8), TTFT (0.5), load (1).
+    -- Relative TTFT avoids one very slow outlier flattening all fast routes.
+    -- Key creation/deletion policy never enters the score or candidate pool.
+    local latencyFactor = 0.5
     if fastest ~= nil and item.latency > 0 then
       latencyFactor = math.max(0.1, math.sqrt(fastest / item.latency))
     end
-    local successFactor = (item.successRate / 1000) ^ 2
+    local success = math.max(0, math.min(1, item.successRate / 1000))
     local failureFactor = math.max(0.02, 0.5 ^ math.min(item.failures, 6))
-    local loadFactor = math.max(0.1, 1 - item.active / item.softLimit)
-    item.weight = math.max(0.01, latencyFactor * successFactor * failureFactor * loadFactor)
+    local loadFactor = math.max(0, 1 - item.active / item.limit)
+    local score = 0.8 * success + 0.5 * latencyFactor + loadFactor
+    -- Repeated failures must outweigh spare capacity, including members that
+    -- explicitly disable automatic pausing. A small floor allows recovery.
+    local credentialFactor = item.credentialBad and 0.02 or 1
+    item.weight = math.max(0.01, score * success ^ 2 * failureFactor * credentialFactor)
     totalWeight = totalWeight + item.weight
   end
   local totalCredit = 0
@@ -132,7 +121,7 @@ else
   best = selected
   for _, item in ipairs(pool) do
     if item.index == best.index then item.credit = item.credit - totalWeight end
-    redis.call('SET', KEYS[item.offset + 4], tostring(item.credit), 'PX', ARGV[6])
+    redis.call('SET', KEYS[item.offset + 4], tostring(item.credit), 'PX', ARGV[4])
   end
 end
 redis.call('ZADD', KEYS[best.offset], now + tonumber(ARGV[3]), ARGV[2])
@@ -147,7 +136,6 @@ type schedulerRoute struct {
 	ID             string `json:"id"`
 	Priority       int    `json:"priority"`
 	Limit          int    `json:"limit"`
-	Provided       bool   `json:"provided"`
 	ManualPause    bool   `json:"manualPause"`
 	ModelHealthID  string `json:"modelHealthID"`
 	ModelRemoved   bool   `json:"modelRemoved"`
@@ -171,7 +159,7 @@ func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID
 		}
 		keys = append(keys, leaseKey(route.ID), latencyKey(route.ID), healthKey(route.ID), modelHealthKey(modelID), schedulerBalanceKey(route.ID), schedulerQualityKey(qualityID))
 		_, removed := route.RemovedModels[modelID]
-		input = append(input, schedulerRoute{route.ID, route.Priority, route.ConcurrencyLimit, route.UseProvidedKey, route.SchedulingPaused, modelID, removed, route.NeverAutoPause})
+		input = append(input, schedulerRoute{route.ID, route.Priority, route.ConcurrencyLimit, route.SchedulingPaused, modelID, removed, route.NeverAutoPause})
 	}
 	encoded, err := json.Marshal(input)
 	if err != nil {
@@ -179,7 +167,7 @@ func (l *Limiter) acquireBestAtomic(ctx context.Context, routes []Route, leaseID
 	}
 	compact := len(specs) > 0 && specs[0].Path == compactPath
 	values, err := acquireBestRouteScript.Run(ctx, l.redis, keys, string(encoded), leaseID,
-		leaseTTL.Milliseconds(), temporaryKeySoftConcurrency, providedKeySoftConcurrency, routeLatencyTTL.Milliseconds(), boolInt(compact)).Int64Slice()
+		leaseTTL.Milliseconds(), routeLatencyTTL.Milliseconds(), boolInt(compact)).Int64Slice()
 	if err != nil {
 		return nil, nil, err
 	}

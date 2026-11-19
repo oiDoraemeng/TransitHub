@@ -12,53 +12,29 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func TestLimiterRedisSchedulingStages(t *testing.T) {
+func TestLimiterRedisBalancesMixedKeyTypes(t *testing.T) {
 	limiter, client := redisTestLimiter(t)
 	ctx := context.Background()
 	prefix := fmt.Sprintf("scheduler-test-%d-", time.Now().UnixNano())
 	routes := []Route{
-		{ID: prefix + "temporary-fast", Priority: 2, ConcurrencyLimit: 50},
-		{ID: prefix + "temporary-slow", Priority: 2, ConcurrencyLimit: 50},
+		{ID: prefix + "temporary-a", Priority: 2, ConcurrencyLimit: 50},
+		{ID: prefix + "temporary-b", Priority: 2, ConcurrencyLimit: 50},
 		{ID: prefix + "provided", Priority: 2, ConcurrencyLimit: 50, UseProvidedKey: true},
 	}
 	cleanupRedisTestRoutes(t, client, routes)
-	if err := limiter.ObserveResponseHeaderLatency(ctx, routes[0].ID, 20*time.Millisecond); err != nil {
-		t.Fatal(err)
-	}
-	if err := limiter.ObserveResponseHeaderLatency(ctx, routes[1].ID, 100*time.Millisecond); err != nil {
-		t.Fatal(err)
-	}
-	if err := limiter.ObserveResponseHeaderLatency(ctx, routes[2].ID, 10*time.Millisecond); err != nil {
-		t.Fatal(err)
-	}
-
 	counts := make(map[string]int)
-	leases := make([]*Lease, 0, 21)
 	for index := 0; index < 21; index++ {
 		lease, route, err := limiter.AcquireBest(ctx, routes, fmt.Sprintf("request-%d", index))
-		if err != nil {
-			t.Fatal(err)
+		if err != nil || lease == nil || route == nil {
+			t.Fatalf("acquire %d: %v", index, err)
 		}
-		if lease == nil || route == nil {
-			t.Fatalf("request %d did not acquire a route", index)
-		}
-		if index < 20 {
-			if (index < 10) == route.UseProvidedKey {
-				t.Fatalf("request %d selected wrong key tier: %s", index, route.ID)
-			}
-			if index == 1 && (counts[routes[0].ID] != 1 || route.ID != routes[1].ID) {
-				t.Fatal("second request did not share the temporary tier with the slower route")
-			}
-		}
-		leases = append(leases, lease)
+		t.Cleanup(func() { lease.Release(ctx) })
 		counts[route.ID]++
 	}
-	for _, lease := range leases {
-		lease.Release(ctx)
-	}
-	temporaryTotal := counts[routes[0].ID] + counts[routes[1].ID]
-	if temporaryTotal != 11 || counts[routes[0].ID] < 5 || counts[routes[1].ID] < 5 || counts[routes[2].ID] != 10 {
-		t.Fatalf("route counts=%v want both temporary routes at least 5, temporary total 11, provided 10", counts)
+	for _, route := range routes {
+		if counts[route.ID] != 7 {
+			t.Fatalf("key type affected balancing: %v", counts)
+		}
 	}
 }
 
@@ -93,7 +69,7 @@ func TestLimiterRedisRecordsTodayRequests(t *testing.T) {
 	}
 }
 
-func TestLimiterRedisSoftCapIsAtomic(t *testing.T) {
+func TestLimiterRedisHardCapIsAtomic(t *testing.T) {
 	limiter, client := redisTestLimiter(t)
 	ctx := context.Background()
 	route := Route{ID: fmt.Sprintf("soft-cap-test-%d", time.Now().UnixNano()), ConcurrencyLimit: 50}
@@ -107,12 +83,12 @@ func TestLimiterRedisSoftCapIsAtomic(t *testing.T) {
 		wait.Add(1)
 		go func(index int) {
 			defer wait.Done()
-			lease, ok, err := limiter.acquireWithLimit(ctx, route, fmt.Sprintf("request-%d", index), temporaryKeySoftConcurrency)
+			lease, ok, err := limiter.AcquireBest(ctx, []Route{route}, fmt.Sprintf("request-%d", index))
 			if err != nil {
 				t.Errorf("acquire: %v", err)
 				return
 			}
-			if !ok {
+			if ok == nil {
 				return
 			}
 			acquired.Add(1)
@@ -125,8 +101,8 @@ func TestLimiterRedisSoftCapIsAtomic(t *testing.T) {
 	for _, lease := range leases {
 		lease.Release(ctx)
 	}
-	if acquired.Load() != temporaryKeySoftConcurrency {
-		t.Fatalf("acquired=%d want %d", acquired.Load(), temporaryKeySoftConcurrency)
+	if acquired.Load() != int64(route.ConcurrencyLimit) {
+		t.Fatalf("acquired=%d want %d", acquired.Load(), route.ConcurrencyLimit)
 	}
 }
 

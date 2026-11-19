@@ -35,6 +35,7 @@ type mappedResponseContext struct {
 	ResponsesAPI        bool
 	ReasoningMode       string
 	ReasoningEffort     string
+	ClientEffort        *clientReasoningEffort
 }
 
 func newMappedResponseContext(incoming *http.Request, replay *replayBody, sourceModel string, mapping map[string]string) (mappedResponseContext, error) {
@@ -125,6 +126,9 @@ func rewriteMappedResponseObject(payload map[string]any, context mappedResponseC
 				reasoning["effort"] = context.ReasoningEffort
 			}
 		}
+	}
+	if hasMappedResponseMetadata(payload) {
+		restoreClientReasoningEffort(payload, context.ClientEffort)
 	}
 }
 

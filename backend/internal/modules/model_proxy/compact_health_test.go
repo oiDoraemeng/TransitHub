@@ -176,8 +176,21 @@ func TestCompactSchedulerPrefersLatestActualModelSuccess(t *testing.T) {
 	acquire([]Route{b, a}, routeProbeSpec{ModelID: "alias", Path: "/v1/responses"}, a.ID).Release(ctx)
 	a.Priority = 5
 	// Success from another protocol/model must not influence selection.
-	acquire([]Route{a, b}, routeProbeSpec{ModelID: "alias", Path: "/v1/responses"}, a.ID).Release(ctx)
-	acquire([]Route{a, b}, routeProbeSpec{ModelID: "different", Path: compactPath}, a.ID).Release(ctx)
+	for _, request := range []routeProbeSpec{{ModelID: "alias", Path: "/v1/responses"}, {ModelID: "different", Path: compactPath}} {
+		client.Del(ctx, schedulerBalanceKey(a.ID), schedulerBalanceKey(b.ID))
+		counts := map[string]int{}
+		for i := 0; i < 20; i++ {
+			lease, selected, err := limiter.AcquireBest(ctx, []Route{a, b}, "unrelated", request)
+			if err != nil || lease == nil || selected == nil {
+				t.Fatalf("acquire: %v", err)
+			}
+			counts[selected.ID]++
+			lease.Release(ctx)
+		}
+		if counts[a.ID] != 10 || counts[b.ID] != 10 {
+			t.Fatalf("Compact history leaked to %v: %v", request, counts)
+		}
+	}
 	// A new failed request invalidates the preference before isolation at three.
 	failed := acquire([]Route{a, b}, spec, b.ID)
 	if _, err := limiter.ObserveModelResult(ctx, failed, false, false, b, spec); err != nil {
@@ -397,7 +410,7 @@ func TestCompactWithoutHistorySharesAllPriorities(t *testing.T) {
 			a.Priority, b.Priority = 10, 0
 			if overflow {
 				for _, route := range []Route{a, b} {
-					for i := 0; i < temporaryKeySoftConcurrency; i++ {
+					for i := 0; i < 5; i++ {
 						acquireTestLease(t, limiter, route, fmt.Sprintf("held-%d", i))
 					}
 				}

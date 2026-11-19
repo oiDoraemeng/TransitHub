@@ -11,12 +11,10 @@ import (
 )
 
 const (
-	leaseTTL                    = 45 * time.Second
-	leaseRefresh                = 15 * time.Second
-	temporaryKeySoftConcurrency = 5
-	providedKeySoftConcurrency  = 10
-	routeLatencyTTL             = 30 * time.Minute
-	maxObservedLatency          = 2 * time.Minute
+	leaseTTL           = 45 * time.Second
+	leaseRefresh       = 15 * time.Second
+	routeLatencyTTL    = 30 * time.Minute
+	maxObservedLatency = 2 * time.Minute
 )
 
 var acquireLeaseScript = redis.NewScript(routeHealthLua + `
