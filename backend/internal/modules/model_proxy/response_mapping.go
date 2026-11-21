@@ -36,6 +36,7 @@ type mappedResponseContext struct {
 	ReasoningMode       string
 	ReasoningEffort     string
 	ClientEffort        *clientReasoningEffort
+	BufferedStream      bool
 }
 
 func newMappedResponseContext(incoming *http.Request, replay *replayBody, sourceModel string, mapping map[string]string) (mappedResponseContext, error) {

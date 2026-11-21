@@ -21,6 +21,7 @@ type healthResponseBody struct {
 	modelMissing    bool
 	credentialError bool
 	oversized       bool
+	startupLatency  time.Duration
 }
 
 func trackResponseHealth(response *http.Response) {

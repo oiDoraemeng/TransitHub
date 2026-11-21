@@ -76,6 +76,28 @@ func forceDoraLunaReasoning(baseURL, requestURI string, body io.ReadCloser, mapp
 	}
 	mapping.Enabled = true
 	mapping.ClientEffort = original
+	// A buffered dora response may take longer than the startup timeout even
+	// while the model is generating. Observe its stream internally, then return
+	// the original JSON protocol after completion. Audio/background requests
+	// retain their native response semantics.
+	streaming, validStream := payload["stream"].(bool)
+	background, _ := payload["background"].(bool)
+	if !streaming && (validStream || payload["stream"] == nil) && !background && payload["audio"] == nil && payload["modalities"] == nil {
+		mapping.BufferedStream = true
+		payload["stream"] = true
+		if endpoint.Path == "/v1/chat/completions" {
+			options, _ := payload["stream_options"].(map[string]any)
+			if options == nil {
+				options = make(map[string]any)
+			}
+			options["include_usage"] = true
+			payload["stream_options"] = options
+		}
+		encoded, err = json.Marshal(payload)
+		if err != nil {
+			return nil, mapping, err
+		}
+	}
 	return io.NopCloser(bytes.NewReader(encoded)), mapping, nil
 }
 

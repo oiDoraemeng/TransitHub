@@ -424,7 +424,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			if response != nil {
 				status = response.StatusCode
 			}
-			log.Printf("[model-proxy] dispatch request_id=%s route=%s model=%s attempt=%d status=%d ready_in=%s failed=%t path=%s", requestID, route.Name, modelID, attempts, status, time.Since(started), err != nil || status < 200 || status >= 300 || responseHealth(response).failed, incoming.URL.Path)
+			log.Printf("[model-proxy] dispatch request_id=%s route=%s model=%s attempt=%d status=%d ready_in=%s failed=%t path=%s stream=%t startup_in=%s", requestID, route.Name, modelID, attempts, status, time.Since(started), err != nil || status < 200 || status >= 300 || responseHealth(response).failed, incoming.URL.Path, streaming, responseHealth(response).startupLatency)
 			return response, err
 		})
 		if attemptErr != nil {
@@ -573,6 +573,9 @@ func (s *Service) observeSmartGroupLatency(ctx context.Context, route Route, lea
 	if s.limiter == nil || s.latencySamples == nil || ctx.Err() != nil {
 		return
 	}
+	if startup := responseHealth(response).startupLatency; startup > 0 {
+		elapsed = startup
+	}
 	if attemptErr != nil || response == nil || response.StatusCode < 200 || response.StatusCode >= 300 || responseHealth(response).failed {
 		if elapsed < failurePenalty {
 			elapsed = failurePenalty
@@ -670,15 +673,16 @@ func (s *Service) performAttempt(incoming *http.Request, route Route, bodyFactor
 
 func (s *Service) performAttemptWithResponseHeaderTimeout(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string, responseMapping mappedResponseContext, synchronousRequest bool, responseHeaderTimeout time.Duration) (*http.Response, bool, error) {
 	if responseHeaderTimeout <= 0 {
-		return s.performPreparedAttempt(incoming, route, bodyFactory, modelMapping, responseMapping, synchronousRequest, responseHeaderTimeout)
+		return s.performPreparedAttempt(incoming, route, bodyFactory, modelMapping, responseMapping, synchronousRequest, responseHeaderTimeout, nil)
 	}
 	// Include key creation, protocol preparation and first useful SSE output in
 	// the startup deadline. Stop the timer before returning an accepted stream;
 	// the stream itself retains the downstream request's lifetime.
 	ctx, cancel := context.WithCancel(incoming.Context())
-	timer := time.AfterFunc(responseHeaderTimeout, cancel)
-	response, retryable, err := s.performPreparedAttempt(incoming.WithContext(ctx), route, bodyFactory, modelMapping, responseMapping, synchronousRequest, responseHeaderTimeout)
-	if !timer.Stop() && incoming.Context().Err() == nil {
+	guard := newUpstreamStartupGuard(responseHeaderTimeout, cancel)
+	response, retryable, err := s.performPreparedAttempt(incoming.WithContext(ctx), route, bodyFactory, modelMapping, responseMapping, synchronousRequest, responseHeaderTimeout, guard.accept)
+	guard.accept()
+	if guard.state.Load() == 2 && incoming.Context().Err() == nil {
 		if response != nil && response.Body != nil {
 			_ = response.Body.Close()
 		}
@@ -689,6 +693,7 @@ func (s *Service) performAttemptWithResponseHeaderTimeout(incoming *http.Request
 		cancel()
 		return response, retryable, err
 	}
+	responseHealth(response).startupLatency = guard.elapsed
 	if health, ok := response.Body.(*healthResponseBody); ok {
 		health.ReadCloser = &cancelOnCloseBody{ReadCloser: health.ReadCloser, cancel: cancel}
 	} else {
@@ -697,7 +702,7 @@ func (s *Service) performAttemptWithResponseHeaderTimeout(incoming *http.Request
 	return response, retryable, nil
 }
 
-func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string, responseMapping mappedResponseContext, synchronousRequest bool, responseHeaderTimeout time.Duration) (*http.Response, bool, error) {
+func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bodyFactory func() (io.ReadCloser, error), modelMapping map[string]string, responseMapping mappedResponseContext, synchronousRequest bool, responseHeaderTimeout time.Duration, onStarted func()) (*http.Response, bool, error) {
 	client, err := s.dataClientForRoute(incoming.Context(), route)
 	if err != nil {
 		return nil, true, err
@@ -750,6 +755,9 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		return nil, true, err
 	}
 	copyRequestHeaders(request.Header, incoming.Header)
+	if responseMapping.BufferedStream {
+		request.Header.Set("Accept", "text/event-stream")
+	}
 	request.Header.Set("Authorization", "Bearer "+secret)
 	request.Header.Set("User-Agent", upstream.BrowserUserAgent)
 	var deadlineCleanup *headerDeadlineCleanup
@@ -778,10 +786,40 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		return nil, true, err
 	}
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
+	cleanupHandled := false
+	if responseMapping.BufferedStream && response.StatusCode >= 200 && response.StatusCode < 300 && isEventStream(response.Header) {
+		if needsCleanup && deadlineCleanup == nil {
+			response.Body = newCleanupGateBody(response.Body, func() error { return s.deleteCleanupJobNow(cleanupJob) })
+		} else if deadlineCleanup == nil {
+			cleanup()
+		}
+		cleanupHandled = true
+		trackResponseHealth(response)
+		if responseHeaderTimeout > 0 {
+			remaining := responseHeaderTimeout - time.Since(responseStarted)
+			if remaining <= 0 {
+				remaining = time.Nanosecond
+			}
+			if err := prepareStreamStart(incoming.Context(), response, remaining); err != nil {
+				response.Body.Close()
+				return response, true, err
+			}
+			if responseHealth(response).failed {
+				return response, true, nil
+			}
+			if onStarted != nil {
+				onStarted()
+			}
+		}
+		if err := bufferDoraStream(response, strings.Split(protocolRequest.requestURI, "?")[0] == "/v1/responses"); err != nil {
+			response.Body.Close()
+			return response, true, err
+		}
+	}
 	if !retryable && response.StatusCode >= 200 && response.StatusCode < 300 && responseMapping.Enabled {
 		if err := rewriteMappedResponse(response, responseMapping); err != nil {
 			response.Body.Close()
-			if deadlineCleanup == nil {
+			if !cleanupHandled && deadlineCleanup == nil {
 				cleanup()
 			}
 			return nil, true, err
@@ -790,7 +828,7 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 	if !retryable && protocolRequest.responseAdapter != nil {
 		if err := protocolRequest.responseAdapter(response); err != nil {
 			response.Body.Close()
-			if deadlineCleanup == nil {
+			if !cleanupHandled && deadlineCleanup == nil {
 				cleanup()
 			}
 			return nil, true, err
@@ -802,11 +840,11 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 	// This removes the timing dependency on downstream/TCP buffering when testing
 	// an in-flight streaming request. Non-streaming smart-group members may use
 	// the separate header-deadline cleanup configured above.
-	if !retryable && isEventStream(response.Header) && needsCleanup && deadlineCleanup == nil {
+	if !cleanupHandled && !retryable && isEventStream(response.Header) && needsCleanup && deadlineCleanup == nil {
 		response.Body = newCleanupGateBody(response.Body, func() error {
 			return s.deleteCleanupJobNow(cleanupJob)
 		})
-	} else if deadlineCleanup == nil {
+	} else if !cleanupHandled && deadlineCleanup == nil {
 		cleanup()
 	}
 	trackResponseHealth(response)

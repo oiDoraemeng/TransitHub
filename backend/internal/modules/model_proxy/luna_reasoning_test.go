@@ -206,7 +206,7 @@ func TestDoraLunaPreparedAttemptAppliesPolicyToWireAndRestoresStream(t *testing.
 		if err != nil {
 			t.Fatal(err)
 		}
-		response, retryable, err := service.performPreparedAttempt(incoming, route, replay.Open, route.ModelMapping, mapping, false, time.Second)
+		response, retryable, err := service.performPreparedAttempt(incoming, route, replay.Open, route.ModelMapping, mapping, false, time.Second, nil)
 		if err != nil || retryable {
 			t.Fatalf("attempt: %v %v", retryable, err)
 		}
