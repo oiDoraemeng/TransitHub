@@ -171,13 +171,25 @@ func TestBufferedStreamsRejectPartialAndFailedSuccessBodies(t *testing.T) {
 		{"data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"overloaded\"}}}\n\n", true},
 		{"data: {\"error\":{\"code\":\"model_not_found\"}}\n\n", false},
 		{"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"}}]}\n\ndata: [DONE]\n\n", false},
-		{"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"},\"finish_reason\":\"stop\"}]}\n\n", false},
+		{"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"}}]}\n\n", false},
 	} {
 		response := &http.Response{Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(tc.stream))}
 		trackResponseHealth(response)
 		if err := bufferDoraStream(response, tc.responses); err == nil {
 			t.Fatalf("accepted failed/truncated stream %s", tc.stream)
 		}
+	}
+}
+
+func TestBufferedChatAcceptsCleanEOFWithExplicitFinishReason(t *testing.T) {
+	response := &http.Response{Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader("data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"OK\"},\"finish_reason\":\"stop\"}]}\n\n"))}
+	trackResponseHealth(response)
+	if err := bufferDoraStream(response, false); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := io.ReadAll(response.Body)
+	if !bytes.Contains(data, []byte(`"content":"OK"`)) {
+		t.Fatalf("response=%s", data)
 	}
 }
 

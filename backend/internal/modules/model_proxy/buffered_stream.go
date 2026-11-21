@@ -73,6 +73,12 @@ func bufferDoraStream(response *http.Response, responsesAPI bool) error {
 			return fmt.Errorf("buffered stream exceeds %d bytes", maxProtocolResponseBytes)
 		}
 		if err != nil {
+			// Some compatible providers close cleanly after finish_reason without
+			// a [DONE] sentinel. dora accepts that explicit terminal state too.
+			if err == io.EOF && len(event) == 0 && !responsesAPI && chatChoicesFinished(choices) {
+				terminal = true
+				break
+			}
 			if err == io.EOF {
 				err = io.ErrUnexpectedEOF
 			}
@@ -242,6 +248,18 @@ func bufferDoraStream(response *http.Response, responsesAPI bool) error {
 	response.Header.Set("Content-Length", fmt.Sprint(len(encoded)))
 	response.Header.Del("Content-Encoding")
 	return nil
+}
+
+func chatChoicesFinished(choices map[int]*bufferedChatChoice) bool {
+	if len(choices) == 0 {
+		return false
+	}
+	for _, choice := range choices {
+		if choice.finish == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func readBufferedSSEEvent(reader *bufio.Reader, limit int) ([]byte, error) {

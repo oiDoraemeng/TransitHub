@@ -424,7 +424,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			if response != nil {
 				status = response.StatusCode
 			}
-			log.Printf("[model-proxy] dispatch request_id=%s route=%s model=%s attempt=%d status=%d ready_in=%s failed=%t path=%s stream=%t startup_in=%s", requestID, route.Name, modelID, attempts, status, time.Since(started), err != nil || status < 200 || status >= 300 || responseHealth(response).failed, incoming.URL.Path, streaming, responseHealth(response).startupLatency)
+			log.Printf("[model-proxy] dispatch request_id=%s route=%s model=%s attempt=%d status=%d ready_in=%s failed=%t path=%s stream=%t startup_in=%s failure_kind=%s", requestID, route.Name, modelID, attempts, status, time.Since(started), err != nil || status < 200 || status >= 300 || responseHealth(response).failed, incoming.URL.Path, streaming, responseHealth(response).startupLatency, dispatchFailureKind(incoming.Context(), response, err))
 			return response, err
 		})
 		if attemptErr != nil {
@@ -560,6 +560,27 @@ func startupTimeout(err error) bool {
 	}
 	var timeout interface{ Timeout() bool }
 	return errors.Is(err, context.DeadlineExceeded) || errors.As(err, &timeout) && timeout.Timeout()
+}
+
+func dispatchFailureKind(ctx context.Context, response *http.Response, err error) string {
+	switch {
+	case ctx.Err() != nil:
+		return "client_canceled"
+	case responseHealth(response).failed:
+		return "upstream_error_event"
+	case startupTimeout(err):
+		return "startup_timeout"
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		return "truncated_response"
+	case err != nil:
+		return "transport_or_protocol_error"
+	case response == nil:
+		return "missing_response"
+	case response.StatusCode < 200 || response.StatusCode >= 300:
+		return "http_error"
+	default:
+		return "none"
+	}
 }
 
 func smartGroupResponseHeaderTimeout(attemptIndex int) time.Duration {
