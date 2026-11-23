@@ -150,8 +150,9 @@ export default {
         tab: 'Smart groups', heading: 'Smart groups', description: 'Use one key for every member model and combine available concurrency.',
         mediaRouting: {
           title: 'Audio and video routing', video: 'MP4 video', audio: 'WAV / MP3 audio',
-          summary: 'MP4 / WAV / MP3 → gemini ultra', memberBadge: 'Audio/video · MP4 / WAV / MP3',
-          help: 'Attachments automatically use a member named gemini ultra in the current group that supports the requested model, without a keyword match. A paused, full or unavailable member returns an error; audio/video never falls back to a GPT mapping.',
+          switchLabel: 'Accept audio/video attachments (MP4 / WAV / MP3)', memberBadge: 'Audio/video · MP4 / WAV / MP3',
+          selectedMembers: 'Members with media input enabled', entries: 'Audio/video entries:', noEntries: 'None selected; enable one in member policies',
+          help: 'Enable media input in member policies to route MP4 and WAV/MP3 to selected Gemini members in this group that support the requested model, without keyword matching. Multiple entries use priority and concurrency; an error is returned when all are unavailable. The switch applies only to this group.',
         },
         add: 'Add smart group', edit: 'Edit smart group', empty: 'No smart groups yet.', formHelp: 'Members must be regular proxy keys in the current workspace.',
         selectRoutes: 'Select existing proxy routes', memberRoute: 'Proxy route', selectMemberRoute: 'Select a route to add', noAvailableMemberRoutes: 'No enabled proxy routes are available to add.',
@@ -188,7 +189,7 @@ export default {
           providedKeyHelp: 'The key is saved on the proxy route and shared by every smart group that uses it. When enabled, this member uses it without creating or deleting a temporary key. Leave blank to keep the current route key.',
           providedKeyError: 'An upstream key is required when prepared-key mode is enabled.', providedKeySummary: 'Shared proxy-route key {preview}', routeProvidedKeySummary: 'Route default key {preview}',
           keywordMatchMode: 'Keyword match behavior', keywordDisabled: 'Do not check', keywordSkipOnMatch: 'Skip this member on match', keywordRequireMatch: 'Select this member only on match',
-          keywordStrategyHelp: 'Keywords are configured once on the smart group. This setting controls only how this member handles a match. MP4 and WAV/MP3 attachments automatically use gemini ultra and bypass keyword rules.',
+          keywordStrategyHelp: 'Keywords are configured once on the smart group. This setting controls only how this member handles a match. MP4 and WAV/MP3 attachments use only members with media input enabled and bypass keyword rules.',
           keywordSkipOnMatchSummary: 'Skip on match', keywordRequireMatchSummary: 'Require match',
           modelMappingEnabled: 'Model mapping enabled', modelMapping: 'Member model mapping', modelMappingPlaceholder: 'For example: gpt-6-astra = gpt-6-luna', modelMappingHelp: 'One entry per line in the form “client model = upstream model”. Only this member uses these mappings.', modelMappingError: 'Invalid model mapping. Use “client model = upstream model”, one entry per line.', modelMappingRequired: 'Enter at least one mapping when model mapping is enabled.', default: 'No member restrictions'
         }

@@ -22,6 +22,7 @@ export interface ProxyRoute {
   modelHealth?: ProxyModelHealth[]
   schedulingPaused?: boolean
   neverAutoPause?: boolean
+  mediaInputEnabled?: boolean
   streamOnly?: boolean
   minInputTokens?: number
   requestsPerMinute?: number
@@ -149,6 +150,7 @@ export interface SmartGroupInput {
 
 export interface SmartGroupMemberPolicyInput {
   schedulingPaused?: boolean
+  mediaInputEnabled: boolean
   neverAutoPause?: boolean
   streamOnly: boolean
   minInputTokens: number

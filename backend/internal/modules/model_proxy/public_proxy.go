@@ -182,7 +182,7 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 		var media requestMedia
 		incoming, media = withRequestMedia(incoming, payload, modelID)
 		if (media.Audio || media.Video) && !nativeGeminiModel(modelID) {
-			writeOpenAIError(w, http.StatusBadRequest, "unsupported_media", "audio and video require a native Gemini model through the gemini ultra route")
+			writeOpenAIError(w, http.StatusBadRequest, "unsupported_media", "audio and video require a native Gemini model")
 			return
 		}
 	}
@@ -321,12 +321,12 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	}
 	candidates = filterMediaRoutes(candidates, media, incoming)
 	if len(candidates) == 0 {
-		writeOpenAIError(w, http.StatusServiceUnavailable, "media_route_unavailable", "no enabled gemini ultra member supports this audio/video request or native file reference")
+		writeOpenAIError(w, http.StatusServiceUnavailable, "media_route_unavailable", "no eligible media input member supports this audio/video request or native file reference")
 		return
 	}
 	compact := incoming.URL.Path == compactPath
 	keywordFiltering := false
-	// Audio/video already require the Ultra member. Its keyword rules select
+	// Audio/video already require a media input member. Its keyword rules select
 	// text traffic and must not exclude an attachment it is required to handle.
 	if !compact && !media.Audio && !media.Video {
 		for _, candidate := range candidates {

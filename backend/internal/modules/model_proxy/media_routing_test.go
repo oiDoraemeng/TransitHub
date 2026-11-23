@@ -52,9 +52,14 @@ func TestMediaDetectionIncludesHistoryWithoutReadingTextOrToolSchemas(t *testing
 func TestMediaRoutingNeverFallsBackToGPTOrOtherGroups(t *testing.T) {
 	request := httptest.NewRequest("POST", "/v1/chat/completions", nil)
 	routes := []Route{
-		{ID: "mapped", Name: "gemini 映射", Priority: 10, ModelMappingEnabled: true, ModelMapping: map[string]string{"gemini-test": "gpt-6-luna"}},
+		{ID: "mapped", Name: "gemini 映射", Priority: 10, MediaInputEnabled: true, ModelMappingEnabled: true, ModelMapping: map[string]string{"gemini-test": "gpt-6-luna"}},
 		{ID: "pro", Name: "gemini pro", Priority: 9},
-		{ID: "ultra", Name: "gemini ultra", Priority: 0},
+		{ID: "ultra", Name: "selected media route", Priority: 0, MediaInputEnabled: true},
+	}
+	disabled := routes[2]
+	disabled.Name, disabled.MediaInputEnabled = "gemini ultra", false
+	if got := filterMediaRoutes([]Route{disabled}, requestMedia{Audio: true, Model: "gemini-test"}, request); len(got) != 0 {
+		t.Fatal("route name bypassed a disabled media input switch")
 	}
 	for _, m := range []requestMedia{{Audio: true, Model: "gemini-test"}, {Video: true, Model: "gemini-test"}} {
 		got := filterMediaRoutes(routes, m, request)
@@ -287,7 +292,7 @@ func TestInlinePDFToNativeGeminiUsesNativeProtocol(t *testing.T) {
 }
 
 func TestMediaSmartGroupPostgresRedisUsesOnlyUltra(t *testing.T) {
-	for _, scenario := range []string{"success", "failed", "full", "paused", "pdf-fallback"} {
+	for _, scenario := range []string{"success", "failed", "full", "paused", "disabled", "renamed", "pdf-fallback"} {
 		t.Run(scenario, func(t *testing.T) {
 			repo := memberPauseTestRepository(t)
 			limiter, client := redisTestLimiter(t)
@@ -349,7 +354,13 @@ func TestMediaSmartGroupPostgresRedisUsesOnlyUltra(t *testing.T) {
 				if member.route.ID == ultra.ID && scenario != "pdf-fallback" {
 					keywordMode = KeywordMatchModeRequireMatch
 				}
-				if err := repo.UpdateMemberPolicy(ctx, "user", "workspace", "media-group", member.route.ID, nil, nil, nil, &member.priority, &member.mapped, &mapping, &provided, nil, nil, &keywordMode, nil, nil, nil, &neverPause); err != nil {
+				mediaEnabled := member.route.ID == ultra.ID && scenario != "disabled"
+				if err := repo.UpdateMemberPolicy(ctx, "user", "workspace", "media-group", member.route.ID, nil, nil, nil, &member.priority, &member.mapped, &mapping, &provided, nil, nil, &keywordMode, nil, nil, nil, &neverPause, &mediaEnabled); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if scenario == "renamed" {
+				if _, err := repo.db.Exec(ctx, `UPDATE proxy_routes SET name='selected audio route' WHERE id=$1`, ultra.ID); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -361,7 +372,7 @@ func TestMediaSmartGroupPostgresRedisUsesOnlyUltra(t *testing.T) {
 			}
 			if scenario == "paused" {
 				paused := true
-				if err := repo.UpdateMemberPolicy(ctx, "user", "workspace", "media-group", ultra.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &paused, nil); err != nil {
+				if err := repo.UpdateMemberPolicy(ctx, "user", "workspace", "media-group", ultra.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &paused, nil, nil); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -378,16 +389,16 @@ func TestMediaSmartGroupPostgresRedisUsesOnlyUltra(t *testing.T) {
 			if scenario != "pdf-fallback" && gptCalls.Load() != 0 {
 				t.Fatal("media fell back to a GPT mapping")
 			}
-			if (scenario == "success" || scenario == "pdf-fallback") && (w.Code != 200 || ultraCalls.Load() != 1 || !strings.Contains(w.Body.String(), "silver otter")) {
+			if (scenario == "success" || scenario == "renamed" || scenario == "pdf-fallback") && (w.Code != 200 || ultraCalls.Load() != 1 || !strings.Contains(w.Body.String(), "silver otter")) {
 				t.Fatalf("Ultra failed: status=%d calls=%d body=%s", w.Code, ultraCalls.Load(), w.Body.String())
 			}
 			if scenario == "pdf-fallback" && gptCalls.Load() == 0 {
 				t.Fatal("PDF did not exercise the higher priority GPT failure")
 			}
-			if scenario != "success" && scenario != "pdf-fallback" && w.Code < 400 {
+			if scenario != "success" && scenario != "renamed" && scenario != "pdf-fallback" && w.Code < 400 {
 				t.Fatalf("unavailable Ultra returned success: %d", w.Code)
 			}
-			if (scenario == "full" || scenario == "paused") && ultraCalls.Load() != 0 {
+			if (scenario == "full" || scenario == "paused" || scenario == "disabled") && ultraCalls.Load() != 0 {
 				t.Fatal("unavailable Ultra received traffic")
 			}
 		})

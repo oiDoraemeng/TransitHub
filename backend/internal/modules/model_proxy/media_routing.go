@@ -161,8 +161,8 @@ func filterMediaRoutes(routes []Route, media requestMedia, incoming *http.Reques
 			continue
 		}
 		// Stay within the caller's smart group and model allowlist. A failed or
-		// full Ultra member must never fall through to a text-only GPT alias.
-		if (media.Audio || media.Video) && !strings.EqualFold(strings.Join(strings.Fields(route.Name), " "), "gemini ultra") {
+		// full media member must never fall through to a text-only GPT alias.
+		if (media.Audio || media.Video) && !route.MediaInputEnabled {
 			continue
 		}
 		result = append(result, route)

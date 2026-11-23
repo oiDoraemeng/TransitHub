@@ -150,8 +150,9 @@ export default {
         tab: '智能分组', heading: '智能分组', description: '一个 Key 调用所有成员模型，并自动汇总可用并发。',
         mediaRouting: {
           title: '音视频附件路由', video: 'MP4 视频', audio: 'WAV / MP3 音频',
-          summary: 'MP4 / WAV / MP3 → gemini ultra', memberBadge: '音视频入口 · MP4 / WAV / MP3',
-          help: '自动选择当前分组中名为 gemini ultra、且支持请求模型的成员，无需命中关键词。该成员暂停、满额或不可用时返回错误；音视频不会转给 GPT 映射线路。',
+          switchLabel: '接收音视频附件（MP4 / WAV / MP3）', memberBadge: '音视频入口 · MP4 / WAV / MP3',
+          selectedMembers: '已开启音视频入口的成员', entries: '音视频入口：', noEntries: '未选择，请在成员策略中开启',
+          help: '在成员策略中开启音视频入口后，MP4、WAV/MP3 自动选择当前分组中已开启且支持请求模型的 Gemini 成员，无需命中关键词。多个入口按优先级和并发调度；全部不可用时返回错误。开关仅对当前分组生效。',
         },
         add: '新增智能分组', edit: '编辑智能分组', empty: '还没有智能分组。', formHelp: '成员只能是当前工作区中的普通代理 Key。',
         selectRoutes: '选择现有代理路由', memberRoute: '代理路由', selectMemberRoute: '选择要加入的代理路由', noAvailableMemberRoutes: '没有可加入的已启用代理路由。',
@@ -188,7 +189,7 @@ export default {
           providedKeyHelp: '此 Key 保存到代理路由，所有引用该路由的智能分组共用。开启后此成员使用该 Key 调用模型，不会创建或删除临时 Key；留空表示保留当前路由 Key。',
           providedKeyError: '启用预置上游 Key 时必须提供 Key。', providedKeySummary: '代理路由共享 Key {preview}', routeProvidedKeySummary: '路由默认 Key {preview}',
           keywordMatchMode: '关键词命中策略', keywordDisabled: '不检测', keywordSkipOnMatch: '命中后跳过此成员', keywordRequireMatch: '命中后才选择此成员',
-          keywordStrategyHelp: '关键词在智能分组中统一设置；此处只决定该成员命中或未命中时的处理方式。MP4、WAV/MP3 附件自动走 gemini ultra，不受关键词策略限制。',
+          keywordStrategyHelp: '关键词在智能分组中统一设置；此处只决定该成员命中或未命中时的处理方式。MP4、WAV/MP3 附件只走已开启音视频入口的成员，不受关键词策略限制。',
           keywordSkipOnMatchSummary: '命中跳过', keywordRequireMatchSummary: '命中才选',
           modelMappingEnabled: '启用模型映射', modelMapping: '成员模型映射', modelMappingPlaceholder: '例如：gpt-6-astra = gpt-6-luna', modelMappingHelp: '每行一条，格式为“客户端模型 = 上游模型”。仅此成员使用这些映射。', modelMappingError: '模型映射格式无效，请使用“客户端模型 = 上游模型”，每行一条。', modelMappingRequired: '启用模型映射时至少填写一条映射。', default: '未设置成员限制'
         }
