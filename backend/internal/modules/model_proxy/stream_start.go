@@ -60,7 +60,7 @@ func prepareStreamStart(ctx context.Context, response *http.Response, timeout ti
 		return ctx.Err()
 	case <-timer.C:
 		_ = source.Close()
-		return fmt.Errorf("upstream stream start timeout after %s", timeout)
+		return fmt.Errorf("upstream stream start timeout after %s: %w", timeout, context.DeadlineExceeded)
 	case ready := <-done:
 		if ready.err != nil {
 			_ = source.Close()

@@ -178,6 +178,14 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 	}
 	defer replay.Close()
 	modelID, _ := requestModelID(incoming, replay)
+	if payload, parseErr := replay.Object(); parseErr == nil {
+		var media requestMedia
+		incoming, media = withRequestMedia(incoming, payload, modelID)
+		if (media.Audio || media.Video) && !nativeGeminiModel(modelID) {
+			writeOpenAIError(w, http.StatusBadRequest, "unsupported_media", "audio and video require a native Gemini model through the gemini ultra route")
+			return
+		}
+	}
 	probeSpec := routeProbeSpec{ModelID: modelID, Path: incoming.URL.Path}
 	leaseID, _ := randomID("req_")
 	lease, ok, err := s.limiter.AcquireForModel(incoming.Context(), route, newLeaseID(leaseID, route.ID), probeSpec)
@@ -213,6 +221,11 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 		}
 		attempts++
 		response, retryable, attemptErr := s.performAttempt(incoming, route, replay.Open, nil, mappedResponseContext{}, false)
+		var mediaErr *mediaInputError
+		if errors.As(attemptErr, &mediaErr) {
+			writeOpenAIError(w, http.StatusBadRequest, "invalid_media_input", mediaErr.Error())
+			return
+		}
 		lastResponse, lastAttemptErr = response, attemptErr
 		if attemptErr == nil && !retryable {
 			completed, readErr := s.writeUpstreamResponse(w, response)
@@ -277,6 +290,8 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "model is required")
 		return
 	}
+	payload, _ := replay.Object()
+	incoming, media := withRequestMedia(incoming, payload, modelID)
 	var keywordStreaming bool
 	var keywordInputTokens int
 	var keywordInputText string
@@ -302,6 +317,11 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	}
 	if err != nil || len(candidates) == 0 {
 		writeOpenAIError(w, http.StatusNotFound, "model_not_found", "no enabled smart group member supports this model")
+		return
+	}
+	candidates = filterMediaRoutes(candidates, media, incoming)
+	if len(candidates) == 0 {
+		writeOpenAIError(w, http.StatusServiceUnavailable, "media_route_unavailable", "no enabled gemini ultra member supports this audio/video request or native file reference")
 		return
 	}
 	compact := incoming.URL.Path == compactPath
@@ -428,6 +448,12 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			return response, err
 		})
 		if attemptErr != nil {
+			var mediaErr *mediaInputError
+			if errors.As(attemptErr, &mediaErr) {
+				lease.Release(context.Background())
+				writeOpenAIError(w, http.StatusBadRequest, "invalid_media_input", mediaErr.Error())
+				return
+			}
 			// A member's first attempt and retry are one request outcome. Record
 			// it once before falling back to another member, which has its own health.
 			if attempts > 0 {
@@ -514,6 +540,10 @@ func attemptSmartGroupMemberWithPolicy(ctx context.Context, policy smartGroupRet
 			}
 		}
 		response, err := attempt(timeout)
+		var mediaErr *mediaInputError
+		if errors.As(err, &mediaErr) {
+			return nil, err
+		}
 		if err == nil && response != nil && response.StatusCode >= 200 && response.StatusCode < 300 && !responseHealth(response).failed {
 			return response, nil
 		}
@@ -747,7 +777,7 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		cleanup()
 		return nil, true, err
 	}
-	protocolRequest, err := adaptUpstreamProtocol(protocolIncoming, protocolBody)
+	protocolRequest, err := adaptMediaUpstreamProtocol(protocolIncoming, protocolBody)
 	if err != nil {
 		cleanup()
 		return nil, true, err

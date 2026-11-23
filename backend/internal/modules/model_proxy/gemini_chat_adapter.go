@@ -211,6 +211,10 @@ func geminiPartsToOpenAIContent(parts []geminiPart) any {
 			items = append(items, map[string]any{"type": "image_url", "image_url": map[string]any{
 				"url": "data:" + part.InlineData.MIMEType + ";base64," + part.InlineData.Data,
 			}})
+		case part.InlineData != nil && strings.EqualFold(strings.TrimSpace(strings.SplitN(part.InlineData.MIMEType, ";", 2)[0]), "application/pdf"):
+			items = append(items, map[string]any{"type": "file", "file": map[string]any{
+				"filename": "document.pdf", "file_data": "data:application/pdf;base64," + part.InlineData.Data,
+			}})
 		case part.FileData != nil && strings.HasPrefix(strings.ToLower(part.FileData.MIMEType), "image/"):
 			items = append(items, map[string]any{"type": "image_url", "image_url": map[string]any{"url": part.FileData.FileURI}})
 		}
