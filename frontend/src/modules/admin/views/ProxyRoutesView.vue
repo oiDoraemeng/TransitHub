@@ -75,6 +75,7 @@ const memberPolicyTarget = ref<{ group: ProxySmartGroup; route: ProxyRoute } | n
 const memberPolicyForm = reactive({ neverAutoPause: false, streamOnly: false, minInputTokens: 0, requestsPerMinute: 0, priority: 0, modelMappingEnabled: false, modelMapping: '', useProvidedKey: false, upstreamKey: '', keywordMatchMode: 'disabled' as 'disabled' | 'skip_on_match' | 'require_match', syncKeyDeleteEnabled: false, syncKeyDeleteDelayMs: 500 })
 
 const enabledRoutes = computed(() => routes.value.filter(route => route.enabled))
+const isGeminiUltra = (route: ProxyRoute) => route.name.trim().replace(/\s+/g, ' ').toLowerCase() === 'gemini ultra'
 const editingRouteHasProvidedKey = computed(() => routes.value.find(route => route.id === editingRouteId.value)?.routeProvidedKey ?? false)
 const availableMemberRoutes = computed(() => {
   const existing = new Set(memberModalGroup.value?.members.map(member => member.id) ?? [])
@@ -634,6 +635,14 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
 
       <section v-else-if="activeTab === 'groups'" aria-labelledby="proxy-groups-heading">
         <div class="mb-3"><h3 id="proxy-groups-heading" class="font-semibold">{{ t('admin.modelProxy.groups.heading') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.description') }}</p></div>
+        <div class="mb-4 rounded-xl border border-border bg-surface px-4 py-3">
+          <h4 class="mb-2 text-sm font-medium">{{ t('admin.modelProxy.groups.mediaRouting.title') }}</h4>
+          <dl class="grid gap-2 sm:grid-cols-2">
+            <div class="flex flex-wrap items-center gap-x-2 text-sm"><dt class="text-muted-foreground">{{ t('admin.modelProxy.groups.mediaRouting.video') }}</dt><dd class="font-medium">→ <span class="font-mono">gemini ultra</span></dd></div>
+            <div class="flex flex-wrap items-center gap-x-2 text-sm"><dt class="text-muted-foreground">{{ t('admin.modelProxy.groups.mediaRouting.audio') }}</dt><dd class="font-medium">→ <span class="font-mono">gemini ultra</span></dd></div>
+          </dl>
+          <p class="mt-2 text-xs leading-relaxed text-muted-foreground">{{ t('admin.modelProxy.groups.mediaRouting.help') }}</p>
+        </div>
         <div v-if="!smartGroups.length" class="border border-dashed border-border py-16 text-center text-sm text-muted-foreground">{{ t('admin.modelProxy.groups.empty') }}</div>
         <div v-else class="divide-y divide-border border border-border">
           <article v-for="group in smartGroups" :key="group.id">
@@ -662,6 +671,7 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
                   <div v-for="member in group.members" :key="member.id" class="flex flex-wrap items-start justify-between gap-2 py-2.5 text-sm">
                     <div class="min-w-0">
                       <div class="flex flex-wrap items-baseline gap-x-2"><span class="font-medium">{{ member.name }}</span><span class="truncate text-xs text-muted-foreground">{{ member.siteName }} / {{ member.groupName || t('admin.modelProxy.form.preparedKeyBinding') }}</span></div>
+                      <div v-if="isGeminiUltra(member)" class="mt-1 inline-flex rounded border border-signal/20 bg-signal/10 px-1.5 py-0.5 text-xs text-signal">{{ t('admin.modelProxy.groups.mediaRouting.memberBadge') }}</div>
                       <div v-if="member.schedulingPaused" class="text-xs text-warning" :title="t('admin.modelProxy.memberPause.help')">{{ t('admin.modelProxy.memberPause.paused') }}</div>
                       <div v-if="member.neverAutoPause" class="text-xs text-signal" :title="t('admin.modelProxy.groups.policy.neverAutoPauseHelp')">{{ t('admin.modelProxy.groups.policy.neverAutoPause') }}</div>
                       <div v-if="member.pausedUntil && !member.neverAutoPause" class="text-xs text-warning" :title="t('admin.modelProxy.circuit.help')">{{ t('admin.modelProxy.circuit.paused', { time: formatDate(member.pausedUntil) }) }}<span v-if="member.nextProbeAt"> · {{ t('admin.modelProxy.circuit.nextProbe', { time: formatDate(member.nextProbeAt) }) }}</span></div>
@@ -778,6 +788,10 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
         <form class="modal-panel max-w-lg" @submit.prevent="submitMemberPolicy">
           <div class="modal-header"><div><h3 class="font-semibold">{{ t('admin.modelProxy.groups.policy.edit') }}</h3><p class="mt-1 text-sm text-muted-foreground">{{ memberPolicyTarget.route.name }} · {{ memberPolicyTarget.route.siteName }} / {{ memberPolicyTarget.route.groupName || memberPolicyTarget.route.groupId }}</p></div><button type="button" @click="memberPolicyTarget = null"><X class="h-5 w-5" /></button></div>
           <div class="modal-body space-y-4 p-5">
+            <div class="rounded-md border border-border bg-muted/30 p-3">
+              <p class="text-sm font-medium">{{ t('admin.modelProxy.groups.mediaRouting.summary') }}</p>
+              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">{{ t('admin.modelProxy.groups.mediaRouting.help') }}</p>
+            </div>
             <label class="field"><span>{{ t('admin.modelProxy.groups.policy.priority') }}</span><input v-model.number="memberPolicyForm.priority" type="number" min="0" step="1" required /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.policy.priorityHelp') }}</small></label>
             <div class="space-y-2 rounded-md border border-border bg-muted/30 p-3">
               <label class="flex items-center gap-3 text-sm"><input v-model="memberPolicyForm.neverAutoPause" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.groups.policy.neverAutoPause') }}</label>
