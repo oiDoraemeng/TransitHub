@@ -326,7 +326,9 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	}
 	compact := incoming.URL.Path == compactPath
 	keywordFiltering := false
-	if !compact {
+	// Audio/video already require the Ultra member. Its keyword rules select
+	// text traffic and must not exclude an attachment it is required to handle.
+	if !compact && !media.Audio && !media.Video {
 		for _, candidate := range candidates {
 			if candidate.KeywordMatchMode != KeywordMatchModeDisabled {
 				keywordFiltering = true

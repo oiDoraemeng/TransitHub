@@ -325,6 +325,9 @@ func TestMediaSmartGroupPostgresRedisUsesOnlyUltra(t *testing.T) {
 			if err := repo.AddMember(ctx, "user", "workspace", "media-group", gpt.ID); err != nil {
 				t.Fatal(err)
 			}
+			if _, err := repo.db.Exec(ctx, `UPDATE proxy_smart_groups SET keywords=ARRAY['restricted-keyword']::text[] WHERE id='media-group'`); err != nil {
+				t.Fatal(err)
+			}
 			for _, member := range []struct {
 				route       Route
 				name, model string
@@ -342,7 +345,11 @@ func TestMediaSmartGroupPostgresRedisUsesOnlyUltra(t *testing.T) {
 				}
 				provided, neverPause := true, true
 				mapping := `{"gemini-test":"gpt-6-luna"}`
-				if err := repo.UpdateMemberPolicy(ctx, "user", "workspace", "media-group", member.route.ID, nil, nil, nil, &member.priority, &member.mapped, &mapping, &provided, nil, nil, nil, nil, nil, nil, &neverPause); err != nil {
+				keywordMode := KeywordMatchModeDisabled
+				if member.route.ID == ultra.ID && scenario != "pdf-fallback" {
+					keywordMode = KeywordMatchModeRequireMatch
+				}
+				if err := repo.UpdateMemberPolicy(ctx, "user", "workspace", "media-group", member.route.ID, nil, nil, nil, &member.priority, &member.mapped, &mapping, &provided, nil, nil, &keywordMode, nil, nil, nil, &neverPause); err != nil {
 					t.Fatal(err)
 				}
 			}
