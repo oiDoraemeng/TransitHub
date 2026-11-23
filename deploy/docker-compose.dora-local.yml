@@ -1,0 +1,9 @@
+# Optional override when Dora and TransitHub run on the same Docker host.
+# Keep the public URL and TLS SNI, but reach the host's Nginx internally.
+# Nginx must listen on port 443 on the Docker host gateway and serve this domain.
+# docker compose -f <production-compose.yml> -f docker-compose.dora-local.yml up -d app
+services:
+  app:
+    extra_hosts:
+      - "dora2api.xyz:host-gateway"
+      - "www.dora2api.xyz:host-gateway"

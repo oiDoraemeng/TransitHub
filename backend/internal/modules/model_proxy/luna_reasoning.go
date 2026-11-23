@@ -3,9 +3,13 @@ package model_proxy
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/url"
 	"strings"
+
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 // Keep the client's metadata separate from the upstream-only policy. In
@@ -34,40 +38,64 @@ func forceDoraLunaReasoning(baseURL, requestURI string, body io.ReadCloser, mapp
 	if closeErr != nil {
 		return nil, mapping, closeErr
 	}
-	var payload map[string]any
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber() // Preserve large integers in tool arguments and metadata.
-	if err := decoder.Decode(&payload); err != nil {
+	if !gjson.ValidBytes(raw) || len(bytes.TrimSpace(raw)) == 0 || bytes.TrimSpace(raw)[0] != '{' {
+		return nil, mapping, errors.New("request body must contain one JSON object")
+	}
+	raw, err = canonicalPatchObject(raw)
+	if err != nil {
 		return nil, mapping, err
 	}
-	model, _ := payload["model"].(string)
+	for _, key := range []string{"reasoning", "stream_options"} {
+		raw, err = canonicalPatchMetadata(raw, key)
+		if err != nil {
+			return nil, mapping, err
+		}
+	}
+	fields := gjson.GetManyBytes(raw, "model", "reasoning", "reasoning_effort", "stream", "background", "audio", "modalities", "stream_options")
+	model := fields[0].String()
 	if _, luna := mappedModelTargets[strings.ToLower(strings.TrimSpace(model))]; !luna {
 		return io.NopCloser(bytes.NewReader(raw)), mapping, nil
 	}
-	reasoning, _ := payload["reasoning"].(map[string]any)
+	// Patch only policy fields. Decoding every message/tool into map[string]any
+	// multiplies live allocations for multi-MiB requests at high concurrency.
+	reasoning := fields[1]
+	effort := reasoning.Get("effort")
 	original := &clientReasoningEffort{}
-	original.Value, original.NestedPresent = reasoning["effort"]
-	flat, flatPresent := payload["reasoning_effort"]
-	original.FlatPresent = flatPresent
-	original.Present = original.NestedPresent || flatPresent
+	original.NestedPresent, original.FlatPresent = effort.Exists(), fields[2].Exists()
+	original.Present = original.NestedPresent || original.FlatPresent
 	if !original.NestedPresent {
-		original.Value = flat
+		effort = fields[2]
+	}
+	if original.Present {
+		decoder := json.NewDecoder(strings.NewReader(effort.Raw))
+		decoder.UseNumber()
+		if err := decoder.Decode(&original.Value); err != nil {
+			return nil, mapping, err
+		}
+	}
+	options := &sjson.Options{Optimistic: true, ReplaceInPlace: true}
+	encoded := raw
+	set := func(path string, value any) {
+		if err == nil {
+			encoded, err = sjson.SetBytesOptions(encoded, path, value, options)
+		}
 	}
 	if endpoint.Path == "/v1/responses" {
-		if reasoning == nil {
-			reasoning = make(map[string]any)
-			payload["reasoning"] = reasoning
+		if !reasoning.IsObject() {
+			set("reasoning", map[string]any{"effort": "max"})
+		} else {
+			set("reasoning.effort", "max")
 		}
-		reasoning["effort"] = "max"
 		// Conflicting legacy fields must not override the canonical value.
-		delete(payload, "reasoning_effort")
+		if err == nil {
+			encoded, err = sjson.DeleteBytes(encoded, "reasoning_effort")
+		}
 	} else {
-		payload["reasoning_effort"] = "max"
-		if reasoning != nil {
-			reasoning["effort"] = "max"
+		set("reasoning_effort", "max")
+		if reasoning.IsObject() {
+			set("reasoning.effort", "max")
 		}
 	}
-	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return nil, mapping, err
 	}
@@ -80,23 +108,20 @@ func forceDoraLunaReasoning(baseURL, requestURI string, body io.ReadCloser, mapp
 	// while the model is generating. Observe its stream internally, then return
 	// the original JSON protocol after completion. Audio/background requests
 	// retain their native response semantics.
-	streaming, validStream := payload["stream"].(bool)
-	background, _ := payload["background"].(bool)
-	if !streaming && (validStream || payload["stream"] == nil) && !background && payload["audio"] == nil && payload["modalities"] == nil {
+	stream := fields[3]
+	if stream.Type != gjson.True && (stream.Type == gjson.False || stream.Type == gjson.Null) && !fields[4].Bool() && fields[5].Type == gjson.Null && fields[6].Type == gjson.Null {
 		mapping.BufferedStream = true
-		payload["stream"] = true
+		set("stream", true)
 		if endpoint.Path == "/v1/chat/completions" {
-			options, _ := payload["stream_options"].(map[string]any)
-			if options == nil {
-				options = make(map[string]any)
+			if !fields[7].IsObject() {
+				set("stream_options", map[string]any{"include_usage": true})
+			} else {
+				set("stream_options.include_usage", true)
 			}
-			options["include_usage"] = true
-			payload["stream_options"] = options
 		}
-		encoded, err = json.Marshal(payload)
-		if err != nil {
-			return nil, mapping, err
-		}
+	}
+	if err != nil {
+		return nil, mapping, err
 	}
 	return io.NopCloser(bytes.NewReader(encoded)), mapping, nil
 }

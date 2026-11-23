@@ -16,6 +16,9 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
+
 	"transithub/backend/internal/modules/upstream"
 )
 
@@ -679,24 +682,23 @@ func applyModelMapping(incoming *http.Request, body io.ReadCloser, enabled bool,
 	if closeErr != nil {
 		return nil, nil, closeErr
 	}
-	var payload map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &payload); err != nil || payload == nil {
+	if !gjson.ValidBytes(raw) {
 		return incoming, io.NopCloser(bytes.NewReader(raw)), nil
 	}
-	var source string
-	if err := json.Unmarshal(payload["model"], &source); err != nil {
+	raw, err = canonicalPatchObject(raw)
+	if err != nil {
+		return nil, nil, err
+	}
+	sourceField := gjson.GetBytes(raw, "model")
+	if sourceField.Type != gjson.String {
 		return incoming, io.NopCloser(bytes.NewReader(raw)), nil
 	}
+	source := sourceField.String()
 	target := strings.TrimSpace(mapping[strings.TrimSpace(source)])
 	if target == "" || target == source {
 		return incoming, io.NopCloser(bytes.NewReader(raw)), nil
 	}
-	encodedTarget, err := json.Marshal(target)
-	if err != nil {
-		return nil, nil, err
-	}
-	payload["model"] = encodedTarget
-	encoded, err := json.Marshal(payload)
+	encoded, err := sjson.SetBytesOptions(raw, "model", target, &sjson.Options{Optimistic: true, ReplaceInPlace: true})
 	if err != nil {
 		return nil, nil, err
 	}
