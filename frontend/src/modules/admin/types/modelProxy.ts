@@ -1,5 +1,7 @@
 import type { UpstreamGroupInfo, UpstreamSiteResponse } from './upstream'
 
+export type ReasoningEffort = '' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+
 export interface ProxyRoute {
   id: string
   name: string
@@ -34,6 +36,7 @@ export interface ProxyRoute {
   keywordMatchMode?: 'disabled' | 'skip_on_match' | 'require_match'
   modelMappingEnabled?: boolean
   modelMapping?: Record<string, string>
+  reasoningEffort?: ReasoningEffort
   syncKeyDeleteEnabled?: boolean
   syncKeyDeleteDelayMs?: number
   modelSyncedAt: string | null
@@ -149,6 +152,7 @@ export interface SmartGroupInput {
 }
 
 export interface SmartGroupMemberPolicyInput {
+  reasoningEffort?: ReasoningEffort
   schedulingPaused?: boolean
   mediaInputEnabled: boolean
   neverAutoPause?: boolean

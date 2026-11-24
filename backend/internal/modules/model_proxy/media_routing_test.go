@@ -355,7 +355,7 @@ func TestMediaSmartGroupPostgresRedisUsesOnlyUltra(t *testing.T) {
 					keywordMode = KeywordMatchModeRequireMatch
 				}
 				mediaEnabled := member.route.ID == ultra.ID && scenario != "disabled"
-				if err := repo.UpdateMemberPolicy(ctx, "user", "workspace", "media-group", member.route.ID, nil, nil, nil, &member.priority, &member.mapped, &mapping, &provided, nil, nil, &keywordMode, nil, nil, nil, &neverPause, &mediaEnabled); err != nil {
+				if err := repo.UpdateMemberPolicy(ctx, "user", "workspace", "media-group", member.route.ID, nil, nil, nil, &member.priority, &member.mapped, &mapping, &provided, nil, nil, &keywordMode, nil, nil, nil, &neverPause, &mediaEnabled, nil); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -372,7 +372,7 @@ func TestMediaSmartGroupPostgresRedisUsesOnlyUltra(t *testing.T) {
 			}
 			if scenario == "paused" {
 				paused := true
-				if err := repo.UpdateMemberPolicy(ctx, "user", "workspace", "media-group", ultra.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &paused, nil, nil); err != nil {
+				if err := repo.UpdateMemberPolicy(ctx, "user", "workspace", "media-group", ultra.ID, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &paused, nil, nil, nil); err != nil {
 					t.Fatal(err)
 				}
 			}

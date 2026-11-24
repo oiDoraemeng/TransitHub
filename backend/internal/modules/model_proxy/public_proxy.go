@@ -793,12 +793,12 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		cleanup()
 		return nil, true, errors.New("upstream site is unavailable")
 	}
-	// Apply after alias/protocol conversion so the final dora2api model decides
-	// the policy, including Gemini aliases converted to Chat Completions.
+	// Apply the member's effort after alias/protocol conversion. With no override,
+	// preserve the Dora Luna max default, including converted Gemini aliases.
 	if !route.ModelMappingEnabled {
 		responseMapping = mappedResponseContext{}
 	}
-	body, responseMapping, err = forceDoraLunaReasoning(baseURL, protocolRequest.requestURI, body, responseMapping)
+	body, responseMapping, err = applyUpstreamReasoning(baseURL, protocolRequest.requestURI, body, responseMapping, route.ReasoningEffort)
 	if err != nil {
 		cleanup()
 		return nil, true, err

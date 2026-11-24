@@ -174,6 +174,9 @@ export default {
         customKeys: '自定义入口 Key', customKeyTotal: '当前 {count} 个', noCustomKeys: '尚未设置自定义 Key，系统生成的主 Key 不受影响。',
         addCustomKeys: '新增自定义 Key', customKeyPlaceholder: '每行填写一个自定义 Key', customKeyHelp: '最多 32 个；保存后与系统生成的主 Key 同时有效。留空不会修改现有自定义 Key。', removeCustomKey: '移除此自定义 Key',
         policy: {
+          reasoningEffort: '上游推理强度', reasoningDefault: '默认策略',
+          reasoningHelp: '为当前成员的 Chat / Responses 请求指定推理强度，模型映射后生效。默认：Dora Luna 使用 max，其他模型沿用请求参数。返回给客户端的推理参数保持原请求设置。',
+          reasoningSummary: '推理 {effort}',
           neverAutoPause: '永不自动暂停',
           neverAutoPauseHelp: '仅对当前分组成员生效。请求失败不会触发自动暂停或模型隔离，已有自动隔离也不影响调度。手动暂停、手动移除模型和并发限制仍生效。',
           edit: '成员策略', streamOnly: '仅接收流式请求', minInput: '最少输入 Token',

@@ -34,7 +34,7 @@ func TestDoraLunaForceMaxAndRestoreClientMetadata(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					body, mapping, err = forceDoraLunaReasoning("https://www.dora2api.xyz", path, body, mapping)
+					body, mapping, err = applyUpstreamReasoning("https://www.dora2api.xyz", path, body, mapping, "")
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -126,7 +126,7 @@ func TestDoraLunaOverrideScopeAndDirectModel(t *testing.T) {
 		{"https://dora2api.xyz", "/v1/responses/compact", "gpt-6-luna", false},
 	} {
 		raw := `{"model":"` + test.model + `","reasoning":{"effort":"low"}}`
-		body, mapping, err := forceDoraLunaReasoning(test.base, test.path, io.NopCloser(strings.NewReader(raw)), mappedResponseContext{})
+		body, mapping, err := applyUpstreamReasoning(test.base, test.path, io.NopCloser(strings.NewReader(raw)), mappedResponseContext{}, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -140,7 +140,7 @@ func TestDoraLunaOverrideScopeAndDirectModel(t *testing.T) {
 
 func TestDoraLunaOverridePreservesLargeToolArgumentIntegers(t *testing.T) {
 	raw := `{"model":"gpt-6-luna","input":[{"type":"function_call_output","call_id":"x","output":{"id":9007199254740993}}]}`
-	body, _, err := forceDoraLunaReasoning("https://dora2api.xyz", "/v1/responses", io.NopCloser(strings.NewReader(raw)), mappedResponseContext{})
+	body, _, err := applyUpstreamReasoning("https://dora2api.xyz", "/v1/responses", io.NopCloser(strings.NewReader(raw)), mappedResponseContext{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestDoraLunaGeminiAliasForcesConvertedChat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, _, err = forceDoraLunaReasoning("https://dora2api.xyz", request.requestURI, request.body, mappedResponseContext{})
+	body, _, err = applyUpstreamReasoning("https://dora2api.xyz", request.requestURI, request.body, mappedResponseContext{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

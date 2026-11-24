@@ -52,6 +52,7 @@ type Route struct {
 	KeywordMatchMode      string            `json:"keywordMatchMode,omitempty"`
 	ModelMappingEnabled   bool              `json:"modelMappingEnabled,omitempty"`
 	ModelMapping          map[string]string `json:"modelMapping,omitempty"`
+	ReasoningEffort       string            `json:"reasoningEffort,omitempty"`
 	SyncKeyDeleteEnabled  bool              `json:"syncKeyDeleteEnabled,omitempty"`
 	SyncKeyDeleteDelayMS  int               `json:"syncKeyDeleteDelayMs,omitempty"`
 	ModelSyncedAt         *time.Time        `json:"modelSyncedAt"`
@@ -219,6 +220,7 @@ type UpdateMemberPolicyRequest struct {
 	Priority             *int               `json:"priority,omitempty"`
 	ModelMappingEnabled  *bool              `json:"modelMappingEnabled,omitempty"`
 	ModelMapping         *map[string]string `json:"modelMapping,omitempty"`
+	ReasoningEffort      *string            `json:"reasoningEffort,omitempty"`
 	UseProvidedKey       *bool              `json:"useProvidedKey,omitempty"`
 	UpstreamKey          string             `json:"upstreamKey,omitempty"`
 	KeywordMatchMode     *string            `json:"keywordMatchMode,omitempty"`

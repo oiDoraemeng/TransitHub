@@ -109,7 +109,7 @@ func manualProbeFixture(t *testing.T, serve http.HandlerFunc) (*Service, Route, 
 	for _, group := range []string{"a", "b"} {
 		if err := repo.UpdateMemberPolicy(context.Background(), "user", "workspace", group, route.ID,
 			nil, nil, nil, nil, &mapping, &mappingJSON, &provided,
-			&upstreamKeyCiphertext, &upstreamKeyPreview, nil, nil, nil, &paused, nil, nil); err != nil {
+			&upstreamKeyCiphertext, &upstreamKeyPreview, nil, nil, nil, &paused, nil, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 	}

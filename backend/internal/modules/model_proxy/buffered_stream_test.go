@@ -206,7 +206,7 @@ func TestDoraBufferedPolicyScope(t *testing.T) {
 		{"https://other.example", "/v1/chat/completions", ``, false},
 		{"https://dora2api.xyz", "/v1/responses/compact", ``, false},
 	} {
-		body, mapping, err := forceDoraLunaReasoning(tc.base, tc.path, io.NopCloser(strings.NewReader(`{"model":"gpt-6-luna"`+tc.fields+`}`)), mappedResponseContext{})
+		body, mapping, err := applyUpstreamReasoning(tc.base, tc.path, io.NopCloser(strings.NewReader(`{"model":"gpt-6-luna"`+tc.fields+`}`)), mappedResponseContext{}, "")
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -13,7 +13,7 @@ func BenchmarkDoraLunaLargeRequest(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		body, _, err := forceDoraLunaReasoning("https://www.dora2api.xyz", "/v1/chat/completions", io.NopCloser(bytes.NewReader(raw)), mappedResponseContext{})
+		body, _, err := applyUpstreamReasoning("https://www.dora2api.xyz", "/v1/chat/completions", io.NopCloser(bytes.NewReader(raw)), mappedResponseContext{}, "")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -28,7 +28,7 @@ func BenchmarkDoraLunaLargeRequest(b *testing.B) {
 func TestDoraLunaLargeRequestPreservesOpaquePayload(t *testing.T) {
 	opaque := `{"arguments": { "id":9007199254740993, "escaped":"a\\b\"c" },"history":"` + strings.Repeat("large ", 200000) + `"}`
 	raw := `{"model":"gpt-6-luna","stream":true,"input":` + opaque + `,"reasoning":{"effort":"low"}}`
-	body, _, err := forceDoraLunaReasoning("https://dora2api.xyz", "/v1/responses", io.NopCloser(strings.NewReader(raw)), mappedResponseContext{})
+	body, _, err := applyUpstreamReasoning("https://dora2api.xyz", "/v1/responses", io.NopCloser(strings.NewReader(raw)), mappedResponseContext{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestDoraLunaLargeRequestPreservesOpaquePayload(t *testing.T) {
 
 func TestDoraLunaDuplicateFieldsKeepLastValue(t *testing.T) {
 	raw := `{"model":"other","model":"gpt-6-luna","stream":true,"reasoning":{"effort":"low","effort":"high"}}`
-	body, mapping, err := forceDoraLunaReasoning("https://dora2api.xyz", "/v1/responses", io.NopCloser(strings.NewReader(raw)), mappedResponseContext{})
+	body, mapping, err := applyUpstreamReasoning("https://dora2api.xyz", "/v1/responses", io.NopCloser(strings.NewReader(raw)), mappedResponseContext{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -662,6 +662,13 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	if input.Priority != nil && *input.Priority < 0 {
 		return &requestError{Status: 400, Message: "priority cannot be negative"}
 	}
+	if input.ReasoningEffort != nil {
+		effort, err := normalizeReasoningEffort(*input.ReasoningEffort)
+		if err != nil {
+			return err
+		}
+		input.ReasoningEffort = &effort
+	}
 	if input.SyncKeyDeleteDelayMS != nil && (*input.SyncKeyDeleteDelayMS < 1 || *input.SyncKeyDeleteDelayMS > maxSyncKeyDeleteDelayMS) {
 		return &requestError{Status: 400, Message: "syncKeyDeleteDelayMs must be between 1 and 60000"}
 	}
@@ -707,7 +714,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 		}
 		input.KeywordMatchMode = &mode
 	}
-	if input.MediaInputEnabled == nil && input.NeverAutoPause == nil && input.SchedulingPaused == nil && input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordMatchMode == nil && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
+	if input.ReasoningEffort == nil && input.MediaInputEnabled == nil && input.NeverAutoPause == nil && input.SchedulingPaused == nil && input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordMatchMode == nil && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
 	var routeKeyCiphertext, routeKeyPreview *string
@@ -743,7 +750,7 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	if err := s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
 		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
 		input.ModelMappingEnabled, modelMappingJSON, input.UseProvidedKey, routeKeyCiphertext, routeKeyPreview,
-		input.KeywordMatchMode, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS, input.SchedulingPaused, input.NeverAutoPause, input.MediaInputEnabled); err != nil {
+		input.KeywordMatchMode, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS, input.SchedulingPaused, input.NeverAutoPause, input.MediaInputEnabled, input.ReasoningEffort); err != nil {
 		return err
 	}
 	if keyUpdated {

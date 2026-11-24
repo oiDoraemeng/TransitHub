@@ -174,6 +174,9 @@ export default {
         customKeys: 'Custom entry keys', customKeyTotal: '{count} currently', noCustomKeys: 'No custom keys are configured. The system-generated primary key is unchanged.',
         addCustomKeys: 'Add custom keys', customKeyPlaceholder: 'One custom key per line', customKeyHelp: 'Up to 32. After saving, each custom key works alongside the system-generated primary key. Leaving this empty keeps existing custom keys.', removeCustomKey: 'Remove this custom key',
         policy: {
+          reasoningEffort: 'Upstream reasoning effort', reasoningDefault: 'Default policy',
+          reasoningHelp: 'Override effort for this member’s Chat / Responses requests after model mapping. Default: max for Dora Luna; other models keep the requested effort. Client responses retain the original request’s reasoning settings.',
+          reasoningSummary: 'Reasoning {effort}',
           neverAutoPause: 'Never pause automatically',
           neverAutoPauseHelp: 'Applies to this group member only. Failures do not trigger automatic pauses or model isolation, and existing automatic isolation does not block scheduling. Manual pauses, removed models and concurrency limits still apply.',
           edit: 'Member policy', streamOnly: 'Accept streaming requests only', minInput: 'Minimum input tokens',

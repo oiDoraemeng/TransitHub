@@ -13,7 +13,7 @@ import (
 )
 
 // Keep the client's metadata separate from the upstream-only policy. In
-// particular, an omitted effort must never leak our injected max downstream.
+// particular, an omitted effort must never leak our override downstream.
 type clientReasoningEffort struct {
 	Value         any
 	Present       bool
@@ -21,9 +21,20 @@ type clientReasoningEffort struct {
 	FlatPresent   bool
 }
 
-func forceDoraLunaReasoning(baseURL, requestURI string, body io.ReadCloser, mapping mappedResponseContext) (io.ReadCloser, mappedResponseContext, error) {
+func normalizeReasoningEffort(value string) (string, error) {
+	effort := strings.ToLower(strings.TrimSpace(value))
+	switch effort {
+	case "", "low", "medium", "high", "xhigh", "max":
+		return effort, nil
+	default:
+		return "", &requestError{Status: 400, Message: "reasoningEffort must be low, medium, high, xhigh, max, or empty for the default policy"}
+	}
+}
+
+func applyUpstreamReasoning(baseURL, requestURI string, body io.ReadCloser, mapping mappedResponseContext, configuredEffort string) (io.ReadCloser, mappedResponseContext, error) {
 	site, err := url.Parse(baseURL)
-	if err != nil || (!strings.EqualFold(site.Hostname(), "dora2api.xyz") && !strings.EqualFold(site.Hostname(), "www.dora2api.xyz")) {
+	dora := err == nil && (strings.EqualFold(site.Hostname(), "dora2api.xyz") || strings.EqualFold(site.Hostname(), "www.dora2api.xyz"))
+	if !dora && configuredEffort == "" {
 		return body, mapping, nil
 	}
 	endpoint, err := url.ParseRequestURI(requestURI)
@@ -53,8 +64,14 @@ func forceDoraLunaReasoning(baseURL, requestURI string, body io.ReadCloser, mapp
 	}
 	fields := gjson.GetManyBytes(raw, "model", "reasoning", "reasoning_effort", "stream", "background", "audio", "modalities", "stream_options")
 	model := fields[0].String()
-	if _, luna := mappedModelTargets[strings.ToLower(strings.TrimSpace(model))]; !luna {
+	_, luna := mappedModelTargets[strings.ToLower(strings.TrimSpace(model))]
+	luna = dora && luna
+	if !luna && configuredEffort == "" {
 		return io.NopCloser(bytes.NewReader(raw)), mapping, nil
+	}
+	effortOverride := configuredEffort
+	if effortOverride == "" {
+		effortOverride = "max" // Preserve the existing Dora Luna default.
 	}
 	// Patch only policy fields. Decoding every message/tool into map[string]any
 	// multiplies live allocations for multi-MiB requests at high concurrency.
@@ -82,18 +99,18 @@ func forceDoraLunaReasoning(baseURL, requestURI string, body io.ReadCloser, mapp
 	}
 	if endpoint.Path == "/v1/responses" {
 		if !reasoning.IsObject() {
-			set("reasoning", map[string]any{"effort": "max"})
+			set("reasoning", map[string]any{"effort": effortOverride})
 		} else {
-			set("reasoning.effort", "max")
+			set("reasoning.effort", effortOverride)
 		}
 		// Conflicting legacy fields must not override the canonical value.
 		if err == nil {
 			encoded, err = sjson.DeleteBytes(encoded, "reasoning_effort")
 		}
 	} else {
-		set("reasoning_effort", "max")
+		set("reasoning_effort", effortOverride)
 		if reasoning.IsObject() {
-			set("reasoning.effort", "max")
+			set("reasoning.effort", effortOverride)
 		}
 	}
 	if err != nil {
@@ -109,7 +126,7 @@ func forceDoraLunaReasoning(baseURL, requestURI string, body io.ReadCloser, mapp
 	// the original JSON protocol after completion. Audio/background requests
 	// retain their native response semantics.
 	stream := fields[3]
-	if stream.Type != gjson.True && (stream.Type == gjson.False || stream.Type == gjson.Null) && !fields[4].Bool() && fields[5].Type == gjson.Null && fields[6].Type == gjson.Null {
+	if luna && stream.Type != gjson.True && (stream.Type == gjson.False || stream.Type == gjson.Null) && !fields[4].Bool() && fields[5].Type == gjson.Null && fields[6].Type == gjson.Null {
 		mapping.BufferedStream = true
 		set("stream", true)
 		if endpoint.Path == "/v1/chat/completions" {

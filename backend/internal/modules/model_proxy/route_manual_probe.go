@@ -220,7 +220,7 @@ func (s *Service) manualTestFingerprint(ctx context.Context, route Route) (strin
 	encoded, err := json.Marshal([]any{route.ID, route.SiteID, site.BaseURL, route.GroupID,
 		route.ProxyID, proxyVersion, route.Enabled, route.ConcurrencyLimit, route.UseProvidedKey,
 		route.UpstreamKeyCiphertext, route.ModelMappingEnabled, route.ModelMapping,
-		route.SchedulingPaused, route.MemberPolicyRevision})
+		route.SchedulingPaused, route.MemberPolicyRevision, route.ReasoningEffort})
 	if err != nil {
 		return "", err
 	}
