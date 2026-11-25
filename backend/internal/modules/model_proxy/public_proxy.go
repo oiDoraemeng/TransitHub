@@ -235,6 +235,14 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 			return
 		}
 		lastResponse, lastAttemptErr = response, attemptErr
+		if errors.Is(attemptErr, errUpstreamUsageAnomaly) {
+			if response != nil && response.Body != nil {
+				response.Body.Close()
+			}
+			s.observeRouteRequest(incoming.Context(), lease, probeSpec, response, attemptErr, route)
+			writeOpenAIError(w, http.StatusBadGateway, "upstream_usage_anomaly", attemptErr.Error())
+			return
+		}
 		if attemptErr == nil && !retryable {
 			completed, readErr := s.writeUpstreamResponse(w, response)
 			s.recordSuccessfulRouteRequest(incoming.Context(), route.ID, response, completed, readErr)
@@ -550,6 +558,12 @@ func attemptSmartGroupMemberWithPolicy(ctx context.Context, policy smartGroupRet
 			}
 		}
 		response, err := attempt(timeout)
+		if errors.Is(err, errUpstreamUsageAnomaly) {
+			if response != nil && response.Body != nil {
+				response.Body.Close()
+			}
+			return nil, err // Do not repeat a completed request on this member.
+		}
 		var mediaErr *mediaInputError
 		if errors.As(err, &mediaErr) {
 			return nil, err
@@ -809,6 +823,18 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		cleanup()
 		return nil, true, err
 	}
+	var usageGuard *claudeUsageGuard
+	usageModel := responseMapping.SourceModel
+	if route.ModelMappingEnabled && strings.TrimSpace(modelMapping[usageModel]) != "" {
+		usageModel = modelMapping[usageModel]
+	}
+	if usageModel == "" || strings.HasPrefix(strings.ToLower(usageModel), "claude-") {
+		body, usageGuard, err = prepareClaudeUsageGuard(protocolRequest.requestURI, body, route.ID, incoming.Header.Get("X-Request-ID"))
+		if err != nil {
+			cleanup()
+			return nil, true, err
+		}
+	}
 	request, err := http.NewRequestWithContext(incoming.Context(), incoming.Method, strings.TrimRight(baseURL, "/")+protocolRequest.requestURI, body)
 	if err != nil {
 		body.Close()
@@ -847,6 +873,13 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		return nil, true, err
 	}
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
+	if err := usageGuard.attach(response); err != nil {
+		response.Body.Close()
+		if deadlineCleanup == nil {
+			cleanup()
+		}
+		return response, false, err
+	}
 	cleanupHandled := false
 	if responseMapping.BufferedStream && response.StatusCode >= 200 && response.StatusCode < 300 && isEventStream(response.Header) {
 		if needsCleanup && deadlineCleanup == nil {
@@ -863,7 +896,14 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 			}
 			if err := prepareStreamStart(incoming.Context(), response, remaining); err != nil {
 				response.Body.Close()
+				if usageErr := usageGuard.failure(); usageErr != nil {
+					return response, false, usageErr
+				}
 				return response, true, err
+			}
+			if usageErr := usageGuard.failure(); usageErr != nil {
+				response.Body.Close()
+				return response, false, usageErr
 			}
 			if responseHealth(response).failed {
 				return response, true, nil
@@ -874,6 +914,9 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		}
 		if err := bufferDoraStream(response, strings.Split(protocolRequest.requestURI, "?")[0] == "/v1/responses"); err != nil {
 			response.Body.Close()
+			if usageErr := usageGuard.failure(); usageErr != nil {
+				return response, false, usageErr
+			}
 			return response, true, err
 		}
 	}
@@ -919,7 +962,14 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		}
 		if err := prepareStreamStart(incoming.Context(), response, remaining); err != nil {
 			_ = response.Body.Close()
+			if usageErr := usageGuard.failure(); usageErr != nil {
+				return response, false, usageErr
+			}
 			return response, true, err
+		}
+		if usageErr := usageGuard.failure(); usageErr != nil {
+			_ = response.Body.Close()
+			return response, false, usageErr
 		}
 	}
 	return response, retryable, nil
