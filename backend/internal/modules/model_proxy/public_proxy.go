@@ -181,6 +181,11 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 	}
 	defer replay.Close()
 	modelID, _ := requestModelID(incoming, replay)
+	responseMapping, err := newMappedResponseContext(incoming, replay, modelID, nil)
+	if err != nil {
+		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "failed to read request model")
+		return
+	}
 	if payload, parseErr := replay.Object(); parseErr == nil {
 		var media requestMedia
 		incoming, media = withRequestMedia(incoming, payload, modelID)
@@ -223,7 +228,7 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 			}
 		}
 		attempts++
-		response, retryable, attemptErr := s.performAttempt(incoming, route, replay.Open, nil, mappedResponseContext{}, false)
+		response, retryable, attemptErr := s.performAttempt(incoming, route, replay.Open, nil, responseMapping, false)
 		var mediaErr *mediaInputError
 		if errors.As(attemptErr, &mediaErr) {
 			writeOpenAIError(w, http.StatusBadRequest, "invalid_media_input", mediaErr.Error())
@@ -796,7 +801,8 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 	// Apply the member's effort after alias/protocol conversion. With no override,
 	// preserve the Dora Luna max default, including converted Gemini aliases.
 	if !route.ModelMappingEnabled {
-		responseMapping = mappedResponseContext{}
+		responseMapping = mappedResponseContext{Enabled: responseMapping.Enabled, SourceModel: responseMapping.SourceModel,
+			ResponsesAPI: responseMapping.ResponsesAPI, GeminiModelDetail: responseMapping.GeminiModelDetail}
 	}
 	body, responseMapping, err = applyUpstreamReasoning(baseURL, protocolRequest.requestURI, body, responseMapping, route.ReasoningEffort)
 	if err != nil {
@@ -871,8 +877,8 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 			return response, true, err
 		}
 	}
-	if !retryable && response.StatusCode >= 200 && response.StatusCode < 300 && responseMapping.Enabled {
-		if err := rewriteMappedResponse(response, responseMapping); err != nil {
+	if !retryable && protocolRequest.responseAdapter != nil {
+		if err := protocolRequest.responseAdapter(response); err != nil {
 			response.Body.Close()
 			if !cleanupHandled && deadlineCleanup == nil {
 				cleanup()
@@ -880,8 +886,10 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 			return nil, true, err
 		}
 	}
-	if !retryable && protocolRequest.responseAdapter != nil {
-		if err := protocolRequest.responseAdapter(response); err != nil {
+	// Restore the public model after protocol conversion, independently of
+	// whether this member remapped the request or the upstream renamed it.
+	if !retryable && response.StatusCode >= 200 && response.StatusCode < 300 && responseMapping.Enabled {
+		if err := rewriteMappedResponse(response, responseMapping); err != nil {
 			response.Body.Close()
 			if !cleanupHandled && deadlineCleanup == nil {
 				cleanup()
