@@ -300,7 +300,7 @@ func (r *Repository) CreateSmartGroup(ctx context.Context, group SmartGroup, rou
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, `INSERT INTO proxy_smart_groups (id,user_id,admin_account_id,name,enabled,keywords,local_reply_enabled,local_reply_min_tokens,local_reply_max_output_tokens,local_reply_text,usage_correction_enabled,usage_correction_allowance_percent) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled, group.Keywords, group.LocalReplyEnabled, group.LocalReplyMinTokens, group.LocalReplyMaxOutputTokens, group.LocalReplyText, group.UsageCorrectionEnabled, group.UsageCorrectionAllowancePercent); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO proxy_smart_groups (id,user_id,admin_account_id,name,enabled,keywords,local_reply_enabled,local_reply_min_tokens,local_reply_max_output_tokens,local_reply_text,usage_correction_enabled,usage_correction_allowance_percent,fingerprint_reply_enabled) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled, group.Keywords, group.LocalReplyEnabled, group.LocalReplyMinTokens, group.LocalReplyMaxOutputTokens, group.LocalReplyText, group.UsageCorrectionEnabled, group.UsageCorrectionAllowancePercent, group.FingerprintReplyEnabled); err != nil {
 		return err
 	}
 	for _, routeID := range routeIDs {
@@ -323,7 +323,7 @@ func (r *Repository) CreateSmartGroup(ctx context.Context, group SmartGroup, rou
 
 func (r *Repository) ListSmartGroups(ctx context.Context, userID, accountID string) ([]SmartGroup, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(g.keywords,ARRAY[]::text[]),COALESCE(k.key_preview,''),g.created_at,g.updated_at,g.local_reply_enabled,g.local_reply_min_tokens,g.local_reply_max_output_tokens,g.local_reply_text,g.usage_correction_enabled,g.usage_correction_allowance_percent
+		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(g.keywords,ARRAY[]::text[]),COALESCE(k.key_preview,''),g.created_at,g.updated_at,g.local_reply_enabled,g.local_reply_min_tokens,g.local_reply_max_output_tokens,g.local_reply_text,g.usage_correction_enabled,g.usage_correction_allowance_percent,g.fingerprint_reply_enabled
 		FROM proxy_smart_groups g
 		LEFT JOIN proxy_access_keys k ON k.owner_type='smart_group' AND k.owner_id=g.id AND k.key_kind='primary'
 		WHERE g.user_id=$1 AND g.admin_account_id=$2 ORDER BY g.created_at ASC,g.id ASC
@@ -335,7 +335,7 @@ func (r *Repository) ListSmartGroups(ctx context.Context, userID, accountID stri
 	groups := make([]SmartGroup, 0)
 	for rows.Next() {
 		var group SmartGroup
-		if err := rows.Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &group.Keywords, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt, &group.LocalReplyEnabled, &group.LocalReplyMinTokens, &group.LocalReplyMaxOutputTokens, &group.LocalReplyText, &group.UsageCorrectionEnabled, &group.UsageCorrectionAllowancePercent); err != nil {
+		if err := rows.Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &group.Keywords, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt, &group.LocalReplyEnabled, &group.LocalReplyMinTokens, &group.LocalReplyMaxOutputTokens, &group.LocalReplyText, &group.UsageCorrectionEnabled, &group.UsageCorrectionAllowancePercent, &group.FingerprintReplyEnabled); err != nil {
 			return nil, err
 		}
 		groups = append(groups, group)
@@ -373,10 +373,10 @@ func (r *Repository) ListSmartGroups(ctx context.Context, userID, accountID stri
 func (r *Repository) GetSmartGroupConfig(ctx context.Context, groupID string) (*SmartGroup, error) {
 	var group SmartGroup
 	err := r.db.QueryRow(ctx, `
-		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(g.keywords,ARRAY[]::text[]),COALESCE(k.key_preview,''),g.created_at,g.updated_at,g.local_reply_enabled,g.local_reply_min_tokens,g.local_reply_max_output_tokens,g.local_reply_text,g.usage_correction_enabled,g.usage_correction_allowance_percent
+		SELECT g.id,g.user_id,g.admin_account_id,g.name,g.enabled,COALESCE(g.keywords,ARRAY[]::text[]),COALESCE(k.key_preview,''),g.created_at,g.updated_at,g.local_reply_enabled,g.local_reply_min_tokens,g.local_reply_max_output_tokens,g.local_reply_text,g.usage_correction_enabled,g.usage_correction_allowance_percent,g.fingerprint_reply_enabled
 		FROM proxy_smart_groups g LEFT JOIN proxy_access_keys k ON k.owner_type='smart_group' AND k.owner_id=g.id AND k.key_kind='primary'
 		WHERE g.id=$1
-	`, groupID).Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &group.Keywords, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt, &group.LocalReplyEnabled, &group.LocalReplyMinTokens, &group.LocalReplyMaxOutputTokens, &group.LocalReplyText, &group.UsageCorrectionEnabled, &group.UsageCorrectionAllowancePercent)
+	`, groupID).Scan(&group.ID, &group.UserID, &group.AdminAccountID, &group.Name, &group.Enabled, &group.Keywords, &group.KeyPreview, &group.CreatedAt, &group.UpdatedAt, &group.LocalReplyEnabled, &group.LocalReplyMinTokens, &group.LocalReplyMaxOutputTokens, &group.LocalReplyText, &group.UsageCorrectionEnabled, &group.UsageCorrectionAllowancePercent, &group.FingerprintReplyEnabled)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -409,7 +409,7 @@ func (r *Repository) GetSmartGroup(ctx context.Context, groupID string) (*SmartG
 }
 
 func (r *Repository) UpdateSmartGroup(ctx context.Context, group SmartGroup) error {
-	result, err := r.db.Exec(ctx, `UPDATE proxy_smart_groups SET name=$4,enabled=$5,keywords=$6,local_reply_enabled=$7,local_reply_min_tokens=$8,local_reply_max_output_tokens=$9,local_reply_text=$10,usage_correction_enabled=$11,usage_correction_allowance_percent=$12,updated_at=now() WHERE id=$1 AND user_id=$2 AND admin_account_id=$3`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled, group.Keywords, group.LocalReplyEnabled, group.LocalReplyMinTokens, group.LocalReplyMaxOutputTokens, group.LocalReplyText, group.UsageCorrectionEnabled, group.UsageCorrectionAllowancePercent)
+	result, err := r.db.Exec(ctx, `UPDATE proxy_smart_groups SET name=$4,enabled=$5,keywords=$6,local_reply_enabled=$7,local_reply_min_tokens=$8,local_reply_max_output_tokens=$9,local_reply_text=$10,usage_correction_enabled=$11,usage_correction_allowance_percent=$12,fingerprint_reply_enabled=$13,updated_at=now() WHERE id=$1 AND user_id=$2 AND admin_account_id=$3`, group.ID, group.UserID, group.AdminAccountID, group.Name, group.Enabled, group.Keywords, group.LocalReplyEnabled, group.LocalReplyMinTokens, group.LocalReplyMaxOutputTokens, group.LocalReplyText, group.UsageCorrectionEnabled, group.UsageCorrectionAllowancePercent, group.FingerprintReplyEnabled)
 	if err != nil {
 		return err
 	}

@@ -496,6 +496,7 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 		return SmartGroup{}, "", err
 	}
 	group := SmartGroup{UsageCorrectionEnabled: input.UsageCorrectionEnabled, UsageCorrectionAllowancePercent: allowance, ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, Keywords: keywords, KeyPreview: preview, LocalReplyEnabled: input.LocalReplyEnabled, LocalReplyMinTokens: minTokens, LocalReplyMaxOutputTokens: maxOutputTokens, LocalReplyText: replyText}
+	group.FingerprintReplyEnabled = input.FingerprintReplyEnabled
 	if err := s.repository.CreateSmartGroup(ctx, group, routeIDs, keyID, hash, ciphertext, preview); err != nil {
 		return SmartGroup{}, "", err
 	}
@@ -544,6 +545,9 @@ func (s *Service) UpdateSmartGroup(ctx context.Context, userID, groupID string, 
 	}
 	if input.LocalReplyEnabled != nil {
 		group.LocalReplyEnabled = *input.LocalReplyEnabled
+	}
+	if input.FingerprintReplyEnabled != nil {
+		group.FingerprintReplyEnabled = *input.FingerprintReplyEnabled
 	}
 	if input.LocalReplyMinTokens != nil {
 		group.LocalReplyMinTokens = minTokens

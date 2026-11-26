@@ -64,6 +64,7 @@ export interface ProxyModel {
 }
 
 export interface ProxySmartGroup {
+  fingerprintReplyEnabled: boolean
   usageCorrectionEnabled: boolean
   usageCorrectionAllowancePercent: number
   keywordMatchCounts: Record<string, number>
@@ -142,6 +143,7 @@ export interface RouteModelTestResult {
 }
 
 export interface SmartGroupInput {
+  fingerprintReplyEnabled: boolean
   usageCorrectionEnabled: boolean
   usageCorrectionAllowancePercent: number
   name: string

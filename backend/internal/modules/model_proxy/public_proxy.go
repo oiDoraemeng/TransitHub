@@ -311,6 +311,9 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			return
 		}
 	}
+	if s.serveGroupFingerprintReply(w, incoming, group, replay, modelID) {
+		return
+	}
 	if s.serveGroupLocalReply(w, incoming, group, replay, modelID) {
 		return
 	}

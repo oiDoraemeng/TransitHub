@@ -81,6 +81,7 @@ type EgressProxy struct {
 }
 
 type SmartGroup struct {
+	FingerprintReplyEnabled         bool             `json:"fingerprintReplyEnabled"`
 	UsageCorrectionEnabled          bool             `json:"usageCorrectionEnabled"`
 	UsageCorrectionAllowancePercent int              `json:"usageCorrectionAllowancePercent"`
 	ID                              string           `json:"id"`
@@ -181,6 +182,7 @@ type EgressProxyTestResult struct {
 }
 
 type CreateSmartGroupRequest struct {
+	FingerprintReplyEnabled         bool     `json:"fingerprintReplyEnabled"`
 	UsageCorrectionEnabled          bool     `json:"usageCorrectionEnabled"`
 	UsageCorrectionAllowancePercent *int     `json:"usageCorrectionAllowancePercent"`
 	Name                            string   `json:"name"`
@@ -195,6 +197,7 @@ type CreateSmartGroupRequest struct {
 }
 
 type UpdateSmartGroupRequest struct {
+	FingerprintReplyEnabled         *bool     `json:"fingerprintReplyEnabled,omitempty"`
 	UsageCorrectionEnabled          *bool     `json:"usageCorrectionEnabled"`
 	UsageCorrectionAllowancePercent *int      `json:"usageCorrectionAllowancePercent"`
 	LocalReplyEnabled               *bool     `json:"localReplyEnabled,omitempty"`

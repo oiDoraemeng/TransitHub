@@ -167,6 +167,8 @@ export default {
         modelCapacity: 'Effective concurrency {count}', entryKey: 'Regular durable entry key', addMember: 'Add member', keywordCount: '{count} keywords', customKeyCount: '{count} custom keys',
         keywords: 'Group keywords', keywordPlaceholder: 'One keyword per line or comma, for example: pelican\ncandy',
         keywordHelp: 'All members share these case-insensitive keywords for member match policies. When local replies are enabled, any keyword match also sends small requests through normal upstream routing.',
+        fingerprintReply: 'Fingerprint reference replies',
+        fingerprintReplyHelp: 'Match complete lm.ikale.io and ModelTrace challenges, wait 3–9 seconds, and return a reference sample for the requested model without an upstream request. Samples do not repeat within 30 challenges (10 ordinary rounds of 3). Responses are marked as reference replay.',
         localReply: 'Enable local replies', localReplyMinTokens: 'Minimum input tokens (adjustable)',
         localReplyHelp: 'Off by default. The small-input rule estimates full context at about 4 characters per token without subtracting cache hits. Keywords, cache settings, history references, media and files use upstream routing. The output-limit rule applies independently, including to keyword matches and cached requests. JSON and streaming replies retain the requested model name.',
         localReplyMaxOutputTokens: 'Maximum output token threshold (adjustable)',

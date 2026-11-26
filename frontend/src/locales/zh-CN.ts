@@ -167,6 +167,8 @@ export default {
         modelCapacity: '有效并发 {count}', entryKey: '普通长期入口 Key', addMember: '添加成员', keywordCount: '{count} 个关键词', customKeyCount: '{count} 个自定义 Key',
         keywords: '分组关键词', keywordPlaceholder: '每行或用逗号填写一个关键词，例如：鹈鹕\n糖果',
         keywordHelp: '所有成员共用这组关键词，匹配不区分大小写。成员可用其设置命中策略；开启小请求本地返回后，命中任一关键词也会继续请求上游。',
+        fingerprintReply: '指纹题参考样本回复',
+        fingerprintReplyHelp: '匹配 lm.ikale.io 和 ModelTrace 的完整指纹题后，等待 3–9 秒并返回对应模型的参考样本，不请求上游。最近 30 道题不重复（常规每轮 3 题，共 10 轮）；回复标记为参考样本。',
         localReply: '启用本地返回', localReplyMinTokens: '最小输入 Token（可调）',
         localReplyHelp: '默认关闭。小输入规则按完整上下文估算（约 4 个字符为 1 Token），不扣除缓存；命中关键词或带缓存配置、历史引用、图片及文件时，正常请求上游。最大输出规则独立生效，命中后直接本地返回，包括带关键词或缓存的请求。普通和流式响应均使用请求中的模型名。',
         localReplyMaxOutputTokens: '最大输出 Token 阈值（可调）',

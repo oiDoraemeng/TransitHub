@@ -65,6 +65,7 @@ const removedSmartCustomKeyIds = ref<string[]>([])
 const smartUsageCorrectionEnabled = ref(false)
 const smartUsageCorrectionAllowancePercent = ref(40)
 const smartEnabled = ref(true)
+const smartFingerprintReplyEnabled = ref(false)
 const smartLocalReplyEnabled = ref(false)
 const smartLocalReplyMinTokens = ref(100)
 const smartLocalReplyMaxOutputTokens = ref(20)
@@ -291,6 +292,7 @@ const openCreateSmart = () => {
   smartUsageCorrectionEnabled.value = false
   smartUsageCorrectionAllowancePercent.value = 40
   smartEnabled.value = true
+  smartFingerprintReplyEnabled.value = false
   smartLocalReplyEnabled.value = false
   smartLocalReplyMinTokens.value = 100
   smartLocalReplyMaxOutputTokens.value = 20
@@ -308,6 +310,7 @@ const openEditSmart = (group: ProxySmartGroup) => {
   smartUsageCorrectionEnabled.value = group.usageCorrectionEnabled ?? false
   smartUsageCorrectionAllowancePercent.value = group.usageCorrectionAllowancePercent ?? 40
   smartEnabled.value = group.enabled
+  smartFingerprintReplyEnabled.value = group.fingerprintReplyEnabled ?? false
   smartLocalReplyEnabled.value = group.localReplyEnabled ?? false
   smartLocalReplyMinTokens.value = group.localReplyMinTokens ?? 100
   smartLocalReplyMaxOutputTokens.value = group.localReplyMaxOutputTokens ?? 20
@@ -339,13 +342,13 @@ const submitSmart = async () => {
   errorMessage.value = ''
   try {
     if (editingSmartGroupId.value) {
-      await updateProxySmartGroup(editingSmartGroupId.value, { name: smartName.value.trim(), keywords, enabled: smartEnabled.value, usageCorrectionEnabled: smartUsageCorrectionEnabled.value, usageCorrectionAllowancePercent: smartUsageCorrectionAllowancePercent.value, localReplyEnabled: smartLocalReplyEnabled.value, localReplyMinTokens: smartLocalReplyMinTokens.value, localReplyMaxOutputTokens: smartLocalReplyMaxOutputTokens.value, localReplyText: smartLocalReplyText.value })
+      await updateProxySmartGroup(editingSmartGroupId.value, { name: smartName.value.trim(), keywords, enabled: smartEnabled.value, usageCorrectionEnabled: smartUsageCorrectionEnabled.value, usageCorrectionAllowancePercent: smartUsageCorrectionAllowancePercent.value, fingerprintReplyEnabled: smartFingerprintReplyEnabled.value, localReplyEnabled: smartLocalReplyEnabled.value, localReplyMinTokens: smartLocalReplyMinTokens.value, localReplyMaxOutputTokens: smartLocalReplyMaxOutputTokens.value, localReplyText: smartLocalReplyText.value })
       if (addKeys.length || removedSmartCustomKeyIds.value.length) {
         await updateProxySmartGroupCustomKeys(editingSmartGroupId.value, { addKeys, removeKeyIds: [...removedSmartCustomKeyIds.value] })
       }
       flash(t('admin.modelProxy.notices.groupUpdated'))
     } else {
-      const created = await createProxySmartGroup({ name: smartName.value.trim(), keywords, enabled: smartEnabled.value, usageCorrectionEnabled: smartUsageCorrectionEnabled.value, usageCorrectionAllowancePercent: smartUsageCorrectionAllowancePercent.value, routeIds: [...selectedRouteIds.value], localReplyEnabled: smartLocalReplyEnabled.value, localReplyMinTokens: smartLocalReplyMinTokens.value, localReplyMaxOutputTokens: smartLocalReplyMaxOutputTokens.value, localReplyText: smartLocalReplyText.value })
+      const created = await createProxySmartGroup({ name: smartName.value.trim(), keywords, enabled: smartEnabled.value, usageCorrectionEnabled: smartUsageCorrectionEnabled.value, usageCorrectionAllowancePercent: smartUsageCorrectionAllowancePercent.value, routeIds: [...selectedRouteIds.value], fingerprintReplyEnabled: smartFingerprintReplyEnabled.value, localReplyEnabled: smartLocalReplyEnabled.value, localReplyMinTokens: smartLocalReplyMinTokens.value, localReplyMaxOutputTokens: smartLocalReplyMaxOutputTokens.value, localReplyText: smartLocalReplyText.value })
       await copyText(created.key)
     }
     smartModalOpen.value = false
@@ -768,6 +771,8 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
             <label class="field"><span>{{ t('admin.modelProxy.form.name') }}</span><input v-model="smartName" required /></label>
             <label class="field"><span>{{ t('admin.modelProxy.groups.keywords') }}</span><textarea v-model="smartKeywords" rows="4" :placeholder="t('admin.modelProxy.groups.keywordPlaceholder')" /><small class="font-normal text-muted-foreground">{{ t('admin.modelProxy.groups.keywordHelp') }}</small></label>
             <div class="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+              <label class="flex items-center justify-between gap-3 text-sm font-medium"><span>{{ t('admin.modelProxy.groups.fingerprintReply') }}</span><input v-model="smartFingerprintReplyEnabled" type="checkbox" class="h-4 w-4" /></label>
+              <p class="text-xs leading-relaxed text-muted-foreground">{{ t('admin.modelProxy.groups.fingerprintReplyHelp') }}</p>
               <label class="flex items-center justify-between gap-3 text-sm font-medium"><span>{{ t('admin.modelProxy.groups.localReply') }}</span><input v-model="smartLocalReplyEnabled" type="checkbox" class="h-4 w-4" /></label>
               <div class="grid gap-3 sm:grid-cols-2">
                 <label class="field"><span>{{ t('admin.modelProxy.groups.localReplyMinTokens') }}</span><input v-model.number="smartLocalReplyMinTokens" type="number" min="1" max="1000000" step="1" required /></label>
