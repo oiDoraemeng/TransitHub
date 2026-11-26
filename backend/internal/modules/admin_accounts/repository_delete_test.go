@@ -11,6 +11,7 @@ func TestWorkspaceDeleteStatementsCoverAllWorkspaceTables(t *testing.T) {
 		"proxy_access_keys",
 		"proxy_smart_groups",
 		"proxy_routes",
+		"proxy_usage_correction_settings",
 		"model_egress_proxies",
 		"mass_email_batch_items",
 		"mass_email_batches",

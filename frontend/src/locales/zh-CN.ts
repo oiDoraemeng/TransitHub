@@ -132,6 +132,12 @@ export default {
       signOut: '退出登录'
     },
     modelProxy: {
+      usageCorrection: {
+        title: '输入用量校正', enable: '开启检测与校正', allowance: '允许超出估算',
+        description: '对当前工作区的直连与智能分组生效；默认关闭。',
+        help: '输入上限＝完整文本输入的本地 Token 估算 ×（1＋允许比例）。0% 表示不允许超出估算。超过上限时优先压缩缓存计量，输出 Token 不变。支持 Chat、Messages、Responses；图片、文件、托管上下文等无法估算的输入跳过。原始与校正计量保留在审计日志；上游实际扣费仍由上游决定。',
+        saving: '保存中…', saved: '已保存，对后续请求生效', retry: '重新加载',
+      },
       title: '模型代理',
       subtitle: '用长期入口 Key 调用 Sub2API 或 New-API，并通过智能分组聚合模型与并发容量。',
       loading: '正在加载...',

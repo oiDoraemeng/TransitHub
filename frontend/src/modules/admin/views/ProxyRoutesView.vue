@@ -8,6 +8,7 @@ import {
 import Button from '@/components/ui/button/Button.vue'
 import RouteModelTestDialog from '../components/RouteModelTestDialog.vue'
 import RouteModelHealthStatus from '../components/RouteModelHealthStatus.vue'
+import UsageCorrectionPanel from '../components/UsageCorrectionPanel.vue'
 import { hasAutomaticModelProbe } from '../utils/modelProxy'
 import {
   addProxySmartGroupMember, createModelEgressProxy, createProxyRoute, createProxySmartGroup,
@@ -596,6 +597,7 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
     </section>
 
     <main class="mx-auto max-w-7xl px-4 py-4 sm:px-6">
+      <UsageCorrectionPanel />
       <div v-if="errorMessage" class="mb-4 flex items-start justify-between border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
         <span>{{ errorMessage }}</span><button title="Close" @click="errorMessage = ''"><X class="h-4 w-4" /></button>
       </div>

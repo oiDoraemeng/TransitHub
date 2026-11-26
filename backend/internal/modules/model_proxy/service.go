@@ -90,6 +90,8 @@ type Service struct {
 	latencySamples    chan routeLatencyObservation
 	probeSettings     RecoveryProbeSettings
 	statistics        *requestStatistics
+
+	usageCorrectionStore usageCorrectionStore
 }
 
 func NewService(repository *Repository, accounts AccountResolver, sites UpstreamSites, platform *upstream.PlatformService, cipher *KeyCipher, limiter *Limiter, maxRequestBytes int64, refreshInterval time.Duration) *Service {

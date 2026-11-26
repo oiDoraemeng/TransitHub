@@ -183,3 +183,8 @@ export interface CleanupStatus {
 
 export type ProxySite = UpstreamSiteResponse
 export type ProxyGroup = UpstreamGroupInfo
+
+export interface UsageCorrectionSettings {
+  enabled: boolean
+  allowancePercent: number
+}

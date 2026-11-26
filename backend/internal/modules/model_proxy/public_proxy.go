@@ -180,6 +180,7 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 		return
 	}
 	defer replay.Close()
+	incoming = s.withUsageCorrection(incoming, replay, route.UserID, route.AdminAccountID)
 	modelID, _ := requestModelID(incoming, replay)
 	responseMapping, err := newMappedResponseContext(incoming, replay, modelID, nil)
 	if err != nil {
@@ -289,6 +290,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		return
 	}
 	defer replay.Close()
+	incoming = s.withUsageCorrection(incoming, replay, group.UserID, group.AdminAccountID)
 	if _, err := replay.Object(); err != nil {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "request body must contain one JSON object")
 		return
@@ -847,6 +849,15 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		return nil, true, err
 	}
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
+	if policy, ok := incoming.Context().Value(usageCorrectionContextKey{}).(inputUsagePolicy); ok && response.StatusCode >= 200 && response.StatusCode < 300 {
+		if err := correctResponseUsage(response, policy, strings.Split(protocolRequest.requestURI, "?")[0], route.ID); err != nil {
+			response.Body.Close()
+			if deadlineCleanup == nil {
+				cleanup()
+			}
+			return nil, false, err
+		}
+	}
 	cleanupHandled := false
 	if responseMapping.BufferedStream && response.StatusCode >= 200 && response.StatusCode < 300 && isEventStream(response.Header) {
 		if needsCleanup && deadlineCleanup == nil {

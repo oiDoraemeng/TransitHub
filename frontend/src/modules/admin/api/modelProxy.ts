@@ -1,6 +1,7 @@
 import { authUnauthorizedErrorKey, getAccessToken, handleAuthExpired, isUnauthorizedApiResponse } from '@/modules/auth/api/auth'
 import type {
   CleanupStatus,
+  UsageCorrectionSettings,
   KeyResponse,
   ModelEgressProxy,
   ModelEgressProxyInput,
@@ -55,6 +56,8 @@ const request = async <T>(path: string, options: RequestInit = {}): Promise<T> =
 }
 
 export const listProxyRoutes = () => request<ProxyRoute[]>('/proxy-routes')
+export const getUsageCorrection = () => request<UsageCorrectionSettings>('/proxy-usage-correction')
+export const saveUsageCorrection = (input: UsageCorrectionSettings) => request<UsageCorrectionSettings>('/proxy-usage-correction', { method: 'PUT', body: JSON.stringify(input) })
 export const listProxySites = () => request<ProxySite[]>('/proxy-routes/sites')
 export const listProxyGroups = (siteId: string) => request<ProxyGroup[]>(`/proxy-routes/sites/${encodeURIComponent(siteId)}/groups`)
 export const createProxyRoute = (input: ProxyRouteInput) => request<{ route: ProxyRoute; key: string }>('/proxy-routes', { method: 'POST', body: JSON.stringify(input) })
