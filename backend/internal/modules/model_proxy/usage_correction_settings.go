@@ -40,7 +40,7 @@ func (s *Service) withUsageCorrection(r *http.Request, replay *replayBody, group
 	if err != nil {
 		return r
 	}
-	estimate, known := estimateCorrectionInput(input)
+	estimate, known := estimateCorrectionInput(input, replay)
 	if !known || estimate <= 0 {
 		return r
 	}

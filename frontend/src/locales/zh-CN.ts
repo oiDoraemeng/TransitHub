@@ -135,7 +135,7 @@ export default {
       usageCorrection: {
         title: '输入用量校正', enable: '开启检测与校正', allowance: '允许超出估算',
         description: '仅对当前智能分组生效，默认关闭；保存后对后续请求生效。',
-        help: '输入上限＝完整文本输入的本地 Token 估算 ×（1＋允许比例）。0% 表示不允许超出估算。超过上限时优先压缩缓存计量，输出 Token 不变。支持 Chat、Messages、Responses；图片、文件、托管上下文等无法估算的输入跳过。原始与校正计量保留在审计日志；上游实际扣费仍由上游决定。',
+        help: '输入上限＝按完整请求体字节量快速估算的 Token ×（1＋允许比例）。0% 表示不允许超出估算。超过上限时优先压缩缓存计量，输出 Token 不变。支持 Chat、Messages、Responses；图片、文件、托管上下文等无法估算的输入跳过。原始与校正计量保留在审计日志；上游实际扣费仍由上游决定。',
         invalidAllowance: '允许比例须为 0–1000 的整数。',
       },
       title: '模型代理',

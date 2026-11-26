@@ -18,24 +18,27 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-// A deliberately conservative local estimate, not a Claude tokenizer or a
-// measurement of hidden input. Count the complete visible history, system text,
-// tool definitions/results and JSON structure; never just the last message.
-// ASCII uses 3 bytes/token, other Unicode code points 2 tokens each, plus
-// message framing. Cache hints do not hide text supplied in the same request.
-func estimateCorrectionInput(input map[string]any) (int64, bool) {
+// Reuse the actual byte count already collected while buffering the request.
+// Sample at most 1 KiB to estimate the non-ASCII byte share; never serialize the
+// parsed input again or scan its text. ASCII uses about 3 bytes/token and CJK
+// about 1.5 bytes/token. This remains an approximation, not a tokenizer.
+// Eligibility checks below inspect JSON structure, not individual text bytes.
+func estimateCorrectionInput(input map[string]any, body *replayBody) (int64, bool) {
 	for _, key := range []string{"previous_response_id", "conversation", "cachedContent", "cached_content", "container", "context_management", "mcp_servers"} {
 		if v := input[key]; v != nil && v != "" {
 			return 0, false
 		}
 	}
-	selected := map[string]any{}
+	hasInput := false
 	for _, key := range []string{"messages", "input", "prompt", "system", "instructions", "tools", "functions", "tool_choice", "function_call"} {
 		if v := input[key]; v != nil {
-			selected[key] = v
+			hasInput = true
+			if opaqueCorrectionContent(v) {
+				return 0, false
+			}
 		}
 	}
-	if len(selected) == 0 || opaqueCorrectionContent(selected) {
+	if !hasInput {
 		return 0, false
 	}
 	// Hosted tools can add context that is absent from the submitted request.
@@ -51,18 +54,13 @@ func estimateCorrectionInput(input map[string]any) (int64, bool) {
 			}
 		}
 	}
-	raw, err := json.Marshal(selected)
-	if err != nil {
+	sampled, nonASCII, ok := sampleCorrectionBytes(body)
+	if !ok {
 		return 0, false
 	}
-	var ascii, other int64
-	for _, r := range string(raw) {
-		if r < 128 {
-			ascii++
-		} else {
-			other++
-		}
-	}
+	// ceil(size * (1 + nonASCII/sample) / 3), without overflowing size*factor.
+	factor, divisor := sampled+nonASCII, 3*sampled
+	estimate := body.size/divisor*factor + (body.size%divisor*factor+divisor-1)/divisor
 	framing := int64(8)
 	if messages, ok := input["messages"].([]any); ok {
 		framing += int64(len(messages)) * 8
@@ -70,7 +68,48 @@ func estimateCorrectionInput(input map[string]any) (int64, bool) {
 	if items, ok := input["input"].([]any); ok {
 		framing += int64(len(items)) * 8
 	}
-	return (ascii+2)/3 + other*2 + framing, true
+	return estimate + framing, true
+}
+
+const correctionSampleBytes = 1024
+const correctionSampleWindows = 8
+
+func sampleCorrectionBytes(body *replayBody) (sampled, nonASCII int64, ok bool) {
+	if body == nil || body.size <= 0 || body.file == nil && int64(len(body.memory)) != body.size {
+		return 0, 0, false
+	}
+	width, windows := int64(correctionSampleBytes/correctionSampleWindows), int64(correctionSampleWindows)
+	if body.size <= correctionSampleBytes {
+		width, windows = body.size, 1
+	}
+	var buffer []byte
+	if body.file != nil {
+		buffer = make([]byte, correctionSampleBytes)
+	}
+	for i := int64(0); i < windows; i++ {
+		offset := int64(0)
+		if windows > 1 {
+			offset = (body.size - width) / (windows - 1) * i
+		}
+		var sample []byte
+		if body.file == nil {
+			sample = body.memory[offset : offset+width]
+		} else {
+			// ReadAt keeps the spool file position intact for request replay.
+			n, err := body.file.ReadAt(buffer[:width], offset)
+			if err != nil || int64(n) != width {
+				return 0, 0, false
+			}
+			sample = buffer[:width]
+		}
+		for _, b := range sample {
+			if b >= 128 {
+				nonASCII++
+			}
+		}
+		sampled += width
+	}
+	return sampled, nonASCII, true
 }
 
 func opaqueCorrectionContent(value any) bool {

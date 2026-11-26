@@ -161,6 +161,18 @@ func TestUsageCorrectionDoraCacheWriteAliasStaysConsistent(t *testing.T) {
 }
 
 func TestCorrectionEstimateFullHistoryToolsUnicodeAndOpaqueContext(t *testing.T) {
+	estimate := func(input map[string]any) (int64, bool) {
+		raw, err := json.Marshal(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		replay, err := newReplayBody(io.NopCloser(bytes.NewReader(raw)), 4096)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer replay.Close()
+		return estimateCorrectionInput(input, replay)
+	}
 	parse := func(raw string) map[string]any {
 		var p map[string]any
 		if err := json.Unmarshal([]byte(raw), &p); err != nil {
@@ -169,29 +181,29 @@ func TestCorrectionEstimateFullHistoryToolsUnicodeAndOpaqueContext(t *testing.T)
 		return p
 	}
 	base := parse(`{"messages":[{"role":"user","content":"hello"}]}`)
-	n, known := estimateCorrectionInput(base)
+	n, known := estimate(base)
 	if !known || n <= 0 {
 		t.Fatal("no baseline estimate")
 	}
 	full := parse(`{"system":"complete system","messages":[{"role":"user","content":"old history 中文中文中文"},{"role":"assistant","content":[{"type":"tool_use","name":"test","input":{"value":9007199254740993}}]},{"role":"user","content":[{"type":"tool_result","content":"tool output"}]}],"tools":[{"name":"test","input_schema":{"type":"object","properties":{"image":{"type":"string"}}}}]}`)
-	total, known := estimateCorrectionInput(full)
+	total, known := estimate(full)
 	if !known || total <= n*2 {
 		t.Fatalf("history/tools missing: %d %d %v", n, total, known)
 	}
 	for _, suffix := range []string{`,"previous_response_id":"r"`, `,"conversation":"c"`, `,"tools":[{"type":"web_search"}]`, `,"mcp_servers":[{}]`} {
 		payload := parse(`{"input":"text"` + suffix + `}`)
-		if _, known := estimateCorrectionInput(payload); known {
+		if _, known := estimate(payload); known {
 			t.Fatalf("opaque request accepted: %v", payload)
 		}
 	}
 	for _, kind := range []string{"image", "document", "input_audio", "item_reference", "compaction", "server_tool_use"} {
 		payload := parse(`{"messages":[{"content":[{"type":"` + kind + `"}]}]}`)
-		if _, known := estimateCorrectionInput(payload); known {
+		if _, known := estimate(payload); known {
 			t.Fatalf("opaque %s accepted", kind)
 		}
 	}
 	full["cache_control"] = map[string]any{"type": "ephemeral"}
-	if _, known := estimateCorrectionInput(full); !known {
+	if _, known := estimate(full); !known {
 		t.Fatal("visible cached text incorrectly skipped")
 	}
 }
