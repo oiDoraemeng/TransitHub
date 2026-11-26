@@ -134,9 +134,9 @@ export default {
     modelProxy: {
       usageCorrection: {
         title: 'Input usage correction', enable: 'Enable detection and correction', allowance: 'Allowance above estimate',
-        description: 'Applies to direct routes and smart groups in this workspace; off by default.',
+        description: 'Applies only to this smart group; off by default. Saved changes apply to subsequent requests.',
         help: 'Input limit = local estimate of the complete text input × (1 + allowance). 0% allows no excess. Cache usage is reduced first; output tokens stay unchanged. Supports Chat, Messages and Responses; images, files and hosted context that cannot be estimated are skipped. Original and corrected counts remain in audit logs; upstream charges are determined by the upstream provider.',
-        saving: 'Saving…', saved: 'Saved; applies to subsequent requests', retry: 'Reload',
+        invalidAllowance: 'Allowance must be an integer between 0 and 1000.',
       },
       title: 'Model Proxy',
       subtitle: 'Call Sub2API or New-API with durable entry keys and aggregate models and concurrency in smart groups.',

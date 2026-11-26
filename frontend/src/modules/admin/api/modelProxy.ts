@@ -1,7 +1,6 @@
 import { authUnauthorizedErrorKey, getAccessToken, handleAuthExpired, isUnauthorizedApiResponse } from '@/modules/auth/api/auth'
 import type {
   CleanupStatus,
-  UsageCorrectionSettings,
   KeyResponse,
   ModelEgressProxy,
   ModelEgressProxyInput,
@@ -56,8 +55,6 @@ const request = async <T>(path: string, options: RequestInit = {}): Promise<T> =
 }
 
 export const listProxyRoutes = () => request<ProxyRoute[]>('/proxy-routes')
-export const getUsageCorrection = () => request<UsageCorrectionSettings>('/proxy-usage-correction')
-export const saveUsageCorrection = (input: UsageCorrectionSettings) => request<UsageCorrectionSettings>('/proxy-usage-correction', { method: 'PUT', body: JSON.stringify(input) })
 export const listProxySites = () => request<ProxySite[]>('/proxy-routes/sites')
 export const listProxyGroups = (siteId: string) => request<ProxyGroup[]>(`/proxy-routes/sites/${encodeURIComponent(siteId)}/groups`)
 export const createProxyRoute = (input: ProxyRouteInput) => request<{ route: ProxyRoute; key: string }>('/proxy-routes', { method: 'POST', body: JSON.stringify(input) })
@@ -86,7 +83,7 @@ export const testModelEgressProxy = (id: string) => request<ModelEgressProxyTest
 
 export const listProxySmartGroups = () => request<ProxySmartGroup[]>('/proxy-smart-groups')
 export const createProxySmartGroup = (input: SmartGroupInput) => request<{ group: ProxySmartGroup; key: string }>('/proxy-smart-groups', { method: 'POST', body: JSON.stringify(input) })
-export const updateProxySmartGroup = (id: string, input: Partial<Pick<SmartGroupInput, 'name' | 'keywords' | 'enabled' | 'localReplyEnabled' | 'localReplyMinTokens' | 'localReplyMaxOutputTokens' | 'localReplyText'>>) => request<ProxySmartGroup>(`/proxy-smart-groups/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+export const updateProxySmartGroup = (id: string, input: Partial<Pick<SmartGroupInput, 'usageCorrectionEnabled' | 'usageCorrectionAllowancePercent' | 'name' | 'keywords' | 'enabled' | 'localReplyEnabled' | 'localReplyMinTokens' | 'localReplyMaxOutputTokens' | 'localReplyText'>>) => request<ProxySmartGroup>(`/proxy-smart-groups/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
 export const deleteProxySmartGroup = (id: string) => request<{ success: boolean }>(`/proxy-smart-groups/${id}`, { method: 'DELETE' })
 export const addProxySmartGroupMember = (id: string, input: { routeId?: string; entryKey?: string }) => request<{ success: boolean }>(`/proxy-smart-groups/${id}/members`, { method: 'POST', body: JSON.stringify(input) })
 export const updateProxySmartGroupMemberPolicy = (id: string, routeId: string, input: Partial<SmartGroupMemberPolicyInput>) => request<{ success: boolean }>(`/proxy-smart-groups/${id}/members/${routeId}`, { method: 'PATCH', body: JSON.stringify(input) })

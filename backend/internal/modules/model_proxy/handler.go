@@ -18,8 +18,6 @@ type Handler struct {
 
 func RegisterRoutes(mux *http.ServeMux, service *Service) {
 	h := &Handler{service: service}
-	mux.HandleFunc("GET /api/proxy-usage-correction", h.usageCorrectionSettings)
-	mux.HandleFunc("PUT /api/proxy-usage-correction", h.usageCorrectionSettings)
 	mux.HandleFunc("GET /api/proxy-routes", h.listRoutes)
 	mux.HandleFunc("POST /api/proxy-routes", h.createRoute)
 	mux.HandleFunc("PATCH /api/proxy-routes/{id}", h.updateRoute)

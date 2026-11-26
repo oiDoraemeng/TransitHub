@@ -180,7 +180,6 @@ func (s *Service) proxyDirect(w http.ResponseWriter, incoming *http.Request, rou
 		return
 	}
 	defer replay.Close()
-	incoming = s.withUsageCorrection(incoming, replay, route.UserID, route.AdminAccountID)
 	modelID, _ := requestModelID(incoming, replay)
 	responseMapping, err := newMappedResponseContext(incoming, replay, modelID, nil)
 	if err != nil {
@@ -290,7 +289,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		return
 	}
 	defer replay.Close()
-	incoming = s.withUsageCorrection(incoming, replay, group.UserID, group.AdminAccountID)
+	incoming = s.withUsageCorrection(incoming, replay, group)
 	if _, err := replay.Object(); err != nil {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid_request", "request body must contain one JSON object")
 		return

@@ -8,7 +8,6 @@ import {
 import Button from '@/components/ui/button/Button.vue'
 import RouteModelTestDialog from '../components/RouteModelTestDialog.vue'
 import RouteModelHealthStatus from '../components/RouteModelHealthStatus.vue'
-import UsageCorrectionPanel from '../components/UsageCorrectionPanel.vue'
 import { hasAutomaticModelProbe } from '../utils/modelProxy'
 import {
   addProxySmartGroupMember, createModelEgressProxy, createProxyRoute, createProxySmartGroup,
@@ -63,6 +62,8 @@ const smartName = ref('')
 const smartKeywords = ref('')
 const smartNewCustomKeys = ref('')
 const removedSmartCustomKeyIds = ref<string[]>([])
+const smartUsageCorrectionEnabled = ref(false)
+const smartUsageCorrectionAllowancePercent = ref(10)
 const smartEnabled = ref(true)
 const smartLocalReplyEnabled = ref(false)
 const smartLocalReplyMinTokens = ref(100)
@@ -287,6 +288,8 @@ const openCreateSmart = () => {
   smartKeywords.value = ''
   smartNewCustomKeys.value = ''
   removedSmartCustomKeyIds.value = []
+  smartUsageCorrectionEnabled.value = false
+  smartUsageCorrectionAllowancePercent.value = 10
   smartEnabled.value = true
   smartLocalReplyEnabled.value = false
   smartLocalReplyMinTokens.value = 100
@@ -302,6 +305,8 @@ const openEditSmart = (group: ProxySmartGroup) => {
   smartKeywords.value = group.keywords?.join('\n') ?? ''
   smartNewCustomKeys.value = ''
   removedSmartCustomKeyIds.value = []
+  smartUsageCorrectionEnabled.value = group.usageCorrectionEnabled ?? false
+  smartUsageCorrectionAllowancePercent.value = group.usageCorrectionAllowancePercent ?? 10
   smartEnabled.value = group.enabled
   smartLocalReplyEnabled.value = group.localReplyEnabled ?? false
   smartLocalReplyMinTokens.value = group.localReplyMinTokens ?? 100
@@ -312,6 +317,10 @@ const openEditSmart = (group: ProxySmartGroup) => {
 }
 
 const submitSmart = async () => {
+  if (!Number.isInteger(smartUsageCorrectionAllowancePercent.value) || smartUsageCorrectionAllowancePercent.value < 0 || smartUsageCorrectionAllowancePercent.value > 1000) {
+    errorMessage.value = t('admin.modelProxy.usageCorrection.invalidAllowance')
+    return
+  }
   if (!Number.isInteger(smartLocalReplyMinTokens.value) || smartLocalReplyMinTokens.value < 1 || smartLocalReplyMinTokens.value > 1000000) {
     errorMessage.value = t('admin.modelProxy.groups.localReplyError')
     return
@@ -330,13 +339,13 @@ const submitSmart = async () => {
   errorMessage.value = ''
   try {
     if (editingSmartGroupId.value) {
-      await updateProxySmartGroup(editingSmartGroupId.value, { name: smartName.value.trim(), keywords, enabled: smartEnabled.value, localReplyEnabled: smartLocalReplyEnabled.value, localReplyMinTokens: smartLocalReplyMinTokens.value, localReplyMaxOutputTokens: smartLocalReplyMaxOutputTokens.value, localReplyText: smartLocalReplyText.value })
+      await updateProxySmartGroup(editingSmartGroupId.value, { name: smartName.value.trim(), keywords, enabled: smartEnabled.value, usageCorrectionEnabled: smartUsageCorrectionEnabled.value, usageCorrectionAllowancePercent: smartUsageCorrectionAllowancePercent.value, localReplyEnabled: smartLocalReplyEnabled.value, localReplyMinTokens: smartLocalReplyMinTokens.value, localReplyMaxOutputTokens: smartLocalReplyMaxOutputTokens.value, localReplyText: smartLocalReplyText.value })
       if (addKeys.length || removedSmartCustomKeyIds.value.length) {
         await updateProxySmartGroupCustomKeys(editingSmartGroupId.value, { addKeys, removeKeyIds: [...removedSmartCustomKeyIds.value] })
       }
       flash(t('admin.modelProxy.notices.groupUpdated'))
     } else {
-      const created = await createProxySmartGroup({ name: smartName.value.trim(), keywords, enabled: smartEnabled.value, routeIds: [...selectedRouteIds.value], localReplyEnabled: smartLocalReplyEnabled.value, localReplyMinTokens: smartLocalReplyMinTokens.value, localReplyMaxOutputTokens: smartLocalReplyMaxOutputTokens.value, localReplyText: smartLocalReplyText.value })
+      const created = await createProxySmartGroup({ name: smartName.value.trim(), keywords, enabled: smartEnabled.value, usageCorrectionEnabled: smartUsageCorrectionEnabled.value, usageCorrectionAllowancePercent: smartUsageCorrectionAllowancePercent.value, routeIds: [...selectedRouteIds.value], localReplyEnabled: smartLocalReplyEnabled.value, localReplyMinTokens: smartLocalReplyMinTokens.value, localReplyMaxOutputTokens: smartLocalReplyMaxOutputTokens.value, localReplyText: smartLocalReplyText.value })
       await copyText(created.key)
     }
     smartModalOpen.value = false
@@ -597,7 +606,6 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
     </section>
 
     <main class="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-      <UsageCorrectionPanel />
       <div v-if="errorMessage" class="mb-4 flex items-start justify-between border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
         <span>{{ errorMessage }}</span><button title="Close" @click="errorMessage = ''"><X class="h-4 w-4" /></button>
       </div>
@@ -772,6 +780,16 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
                 <p v-if="smartLocalReplyMaxOutputTokens > 0">{{ t('admin.modelProxy.groups.localReplyOutputPreview', { count: smartLocalReplyMaxOutputTokens }) }}</p>
               </div>
             </div>
+            <fieldset class="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+              <legend class="px-1 text-sm font-semibold">{{ t('admin.modelProxy.usageCorrection.title') }}</legend>
+              <label class="flex items-center gap-3 text-sm"><input v-model="smartUsageCorrectionEnabled" type="checkbox" class="h-4 w-4" />{{ t('admin.modelProxy.usageCorrection.enable') }}</label>
+              <p class="text-xs text-muted-foreground">{{ t('admin.modelProxy.usageCorrection.description') }}</p>
+              <template v-if="smartUsageCorrectionEnabled">
+                <label class="field"><span>{{ t('admin.modelProxy.usageCorrection.allowance') }} (%)</span><input v-model.number="smartUsageCorrectionAllowancePercent" type="number" min="0" max="1000" step="1" required /></label>
+                <div class="flex gap-2"><button v-for="percent in [0, 10, 20]" :key="percent" type="button" class="rounded border border-border px-3 py-1 text-xs" :class="smartUsageCorrectionAllowancePercent === percent ? 'bg-muted font-semibold' : ''" @click="smartUsageCorrectionAllowancePercent = percent">{{ percent }}%</button></div>
+                <p class="text-xs leading-relaxed text-muted-foreground">{{ t('admin.modelProxy.usageCorrection.help') }}</p>
+              </template>
+            </fieldset>
             <fieldset v-if="editingSmartGroupId" class="space-y-2">
               <div class="flex items-center justify-between gap-3"><legend class="text-sm font-medium">{{ t('admin.modelProxy.groups.customKeys') }}</legend><span class="text-xs text-muted-foreground">{{ t('admin.modelProxy.groups.customKeyTotal', { count: visibleSmartCustomKeys.length }) }}</span></div>
               <div v-if="visibleSmartCustomKeys.length" class="divide-y divide-border border border-border">

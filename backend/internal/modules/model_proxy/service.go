@@ -90,8 +90,6 @@ type Service struct {
 	latencySamples    chan routeLatencyObservation
 	probeSettings     RecoveryProbeSettings
 	statistics        *requestStatistics
-
-	usageCorrectionStore usageCorrectionStore
 }
 
 func NewService(repository *Repository, accounts AccountResolver, sites UpstreamSites, platform *upstream.PlatformService, cipher *KeyCipher, limiter *Limiter, maxRequestBytes int64, refreshInterval time.Duration) *Service {
@@ -426,6 +424,10 @@ func (s *Service) ListSmartGroups(ctx context.Context, userID string) ([]SmartGr
 }
 
 func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input CreateSmartGroupRequest) (SmartGroup, string, error) {
+	allowance, err := usageCorrectionAllowance(input.UsageCorrectionAllowancePercent)
+	if err != nil {
+		return SmartGroup{}, "", err
+	}
 	minTokens, err := localReplyMinTokens(input.LocalReplyMinTokens)
 	if err != nil {
 		return SmartGroup{}, "", err
@@ -493,7 +495,7 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 	if err != nil {
 		return SmartGroup{}, "", err
 	}
-	group := SmartGroup{ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, Keywords: keywords, KeyPreview: preview, LocalReplyEnabled: input.LocalReplyEnabled, LocalReplyMinTokens: minTokens, LocalReplyMaxOutputTokens: maxOutputTokens, LocalReplyText: replyText}
+	group := SmartGroup{UsageCorrectionEnabled: input.UsageCorrectionEnabled, UsageCorrectionAllowancePercent: allowance, ID: groupID, UserID: userID, AdminAccountID: accountID, Name: input.Name, Enabled: enabled, Keywords: keywords, KeyPreview: preview, LocalReplyEnabled: input.LocalReplyEnabled, LocalReplyMinTokens: minTokens, LocalReplyMaxOutputTokens: maxOutputTokens, LocalReplyText: replyText}
 	if err := s.repository.CreateSmartGroup(ctx, group, routeIDs, keyID, hash, ciphertext, preview); err != nil {
 		return SmartGroup{}, "", err
 	}
@@ -508,6 +510,10 @@ func (s *Service) CreateSmartGroup(ctx context.Context, userID string, input Cre
 }
 
 func (s *Service) UpdateSmartGroup(ctx context.Context, userID, groupID string, input UpdateSmartGroupRequest) (SmartGroup, error) {
+	allowance, err := usageCorrectionAllowance(input.UsageCorrectionAllowancePercent)
+	if err != nil {
+		return SmartGroup{}, err
+	}
 	minTokens, err := localReplyMinTokens(input.LocalReplyMinTokens)
 	if err != nil {
 		return SmartGroup{}, err
@@ -529,6 +535,12 @@ func (s *Service) UpdateSmartGroup(ctx context.Context, userID, groupID string, 
 	}
 	if input.Enabled != nil {
 		group.Enabled = *input.Enabled
+	}
+	if input.UsageCorrectionEnabled != nil {
+		group.UsageCorrectionEnabled = *input.UsageCorrectionEnabled
+	}
+	if input.UsageCorrectionAllowancePercent != nil {
+		group.UsageCorrectionAllowancePercent = allowance
 	}
 	if input.LocalReplyEnabled != nil {
 		group.LocalReplyEnabled = *input.LocalReplyEnabled

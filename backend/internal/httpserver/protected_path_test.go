@@ -31,7 +31,6 @@ func TestProtectedPathIncludesModelProxyManagement(t *testing.T) {
 	server := &Server{}
 	for _, path := range []string{
 		"/api/model-proxies", "/api/model-proxies/proxy-1/test",
-		"/api/proxy-usage-correction",
 		"/api/proxy-routes", "/api/proxy-routes/route-1",
 		"/api/proxy-smart-groups", "/api/proxy-smart-groups/group-1/members",
 	} {

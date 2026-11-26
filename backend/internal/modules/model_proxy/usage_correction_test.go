@@ -2,9 +2,7 @@ package model_proxy
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -14,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/tidwall/gjson"
-	"transithub/backend/internal/shared/authctx"
 )
 
 func TestUsageCorrectionHistoricalMessagesAndCacheBreakdown(t *testing.T) {
@@ -199,82 +196,43 @@ func TestCorrectionEstimateFullHistoryToolsUnicodeAndOpaqueContext(t *testing.T)
 	}
 }
 
-type fakeCorrectionStore struct {
-	values map[string]UsageCorrectionSettings
-	err    error
-}
-
-func (f *fakeCorrectionStore) GetUsageCorrection(_ context.Context, user, workspace string) (UsageCorrectionSettings, error) {
-	v, ok := f.values[user+"/"+workspace]
-	if !ok {
-		v.AllowancePercent = 10
-	}
-	return v, f.err
-}
-func (f *fakeCorrectionStore) SaveUsageCorrection(_ context.Context, user, workspace string, v UsageCorrectionSettings) error {
-	if f.values == nil {
-		f.values = map[string]UsageCorrectionSettings{}
-	}
-	f.values[user+"/"+workspace] = v
-	return f.err
-}
-
-func TestUsageCorrectionPolicyIsOptInDynamicAndWorkspaceScoped(t *testing.T) {
-	store := &fakeCorrectionStore{}
-	s := &Service{usageCorrectionStore: store}
+func TestUsageCorrectionPolicyIsOptInAndGroupScoped(t *testing.T) {
+	s := &Service{}
 	replay, err := newReplayBody(io.NopCloser(strings.NewReader(`{"messages":[{"content":"hello"}]}`)), 4096)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer replay.Close()
 	r := httptest.NewRequest("POST", "/v1/messages", nil)
-	if got := s.withUsageCorrection(r, replay, "u", "a"); got != r {
-		t.Fatal("default enabled")
-	}
-	for _, percent := range []int{0, 10, 20, 35, 1000} {
-		store.SaveUsageCorrection(r.Context(), "u", "a", UsageCorrectionSettings{true, percent})
-		got := s.withUsageCorrection(r, replay, "u", "a")
+	enabled := SmartGroup{ID: "a", UsageCorrectionEnabled: true}
+	disabled := SmartGroup{ID: "b", UsageCorrectionAllowancePercent: 10}
+	for _, percent := range []int{0, 10, 20, 37, 1000} {
+		enabled.UsageCorrectionAllowancePercent = percent
+		got := s.withUsageCorrection(r, replay, enabled)
 		policy, ok := got.Context().Value(usageCorrectionContextKey{}).(inputUsagePolicy)
 		if !ok || policy.Limit != (policy.Estimate*int64(100+percent)+99)/100 {
-			t.Fatalf("dynamic setting %d not applied: %+v", percent, policy)
+			t.Fatalf("percentage %d: %+v", percent, policy)
 		}
-		if s.withUsageCorrection(r, replay, "u", "b") != r || s.withUsageCorrection(r, replay, "v", "a") != r {
-			t.Fatal("workspace/user leaked")
+		if s.withUsageCorrection(r, replay, disabled) != r {
+			t.Fatal("another group was affected")
 		}
 	}
-	store.SaveUsageCorrection(r.Context(), "u", "a", UsageCorrectionSettings{false, 0})
-	if s.withUsageCorrection(r, replay, "u", "a") != r {
-		t.Fatal("switch off did not apply")
-	}
-	store.err = errors.New("database unavailable")
-	if s.withUsageCorrection(r, replay, "u", "a") != r {
-		t.Fatal("settings failure broke forwarding")
+	enabled.UsageCorrectionEnabled = false
+	if s.withUsageCorrection(r, replay, enabled) != r {
+		t.Fatal("disabled policy still applied")
 	}
 }
 
-func TestUsageCorrectionSettingsAPIAuthenticationAndValidation(t *testing.T) {
-	store := &fakeCorrectionStore{}
-	h := &Handler{service: &Service{usageCorrectionStore: store, accounts: proxyTestAccount{}}}
-	unauthorized := httptest.NewRecorder()
-	h.usageCorrectionSettings(unauthorized, httptest.NewRequest("GET", "/", nil))
-	if unauthorized.Code != 401 {
-		t.Fatal("unauthenticated settings accessible")
+func TestUsageCorrectionAllowanceValidation(t *testing.T) {
+	if got, err := usageCorrectionAllowance(nil); err != nil || got != 10 {
+		t.Fatalf("default %d %v", got, err)
 	}
-	for _, body := range []string{`{}`, `{"enabled":true}`, `{"enabled":true,"allowancePercent":-1}`, `{"enabled":true,"allowancePercent":1001}`, `{"enabled":true,"allowancePercent":1.5}`} {
-		req := httptest.NewRequest("PUT", "/", strings.NewReader(body))
-		req = req.WithContext(authctx.WithUserID(req.Context(), "u"))
-		w := httptest.NewRecorder()
-		h.usageCorrectionSettings(w, req)
-		if w.Code != 400 {
-			t.Fatalf("invalid %s accepted (%d)", body, w.Code)
+	for _, value := range []int{-1, 0, 10, 20, 37, 1000, 1001} {
+		got, err := usageCorrectionAllowance(&value)
+		valid := value >= 0 && value <= 1000
+		if valid && (err != nil || got != value) || !valid && err == nil {
+			t.Fatalf("value=%d got=%d err=%v", value, got, err)
 		}
-	}
-	req := httptest.NewRequest("PUT", "/", strings.NewReader(`{"enabled":true,"allowancePercent":0}`))
-	req = req.WithContext(authctx.WithUserID(req.Context(), "u"))
-	w := httptest.NewRecorder()
-	h.usageCorrectionSettings(w, req)
-	if w.Code != 200 || !gjson.Get(w.Body.String(), "enabled").Bool() || gjson.Get(w.Body.String(), "allowancePercent").Int() != 0 {
-		t.Fatalf("strict zero lost: %d %s", w.Code, w.Body)
 	}
 }
 
@@ -313,12 +271,11 @@ func TestUsageCorrectionRealForwardingJSONAndSSE(t *testing.T) {
 				defer server.Close()
 				s, route := preparedProbeService(t, server)
 				for _, enabled := range []bool{false, true} {
-					s.usageCorrectionStore = &fakeCorrectionStore{values: map[string]UsageCorrectionSettings{"u/a": {enabled, 10}}}
 					replay, err := newReplayBody(io.NopCloser(strings.NewReader(payload)), 4096)
 					if err != nil {
 						t.Fatal(err)
 					}
-					incoming := s.withUsageCorrection(httptest.NewRequest("POST", path, nil), replay, "u", "a")
+					incoming := s.withUsageCorrection(httptest.NewRequest("POST", path, nil), replay, SmartGroup{UsageCorrectionEnabled: enabled, UsageCorrectionAllowancePercent: 10})
 					response, _, err := s.performAttempt(incoming, route, replay.Open, nil, mappedResponseContext{}, false)
 					if err != nil {
 						t.Fatal(err)

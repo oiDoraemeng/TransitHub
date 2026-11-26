@@ -64,6 +64,8 @@ export interface ProxyModel {
 }
 
 export interface ProxySmartGroup {
+  usageCorrectionEnabled: boolean
+  usageCorrectionAllowancePercent: number
   keywordMatchCounts: Record<string, number>
   id: string
   name: string
@@ -140,6 +142,8 @@ export interface RouteModelTestResult {
 }
 
 export interface SmartGroupInput {
+  usageCorrectionEnabled: boolean
+  usageCorrectionAllowancePercent: number
   name: string
   memberKeys?: string[]
   routeIds?: string[]
@@ -183,8 +187,3 @@ export interface CleanupStatus {
 
 export type ProxySite = UpstreamSiteResponse
 export type ProxyGroup = UpstreamGroupInfo
-
-export interface UsageCorrectionSettings {
-  enabled: boolean
-  allowancePercent: number
-}
