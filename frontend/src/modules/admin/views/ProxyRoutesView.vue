@@ -63,7 +63,7 @@ const smartKeywords = ref('')
 const smartNewCustomKeys = ref('')
 const removedSmartCustomKeyIds = ref<string[]>([])
 const smartUsageCorrectionEnabled = ref(false)
-const smartUsageCorrectionAllowancePercent = ref(10)
+const smartUsageCorrectionAllowancePercent = ref(40)
 const smartEnabled = ref(true)
 const smartLocalReplyEnabled = ref(false)
 const smartLocalReplyMinTokens = ref(100)
@@ -289,7 +289,7 @@ const openCreateSmart = () => {
   smartNewCustomKeys.value = ''
   removedSmartCustomKeyIds.value = []
   smartUsageCorrectionEnabled.value = false
-  smartUsageCorrectionAllowancePercent.value = 10
+  smartUsageCorrectionAllowancePercent.value = 40
   smartEnabled.value = true
   smartLocalReplyEnabled.value = false
   smartLocalReplyMinTokens.value = 100
@@ -306,7 +306,7 @@ const openEditSmart = (group: ProxySmartGroup) => {
   smartNewCustomKeys.value = ''
   removedSmartCustomKeyIds.value = []
   smartUsageCorrectionEnabled.value = group.usageCorrectionEnabled ?? false
-  smartUsageCorrectionAllowancePercent.value = group.usageCorrectionAllowancePercent ?? 10
+  smartUsageCorrectionAllowancePercent.value = group.usageCorrectionAllowancePercent ?? 40
   smartEnabled.value = group.enabled
   smartLocalReplyEnabled.value = group.localReplyEnabled ?? false
   smartLocalReplyMinTokens.value = group.localReplyMinTokens ?? 100
@@ -786,7 +786,8 @@ onBeforeUnmount(() => { viewDisposed = true; if (pollTimer) window.clearInterval
               <p class="text-xs text-muted-foreground">{{ t('admin.modelProxy.usageCorrection.description') }}</p>
               <template v-if="smartUsageCorrectionEnabled">
                 <label class="field"><span>{{ t('admin.modelProxy.usageCorrection.allowance') }} (%)</span><input v-model.number="smartUsageCorrectionAllowancePercent" type="number" min="0" max="1000" step="1" required /></label>
-                <div class="flex gap-2"><button v-for="percent in [0, 10, 20]" :key="percent" type="button" class="rounded border border-border px-3 py-1 text-xs" :class="smartUsageCorrectionAllowancePercent === percent ? 'bg-muted font-semibold' : ''" @click="smartUsageCorrectionAllowancePercent = percent">{{ percent }}%</button></div>
+                <div class="flex gap-2"><button v-for="percent in [0, 10, 20, 40]" :key="percent" type="button" class="rounded border border-border px-3 py-1 text-xs" :class="smartUsageCorrectionAllowancePercent === percent ? 'bg-muted font-semibold' : ''" @click="smartUsageCorrectionAllowancePercent = percent">{{ percent }}%</button></div>
+                <p class="text-sm font-medium">{{ t('admin.modelProxy.usageCorrection.rangeRule', { multiplier: (1 + smartUsageCorrectionAllowancePercent / 100).toFixed(2) }) }}</p>
                 <p class="text-xs leading-relaxed text-muted-foreground">{{ t('admin.modelProxy.usageCorrection.help') }}</p>
               </template>
             </fieldset>

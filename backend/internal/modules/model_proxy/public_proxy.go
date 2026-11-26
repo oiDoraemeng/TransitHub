@@ -849,6 +849,15 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 	}
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
 	if policy, ok := incoming.Context().Value(usageCorrectionContextKey{}).(inputUsagePolicy); ok && response.StatusCode >= 200 && response.StatusCode < 300 {
+		// Select per attempt: a member may map a public alias to another model
+		// family. Never infer tokenization from the public name or endpoint.
+		model := policy.Model
+		if route.ModelMappingEnabled {
+			if target := strings.TrimSpace(modelMapping[model]); target != "" {
+				model = target
+			}
+		}
+		policy = policy.forModel(model)
 		if err := correctResponseUsage(response, policy, strings.Split(protocolRequest.requestURI, "?")[0], route.ID); err != nil {
 			response.Body.Close()
 			if deadlineCleanup == nil {

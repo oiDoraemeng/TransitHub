@@ -130,7 +130,13 @@ func TestUsageCorrectionRejectsUnsafeNumbersAndBoundsAllBuckets(t *testing.T) {
 			for _, read := range []int64{0, 3, 100, 2000} {
 				for _, write := range []int64{0, 1, 500} {
 					original := inputUsageSnapshot{Input: input, Read: read, Write: write, Output: 7}
-					got, _ := capUsage(original, 100, messages)
+					got, changed := capUsage(original, 100, messages)
+					if !changed {
+						if got != original {
+							t.Fatal("below-limit usage changed")
+						}
+						continue
+					}
 					total := got.Input
 					if messages {
 						total += got.Read + got.Write
@@ -218,11 +224,12 @@ func TestUsageCorrectionPolicyIsOptInAndGroupScoped(t *testing.T) {
 	r := httptest.NewRequest("POST", "/v1/messages", nil)
 	enabled := SmartGroup{ID: "a", UsageCorrectionEnabled: true}
 	disabled := SmartGroup{ID: "b", UsageCorrectionAllowancePercent: 10}
-	for _, percent := range []int{0, 10, 20, 37, 1000} {
+	for _, percent := range []int{0, 10, 20, 40, 37, 1000} {
 		enabled.UsageCorrectionAllowancePercent = percent
 		got := s.withUsageCorrection(r, replay, enabled)
 		policy, ok := got.Context().Value(usageCorrectionContextKey{}).(inputUsagePolicy)
-		if !ok || policy.Limit != (policy.Estimate*int64(100+percent)+99)/100 {
+		policy = policy.forModel(policy.Model)
+		if !ok || policy.Min <= 0 || policy.Max < policy.Min || policy.Limit != correctionRangeLimit(policy.Max, percent) {
 			t.Fatalf("percentage %d: %+v", percent, policy)
 		}
 		if s.withUsageCorrection(r, replay, disabled) != r {
@@ -236,7 +243,7 @@ func TestUsageCorrectionPolicyIsOptInAndGroupScoped(t *testing.T) {
 }
 
 func TestUsageCorrectionAllowanceValidation(t *testing.T) {
-	if got, err := usageCorrectionAllowance(nil); err != nil || got != 10 {
+	if got, err := usageCorrectionAllowance(nil); err != nil || got != 40 {
 		t.Fatalf("default %d %v", got, err)
 	}
 	for _, value := range []int{-1, 0, 10, 20, 37, 1000, 1001} {
@@ -299,7 +306,7 @@ func TestUsageCorrectionRealForwardingJSONAndSSE(t *testing.T) {
 						t.Fatal(err)
 					}
 					if enabled {
-						if response.Header.Get("X-TransitHub-Usage-Policy") != "estimated-input-cap" || bytes.Contains(got, []byte("900000")) || bytes.Contains(got, []byte("1000000")) {
+						if response.Header.Get("X-TransitHub-Usage-Policy") != "estimated-input-range-cap" || response.Header.Get("X-TransitHub-Input-Token-Max") == "" || bytes.Contains(got, []byte("900000")) || bytes.Contains(got, []byte("1000000")) {
 							t.Fatalf("wire correction missing: %s", got)
 						}
 					} else if !bytes.Contains(got, []byte(original)) {

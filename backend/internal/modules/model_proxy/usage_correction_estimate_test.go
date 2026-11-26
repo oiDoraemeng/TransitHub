@@ -46,11 +46,11 @@ func TestCorrectionEstimateBoundedSamplingAcrossLanguagesAndStorage(t *testing.T
 		if !known || !spoolKnown || first != second {
 			t.Fatalf("storage changed estimate: %d %d %v %v", first, second, known, spoolKnown)
 		}
+		features, ok := correctionFeatures(input)
+		if !ok || features.Sampled > correctionMaxSampleWork || features.Sampled == 0 {
+			t.Fatalf("unbounded sampling: %+v %v", features, ok)
+		}
 		for _, body := range []*replayBody{memory, spool} {
-			sampled, _, ok := sampleCorrectionBytes(body)
-			if !ok || sampled > correctionSampleBytes {
-				t.Fatalf("unbounded sampling: %d %v", sampled, ok)
-			}
 			reader, err := body.Open()
 			if err != nil {
 				t.Fatal(err)
@@ -61,33 +61,29 @@ func TestCorrectionEstimateBoundedSamplingAcrossLanguagesAndStorage(t *testing.T
 				t.Fatal("sampling changed request replay")
 			}
 		}
-		// Check language calibration against a complete byte census in this
-		// test only. Production reads a fixed sample, irrespective of length.
-		nonASCII := int64(0)
-		for _, b := range memory.memory {
-			if b >= 128 {
-				nonASCII++
+		for _, model := range []string{"gpt-4o", "gpt-4", "gemini-2.5-pro", "claude-sonnet-5-5"} {
+			range_ := features.tokenRange(model)
+			if range_.Min <= 0 || range_.Max < range_.Min || range_.Method == "" {
+				t.Fatalf("bad range: %+v", range_)
 			}
-		}
-		full := (memory.size+nonASCII+2)/3 + 16
-		if delta := first - full; delta < -full/20 || delta > full/20 {
-			t.Fatalf("language sampling drift >5%%: estimate=%d full=%d", first, full)
 		}
 	}
 }
 
-func TestCorrectionEstimateSmallRequestAndFailedSpoolRead(t *testing.T) {
+func TestCorrectionEstimateUsesDecodedInputAndPreservesSpool(t *testing.T) {
 	body, input := correctionEstimateFixture(t, "short 中文", false)
-	sampled, _, ok := sampleCorrectionBytes(body)
-	if !ok || sampled != body.size {
-		t.Fatalf("small sample=%d body=%d ok=%v", sampled, body.size, ok)
+	features, ok := correctionFeatures(input)
+	if !ok || features.Sampled != features.Bytes || features.Bytes >= body.size {
+		t.Fatalf("small sample=%+v body=%d ok=%v", features, body.size, ok)
 	}
 	spool, _ := correctionEstimateFixture(t, "short 中文", true)
-	if err := spool.file.Truncate(1); err != nil {
-		t.Fatal(err)
+	position, _ := spool.file.Seek(0, io.SeekCurrent)
+	if _, known := estimateCorrectionInput(input, spool); !known {
+		t.Fatal("decoded input must not require spool I/O")
 	}
-	if _, known := estimateCorrectionInput(input, spool); known {
-		t.Fatal("unreadable spool must preserve upstream usage")
+	after, _ := spool.file.Seek(0, io.SeekCurrent)
+	if position != after {
+		t.Fatal("estimation moved the replay file position")
 	}
 }
 

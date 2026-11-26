@@ -12,7 +12,7 @@ func TestUsageCorrectionPostgresGroupDefaultsPersistenceAndIsolation(t *testing.
 	service := &Service{repository: repo, accounts: proxyTestAccount{}}
 	for _, id := range []string{"a", "b"} {
 		group, err := repo.GetSmartGroupConfig(ctx, id)
-		if err != nil || group.UsageCorrectionEnabled || group.UsageCorrectionAllowancePercent != 10 {
+		if err != nil || group.UsageCorrectionEnabled || group.UsageCorrectionAllowancePercent != 40 {
 			t.Fatalf("default=%+v %v", group, err)
 		}
 	}
@@ -32,7 +32,7 @@ func TestUsageCorrectionPostgresGroupDefaultsPersistenceAndIsolation(t *testing.
 			t.Fatalf("list=%+v %v", groups, err)
 		}
 		other, err := reloaded.GetSmartGroupConfig(ctx, "b")
-		if err != nil || other.UsageCorrectionEnabled || other.UsageCorrectionAllowancePercent != 10 {
+		if err != nil || other.UsageCorrectionEnabled || other.UsageCorrectionAllowancePercent != 40 {
 			t.Fatalf("leaked to other group: %+v %v", other, err)
 		}
 		// An unrelated partial update must preserve the correction settings.

@@ -1,0 +1,378 @@
+[
+  {
+    "text": "你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。你好，世界！这是一个中文输入测试。",
+    "counts": {
+      "o200k_base": 200,
+      "cl100k_base": 300,
+      "gemma3": 180
+    }
+  },
+  {
+    "text": "A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. A complete request contains system prompts, history and tools. ",
+    "counts": {
+      "o200k_base": 221,
+      "cl100k_base": 221,
+      "gemma3": 221
+    }
+  },
+  {
+    "text": "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789",
+    "counts": {
+      "o200k_base": 334,
+      "cl100k_base": 334,
+      "gemma3": 1000
+    }
+  },
+  {
+    "text": "中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中",
+    "counts": {
+      "o200k_base": 1000,
+      "cl100k_base": 1000,
+      "gemma3": 1000
+    }
+  },
+  {
+    "text": "𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀𠀀",
+    "counts": {
+      "o200k_base": 3000,
+      "cl100k_base": 3000,
+      "gemma3": 4000
+    }
+  },
+  {
+    "text": "Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 Status 🚀🙂🌍 正常 ",
+    "counts": {
+      "o200k_base": 641,
+      "cl100k_base": 961,
+      "gemma3": 561
+    }
+  },
+  {
+    "text": "                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ",
+    "counts": {
+      "o200k_base": 9,
+      "cl100k_base": 9,
+      "gemma3": 33
+    }
+  },
+  {
+    "text": " != nil {\n\t\tt.Fatalf(\"Decrypt: %v\", err)\n\t}\n\tif plain != \"sk-th-secret\" {\n\t\tt.Fatalf(\"Decrypt = %q\", plain)\n\t}\n}\n\nfunc TestKeyCipherRequiresExplicitKey(t *testing.T) {\n\tcipher, err := NewKeyCipher(\"\")\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tif cipher.Available() {\n\t\tt.Fatal(\"empty encryption",
+    "counts": {
+      "o200k_base": 85,
+      "cl100k_base": 85,
+      "gemma3": 110
+    }
+  },
+  {
+    "text": "中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中",
+    "counts": {
+      "o200k_base": 173,
+      "cl100k_base": 173,
+      "gemma3": 173
+    }
+  },
+  {
+    "text": "ue.Raw))\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tif string(canonical) == value.Raw {\n\t\treturn raw, nil\n\t}\n\treturn sjson.SetRawBytes(raw, key, canonical)\n}\npackage model_proxy",
+    "counts": {
+      "o200k_base": 49,
+      "cl100k_base": 49,
+      "gemma3": 64
+    }
+  },
+  {
+    "text": "package model_proxy\n\nimport (\n\t\"context\"\n\n\t\"gitpackage model_proxy\n\nimport (\n\t\"context\"\n\t\"errors\"\n\t\"fmt\"\n\t\"net/http\"\n\t\"reflect\"\n\t\"testing\"\n)\n\nfunc TestMemberNeverAutoPausePersistsAndIsolatesGroups(t *testing.T) {\n\trepo := memberPauseTestRepository(t)\n\troute := Route{ID: \"never-pause-memb",
+    "counts": {
+      "o200k_base": 80,
+      "cl100k_base": 80,
+      "gemma3": 104
+    }
+  },
+  {
+    "text": "zip.NewWriter(w)\n\t\t_, _ = writer.Write([]byte(`{\"model\":\"upstream-model\",\"output\":[]}`))\n\t\t_ = writer.Close()\n\t}))\n\tdefer server.Close()\n\n\tclient, err := newModelHTTPClient(\"\")\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tdefer client.CloseIdleConnections()\n\trequest, err := http.NewRequest(http.MethodPost, server.URL, strings.NewReader(`{}`))\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tcopyRequestHeaders(request.Header, http.Header{\"Accept-Encoding\": []string{\"gzip, br\"}})\n\tresponse, err := client.Do(request)\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tcontext := mappedResponseContext{Enabled: true, SourceModel: \"client-model\", TargetModel: \"upstream-model\"}\n\tif err := rewriteMappedResponse(response, context); err != nil {\n\t\tt.Fatal(err)\n\t}\n\tdefer response.Body.Close()\n\tvar payload map[string]any\n\tif err := json.NewDecoder(response.Body).Decode(&payload); err != nil {\n\t\tt.Fatal(err)\n\t}\n\tif payload[\"model\"] != \"client-model\" {\n\t\tt.Fatalf(\"rewritten model=%v\", payload[\"model\"])\n\t}\n}\n\nfunc TestWaitForProxyRetryHonorsCancellation(t *testing.T) {\n\tctx, cancel := context.WithCancel(context.Background())\n\tcancel()\n\tstarted := time.Now()\n\tif waitForProxyRetry(ctx, 0) {\n\t\tt.Fatal(\"canceled request must not retry\")\n\t}\n\tif time.Since(started) > 100*time.Millisecond {\n\t\tt.Fatal(\"canceled retry wait should return immediately\")\n\t}\n}\n\nfunc TestAttemptSmartGroupMemberRetriesTransientStatusOnce(t *testing.T) {\n\tstatuses := []int{http.StatusServiceUnavailable, http.StatusOK}\n\tcalls := 0\n\tvar timeouts []time.Duration\n\tresponse, err := attemptSmartGroupMember(context.Background(), func(timeout time.Duration) (*http.Response, error) {\n\t\ttimeouts = append(timeouts, timeout)\n\t\tstatus := statuses[calls]\n\t\tcalls++\n\t\treturn &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(\"response\"))}, nil\n\t})\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tdefer response.Body.Close()\n\tif calls != smartGroupAttempts {\n\t\tt.Fatalf(\"attempts=%d want %d\", calls, smartGroupAttempts)\n\t}\n\tif response.StatusCode != http.StatusOK {\n\t\tt.Fatalf(\"status=%d want 200\", response.StatusCode)\n\t}\n\tif len(timeouts) != 2 || timeouts[0] != 90*time.Second || timeouts[1] != 60*time.Second {\n\t\tt.Fatalf(\"timeouts=%v want [90s 60s]\", timeouts)\n\t}\n}\n\nfunc TestAttemptSmartGroupMemberStopsAfterOneRetry(t *testing.T) {\n\tcalls := 0\n\tresponse, err := attemptSmartGroupMember(context.Background(), func(time.Duration) (*http.Response, error) {\n\t\tcalls++\n\t\treturn nil, errors.New(\"network failure\")\n\t})\n\tif response != nil {\n\t\tt.Fatal(\"failed member must not return a response\")\n\t}\n\tif err == nil || err.Error() != \"network failure\" {\n\t\tt.Fatalf(\"error=%v\", err)\n\t}\n\tif calls != smartGroupAttempts {\n\t\tt.Fatalf(\"attempts=%d want %d\", calls, smartGroupAttempts)\n\t}\n}\n\nfunc TestAcquireRouteSecretUsesProvidedKeyWithoutCleanupJob(t *testing.T) {\n\tencoded := base64.StdEncoding.EncodeToString([]byte(\"01234567890123456789012345678901\"))\n\tcipher, err := NewKeyCipher(encoded)\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tciphertext, err := cipher.Encrypt(\"sk-prepared\")\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tservice := &Service{cipher: cipher}\n\tsecret, job, needsCleanup, err := service.acquireRouteSecret(context.Background(), Route{\n\t\tUseProvidedKey:        true,\n\t\tRouteProvidedKey:      true,\n\t\tUpstreamKeyCiphertext: ciphertext,\n\t})\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tif secret != \"sk-prepared\" {\n\t\tt.Fatalf(\"secret=%q\", secret)\n\t}\n\tif needsCleanup {\n\t\tt.Fatal(\"prepared key must not create a cleanup job\")\n\t}\n\tif job.ID != \"\" {\n\t\tt.Fatalf(\"cleanup job=%+v\", job)\n\t}\n}\n\nfunc TestAcquireRouteSecretDoesNotFallbackWhenProvidedKeyUnavailable(t *testing.T) {\n\tservice := &Service{}\n\t_, job, needsCleanup, err := service.acquireRouteSecret(context.Background(), Route{UseProvidedKey: true})\n\tif err == nil || err.Error() != \"prepared upstream key is unavailable\" {\n\t\tt.Fatalf(\"error=%v\", err)\n\t}\n\tif needsCleanup || job.ID != \"\" {\n\t\tt.Fatalf(\"unexpected cleanup fallback: needsCleanup=%t job=%+v\", needsCleanup, job)\n\t}\n}\n\nfunc TestModelRefreshCoolingDownAfterSuccessOrFailure(t *testing.T) {\n\tnow := time.Now()\n\trecentSuccess := now.Add(-time.Minute)\n\tif !modelRefreshCoolingDown(Route{ModelSyncedAt: &recentSuccess}, now, 5*time.Minute) {\n\t\tt.Fatal(\"recent successful refresh must cool down\")\n\t}\n\tif !modelRefreshCoolingDown(Route{ModelSyncError: \"failed\", UpdatedAt: recentSuccess}, now, 5*time.Minute) {\n\t\tt.Fatal(\"recent failed refresh must cool down\")\n\t}\n\toldFailure := now.Add(-6 * time.Minute)\n\tif modelRefreshCoolingDown(Route{ModelSyncError: \"failed\", UpdatedAt: oldFailure}, now, 5*time.Minute) {\n\t\tt.Fatal(\"expired failure cooldown must allow refresh\")\n\t}\n}\n\nfunc TestReplayBodyMemoryAndModel(t *testing.T) {\n\tbody, err := newReplayBody(io.NopCloser(strings.NewReader(`{\"model\":\"gpt-test\",\"input\":\"hello\"}`)), 1024)\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tdefer body.Close()\n\tif body.file != nil {\n\t\tt.Fatal(\"small body should remain in memory\")\n\t}\n\tmodel, err := body.ModelID()\n\tif err != nil || model != \"gpt-test\" {\n\t\tt.Fatalf(\"ModelID=%q err=%v\", model, err)\n\t}\n\tfor range 2 {\n\t\treader, err := body.Open()\n\t\tif err != nil {\n\t\t\tt.Fatal(err)\n\t\t}\n\t\tdata, _ := io.ReadAll(reader)\n\t\treader.Close()\n\t\tif !strings.Contains(string(data), \"hello\") {\n\t\t\tt.Fatalf(\"replayed body = %q\", data)\n\t\t}\n\t}\n}\n\nfunc TestReplayBodySpoolsAndLimits(t *testing.T) {\n\tlarge := `{\"model\":\"gpt-test\",\"input\":\"` + strings.Repeat(\"x\", memoryReplayLimit+128) + `\"}`\n\tbody, err := newReplayBody(io.NopCloser(strings.NewReader(large)), int64(len(large)+1))\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\tif body.file == nil {\n\t\tt.Fatal(\"large body should use a temporary file\")\n\t}\n\tname := body.file.Name()\n\tif err := body.Close(); err != nil {\n\t\tt.Fatal(err)\n\t}\n\tif _, err := newReplayBody(io.NopCloser(strings.NewReader(\"too large\")), 3); err != errBodyTooLarge {\n\t\tt.Fatalf(\"size error=%v\", err)\n\t}\n\t_ = name\n}\n\nfunc TestCleanupGateBodyDeletesBeforeFirstEventIsReleased(t *testing.T) {\n\tvar cleanupCalls int\n\tbody := newCleanupGateBody(\n\t\tio.NopCloser(strings.NewReader(\"data: first\\n\\n\"+\"data: second\\n\\n\")),\n\t\tfunc() error {\n\t\t\tcleanupCalls++\n\t\t\treturn nil\n\t\t},\n\t)\n\n\tfirst := make([]byte, len(\"data: first\\n\\n\"))\n\tn, err := body.Read(first)\n\tif err != nil {\n\t\tt.Fatalf(\"first Read error: %v\", err)\n\t}\n\tif string(first[:n]) != \"data: first\\n\\n\" {\n\t\tt.Fatalf(\"first event = %q\", first[:n])\n\t}\n\tif cleanupCalls != 1 {\n\t\tt.Fatalf(\"cleanup calls after first event = %d, want 1\", cleanupCalls)\n\t}\n\n\trest, err := io.ReadAll(body)\n\tif err != nil {\n\t\tt.Fatalf(\"remaining Read error: %v\", err)\n\t}\n\tif string(rest) != \"data: second\\n\\n\" {\n\t\tt.Fatalf(\"remaining events = %q\", rest)\n\t}\n}\n\nfunc TestCleanupGateBodyStartsCleanupWhileWaitingForFirstEvent(t *testing.T) {\n\tsourceReader, sourceWriter := io.Pipe()\n\tcleanupStarted := make(chan struct{})\n\tcleanupRelease := make(chan struct{})\n\tbody := newCleanupGateBody(sourceReader, func() error {\n\t\tclose(cleanupStarted)\n\t\t<-cleanupRelease\n\t\treturn nil\n\t})\n\treadDone := make(chan error, 1)\n\tgo func() {\n\t\tbuffer := make([]byte, len(\"data: first\\n\\n\"))\n\t\t_, err := body.Read(buffer)\n\t\treadDone <- err\n\t}()\n\tselect {\n\tcase <-cleanupStarted:\n\tcase <-time.After(time.Second):\n\t\tt.Fatal(\"cleanup did not start while waiting for the first event\")\n\t}\n\tif _, err := sourceWriter.Write([]byte(\"data: first\\n\\n\")); err != nil {\n\t\tt.Fatal(err)\n\t}\n\tclose(cleanupRelease)\n\tif err := <-readDone; err != nil {\n\t\tt.Fatal(err)\n\t}\n\t_ = body.Close()\n}\n\nfunc TestHeaderDeadlineCleanupStartsWhenHeadersArriveFirst(t *testing.T) {\n\tcalls := 0\n\tcleanup := newHeaderDeadlineCleanup(time.Hour, func() error {\n\t\tcalls++\n\t\treturn nil\n\t})\n\tstarted := time.Now()\n\tif err := cleanup.finishAtHeaders(); err != nil {\n\t\tt.Fatal(err)\n\t}\n\tif elapsed := time.Since(started); elapsed > 100*time.Millisecond {\n\t\tt.Fatalf(\"header-triggered cleanup took %s\", elapsed)\n\t}\n\tif calls != 1 {\n\t\tt.Fatalf(\"cleanup calls=%d want 1\", calls)\n\t}\n}\n\nfunc TestHeaderDeadlineCleanupStartsBeforeLateHeaders(t *testin",
+    "counts": {
+      "o200k_base": 2140,
+      "cl100k_base": 2145,
+      "gemma3": 2721
+    }
+  },
+  {
+    "text": "请检查完整历史消息、系统提示词、工具定义和工具返回内容。缓存读取和写入不能重复计算。这是独立生成的测试语料。\n请检查完整历史消息、系统提示词、工具定义和工具返回内容。缓存读取和写入不能重复计算",
+    "counts": {
+      "o200k_base": 60,
+      "cl100k_base": 87,
+      "gemma3": 57
+    }
+  },
+  {
+    "text": "中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中",
+    "counts": {
+      "o200k_base": 96,
+      "cl100k_base": 96,
+      "gemma3": 96
+    }
+  },
+  {
+    "text": ", 100, true, false},\n\t\t{\"anthropic-cache-tools\", `{\"tools\":[{\"name\":\"tool\",\"input_schema\":{\"type\":\"object\"},\"cache_control\":{\"type\":\"ephemeral\"}}],\"messages\":[{\"role\":\"user\"",
+    "counts": {
+      "o200k_base": 49,
+      "cl100k_base": 47,
+      "gemma3": 53
+    }
+  },
+  {
+    "text": " {\n\t\t\tw.WriteHeader(503)\n\t\t\tfmt.Fprint(w, `{\"error\":\"retry\"}`)\n\t\t\treturn\n\t\t}\n\t\tw.Header().Set(\"Content-Type\", \"application/json\")\n\t\tfmt.Fprint(w, `{\"id\":\"upstream\",\"object\":\"response\",\"model\":\"model\",\"status\":\"completed\",\"output\":[]}`)\n\t}))\n\tdefer upstream.Close()\n\tservice, route := preparedProbeService(t, upstream)\n\troute.ID = healthTestRoute(t, client).ID\n\tgroupID := fmt.Sprintf(\"keyword-retry-%d\", time.Now().UnixNano())\n\tseedPauseMember(t, repo, route, groupID)\n\tservice.repository, service.limiter, service.accounts = repo, limiter, proxyTestAccount{}\n\tservice.statistics = newRequestStatistics(limiter)\n\tenabled := true\n\tif err := service.UpdateMemberPolicy(context.Background(), \"user\", groupID, route.ID, UpdateMemberPolicyRequest{UseProvidedKey: &enabled}); err != nil {\n\t\tt.Fatal(err)\n\t}\n\tgroup, _ := repo.GetSmartGroupConfig(context.Background(), groupID)\n\tgroup.Keywords = []string{\"premium\"}\n\tkeywordKey, _ := keywordMatchCountKey(groupID, time.Now())\n\trouteKey, _ := routeRequestCountKey(time.Now())\n\tt.Cleanup(func() {\n\t\tclient.Del(context.Background(), keywordKey)\n\t\tclient.HDel(context.Background(), routeKey, route.ID)\n\t})\n\tw := httptest.NewRecorder()\n\tservice.proxySmartGroup(w, httptest.NewRequest(http.MethodPost, \"/v1/responses\", strings.NewReader(`{\"model\":\"model\",\"input\":\"premium premium\"}`)), *group)\n\tservice.statistics.flush(context.Background())\n\tif w.Code != 200 || attempts.Load() != 2 || client.HGet(context.Background(), keywordKey, \"premium\").Val() != \"1\" || client.HGet(context.Background(), routeKey, route.ID).Val() != \"1\" {\n\t\tt.Fatalf(\"status=%d attempts=%d keyword=%s route=%s body=%s\", w.Code, attempts.Load(), client.HGet(context.Background(), keywordKey, \"premium\").Val(), client.HGet(context.Background(), routeKey, route.ID).Val(), w.Body.String())\n\t}\n}\n\nfunc TestDailyStatisticsBatchConcurrentUpdates(t *testing.T) {\n\tlimiter, client := redisTestLimiter(t)\n\tstats := newRequestStatistics(limiter)\n\tnow := time.Now()\n\tkey, expiresAt := keywordMatchCountKey(fmt.Sprintf(\"keyword-batch-%d\", now.UnixNano()), now)\n\tt.Cleanup(func() { client.Del(context.Background(), key) })\n\tvar wg sync.WaitGroup\n\tfor i := 0; i < 100; i++ {\n\t\twg.Add(1)\n\t\tgo func() {\n\t\t\tdefer wg.Done()\n\t\t\tfor j := 0; j < 10; j++ {\n\t\t\t\tstats.add(key, expiresAt, []string{\"keyword\"})\n\t\t\t}\n\t\t}()\n\t}\n\twg.Wait()\n\tif client.Exists(context.Background(), key).Val() != 0 {\n\t\tt.Fatal(\"request counter performed a synchronous write\")\n\t}\n\tstats.flush(context.Background())\n\tif count := client.HGet(context.Background(), key, \"keyword\").Val(); count != \"1000\" {\n\t\tt.Fatalf(\"lost concurrent counts: %s\", count)\n\t}\n\tstats.flush(context.Background())\n\tif count := client.HGet(context.Background(), key, \"keyword\").Val(); count != \"1000\" {\n\t\tt.Fatal(\"flush duplicated counts\")\n\t}\n\tbefore := time.Date(2026, 10, 22, 23, 59, 59, 0, shanghaiLocation)\n\ta, expiry := keywordMatchCountKey(\"group\", before)\n\tb, _ := keywordMatchCountKey(\"group\", before.Add(time.Second))\n\tif a == b || expiry != before.Add(time.Second).Unix() {\n\t\tt.Fatal(\"counter did not rotate at Shanghai midnight\")\n\t}\n\tstats.add(key+\"expired\", now.Add(-time.Second).Unix(), []string{\"keyword\"})\n\tstats.flush(context.Background())\n\tif client.Exists(context.Background(), key+\"expired\").Val() != 0 {\n\t\tt.Fatal(\"expired counter resurrected\")\n\t}\n}\npackage model_proxy\n\nimport (\n\t\"context\"\n\t\"fmt\"\n\t\"net/http\"\n\t\"net/http/httptest\"\n\t\"strings\"\n\t\"sync\"\n\t\"sync/atomic\"\n\t\"testing\"\n\t\"time\"\n)\n\nfunc TestKeywordStatsCountRequestOnceAcrossProtocols(t *testing.T) {\n\tlimiter, client := redisTestLimiter(t)\n\tgroup := SmartGroup{ID: fmt.Sprintf(\"keyword-stats-%d\", time.Now().UnixNano()), Keywords: []string{\"Premium\", \"认真\", \"unused\"}, LocalReplyEnabled: true, LocalReplyMinTokens: 100, LocalReplyMaxOutputTokens: 20}\n\tkey, _ := keywordMatchCountKey(group.ID, time.Now())\n\tt.Cleanup(func() { client.Del(context.Background(), key) })\n\tservice := &Service{limiter: limiter, maxRequestBytes: 1 << 20}\n\tfor _, path := range []string{\"/v1/chat/completions\", \"/v1/responses\", compactPath, \"/v1/messages\", \"/v1beta/models/alias:generateContent\"} {\n\t\tbody := `{\"model\":\"alias\",\"input\":\"PREMIUM premium 认真认真\",\"max_tokens\":20,\"max_output_tokens\":20,\"generationConfig\":{\"maxOutputTokens\":20}}`\n\t\tw := httptest.NewRecorder()\n\t\tservice.proxySmartGroup(w, httptest.NewRequest(http.MethodPost, path, strings.NewReader(body)), group)\n\t\tif w.Code != 200 {\n\t\t\tt.Fatalf(\"status=%d %s\", w.Code, w.Body.String())\n\t\t}\n\t}\n\tgroups := []SmartGroup{group, {ID: \"other-group\", Keywords: group.Keywords}}\n\tif err := limiter.PopulateKeywordMatchCounts(context.Background(), groups); err != nil {\n\t\tt.Fatal(err)\n\t}\n\tif groups[0].KeywordMatchCounts[\"Premium\"] != 5 || groups[0].KeywordMatchCounts[\"认真\"] != 5 || groups[0].KeywordMatchCounts[\"unused\"] != 0 || groups[1].KeywordMatchCounts[\"Premium\"] != 0 {\n\t\tt.Fatalf(\"counts=%v other=%v\", groups[0].KeywordMatchCounts, groups[1].KeywordMatchCounts)\n\t}\n\tif ttl := client.TTL(context.Background(), key).Val(); ttl <= 0 || ttl > 24*time.Hour {\n\t\tt.Fatalf(\"unexpected TTL: %s\", ttl)\n\t}\n}\n\nfunc TestKeywordStatsRetriesCountOneLogicalRequest(t *testing.T) {\n\trepo := memberPauseTestRepository(t)\n\tlimiter, client := redisTestLimiter(t)\n\tvar attempts atomic.Int64\n\tupstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n\t\tif attempts.Add(1) == 1 {\n\t\t\tw.WriteHeader(503)\n\t\t\tfmt.Fprint(w, `{\"error\":\"retry\"}`)\n\t\t\treturn\n\t\t}\n\t\tw.Header().Set(\"Content-Type\", \"application/json\")\n\t\tfmt.Fprint(w, `{\"id\":\"upstream\",\"object\":\"response\",\"model\":\"model\",\"status\":\"completed\",\"output\":[]}`)\n\t}))\n\tdefer upstream.Close()\n\tservice, route := preparedProbeService(t, upstream)\n\troute.ID = healthTestRoute(t, client).ID\n\tgroupID := fmt.Sprintf(\"keyword-retry-%d\", time.Now().UnixNano())\n\tseedPauseMember(t, repo, route, groupID)\n\tservice.repository, service.limiter, service.accounts = repo, limiter, proxyTestAccount{}\n\tservice.statistics = newRequestStatistics(limiter)\n\tenabled := true\n\tif err := service.UpdateMemberPolicy(context.Background(), \"user\", groupID, route.ID, UpdateMemberPolicyRequest{UseProvidedKey: &enabled}); err != nil {\n\t\tt.Fatal(err)\n\t}\n\tgroup, _ := repo.GetSmartGroupConfig(context.Background(), groupID)\n\tgroup.Keywords = []string{\"premium\"}\n\tkeywordKey, _ := keywordMatchCountKey(groupID, time.Now())\n\trouteKey, _ := routeRequestCountKey(time.Now())\n\tt.Cleanup(func() {\n\t\tclient.Del(context.Background(), keywordKey)\n\t\tclient.HDel(context.Background(), routeKey, route.ID)\n\t})\n\tw := httptest.NewRecorder()\n\tservice.proxySmartGroup(w, httptest.NewRequest(http.MethodPost, \"/v1/responses\", strings.NewReader(`{\"model\":\"model\",\"input\":\"premium premium\"}`)), *group)\n\tservice.statistics.flush(context.Background())\n\tif w.Code != 200 || attempts.Load() != 2 || client.HGet(context.Background(), keywordKey, \"premium\").Val() != \"1\" || client.HGet(context.Background(), routeKey, route.ID).Val() != \"1\" {\n\t\tt.Fatalf(\"status=%d attempts=%d keyword=%s route=%s body=%s\", w.Code, attempts.Load(), client.HGet(context.Background(), keywordKey, \"premium\").Val(), client.HGet(context.Background(), routeKey, route.ID).Val(), w.Body.String())\n\t}\n}\n\nfunc TestDailyStatisticsBatchConcurrentUpdates(t *testing.T) {\n\tlimiter, client := redisTestLimiter(t)\n\tstats := newRequestStatistics(limiter)\n\tnow := time.Now()\n\tkey, expiresAt := keywordMatchCountKey(fmt.Sprintf(\"keyword-batch-%d\", now.UnixNano()), now)\n\tt.Cleanup(func() { client.Del(context.Background(), key) })\n\tvar wg sync.WaitGroup\n\tfor i := 0; i < 100; i++ {\n\t\twg.Add(1)\n\t\tgo func() {\n\t\t\tdefer wg.Done()\n\t\t\tfor j := 0; j < 10; j++ {\n\t\t\t\tstats.add(key, expiresAt, []string{\"keyword\"})\n\t\t\t}\n\t\t}()\n\t}\n\twg.Wait()\n\tif client.Exists(context.Background(), key).Val() != 0 {\n\t\tt.Fatal(\"request counter performed a synchronous write\")\n\t}\n\tstats.flush(context.Background())\n\tif count := client.HGet(context.Background(), key, \"keyword\").Val(); count != \"1000\" {\n\t\tt.Fa",
+    "counts": {
+      "o200k_base": 2074,
+      "cl100k_base": 2088,
+      "gemma3": 2630
+    }
+  },
+  {
+    "text": "on.RawMessage\n\t\t\t\tif err := json.Unmarshal([]byte(strings.TrimPrefix(frame, \"data: \")), &chunk); err != nil {\n\t\t\t\t\tt.Fatal(err)\n\t\t\t\t}\n\t\t\t\tchunks++\n\t\t\t\tusage, hasUsage := chunk[\"usage\"]\n\t\t\t\tif hasUsage != includeUsage {\n\t\t\t\t\tt.Fatalf(\"usage field presence=%t want=%t: %s\", hasUsage, includ",
+    "counts": {
+      "o200k_base": 80,
+      "cl100k_base": 79,
+      "gemma3": 91
+    }
+  },
+  {
+    "text": "l(); count != \"1000\" {\n\t\tt.Fatal(\"flush duplicated counts\")\n\t}\n\tbefore := time.Date(2026, 10, 22, 23, 59, 59, 0, shanghaiLocation)\n\ta, expiry := keywordMatchCountKey(\"group\"",
+    "counts": {
+      "o200k_base": 60,
+      "cl100k_base": 60,
+      "gemma3": 77
+    }
+  },
+  {
+    "text": "इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित ट",
+    "counts": {
+      "o200k_base": 30,
+      "cl100k_base": 108,
+      "gemma3": 25
+    }
+  },
+  {
+    "text": "षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक्षण है।\nयह बातचीत के इतिहास और उपकरणों के परिणामों सहित टोकन गणना का परीक",
+    "counts": {
+      "o200k_base": 282,
+      "cl100k_base": 1022,
+      "gemma3": 240
+    }
+  },
+  {
+    "text": "                                                                                                                                                                                                                                                                                                ",
+    "counts": {
+      "o200k_base": 3,
+      "cl100k_base": 3,
+      "gemma3": 10
+    }
+  },
+  {
+    "text": "复计算。这是独立生成的测试语料。\n请检查完整历史消息、系统提示词、工具定义和工具返回内容。缓存读取和写入不能重复计算。这是独立生成的测试语料。\n请检查完整历史消息、系统提示词、工具定义和工具返回",
+    "counts": {
+      "o200k_base": 62,
+      "cl100k_base": 88,
+      "gemma3": 59
+    }
+  },
+  {
+    "text": "ules/     # Domain modules\n│       ├── admin_accounts/\n│       ├── auth/\n│       ├── dashboard/\n│       ├── group_rates/\n│       ├── mass_email/\n│       ├── my_sites/\n│     ",
+    "counts": {
+      "o200k_base": 55,
+      "cl100k_base": 43,
+      "gemma3": 53
+    }
+  },
+  {
+    "text": "中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中",
+    "counts": {
+      "o200k_base": 96,
+      "cl100k_base": 96,
+      "gemma3": 96
+    }
+  },
+  {
+    "text": "imSpace(encoded) == \"\" {\n\t\treturn &KeyCipher{}, nil\n\t}\n\tkey, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))\n\tif err != nil || len(key) != 32 {\n\t\treturn nil, fmt.Errorf(\"PROXY_KEY_ENCRYPTION_KEY must be base64-encoded 32 bytes\")\n\t}\n\tblock, err := aes.NewCipher(key)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\taead, err := cipher.NewGCM(block)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\treturn &KeyCipher{aead: aead}, nil\n}\n\nfunc (c *KeyCipher) Available() bool { return c != nil && c.aead != nil }\n\nfunc (c *KeyCipher) Encrypt(value string) (string, error) {\n\tif !c.Available() {\n\t\treturn \"\", errEncryptionKeyUnavailable\n\t}\n\tnonce := make([]byte, c.aead.NonceSize())\n\tif _, err := io.ReadFull(rand.Reader, nonce); err != nil {\n\t\treturn \"\", err\n\t}\n\tsealed := c.aead.Seal(nil, nonce, []byte(value), nil)\n\treturn base64.RawStdEncoding.EncodeToString(append(nonce, sealed...)), nil\n}\n\nfunc (c *KeyCipher) Decrypt(value string) (string, error) {\n\tif !c.Available() {\n\t\treturn \"\", errEncryptionKeyUnavailable\n\t}\n\tdat",
+    "counts": {
+      "o200k_base": 298,
+      "cl100k_base": 294,
+      "gemma3": 364
+    }
+  },
+  {
+    "text": "package model_proxy\n\nimport (\n\t\"context\"\n\t\"encoding/json\"\n\t\"errors\"\n\t\"fmt\"\n\t\"strings\"\n\t\"time\"\n\n\t\"github.com/jackc/pgx/v5\"\n\t\"github.com/jackc/pgx/v5/pgxpool\"\n)\n\ntype Repository struct {\n\tdb *pgxpool.Pool\n}\n\nfunc NewRepository(db *pgxpool.Pool) *Repository { return &Repository{db: db} }\n\nf",
+    "counts": {
+      "o200k_base": 91,
+      "cl100k_base": 86,
+      "gemma3": 120
+    }
+  },
+  {
+    "text": "{\"type\":\"file\",\"file\":{\"filename\":\"video.mp4\",\"file_data\":\"dmlkZW8=\"}}]}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"lookup\",\"parameters\":{\"type\":\"object\"}}}],\"tool_choice\":\"required\"}`)\n\tgot, err := openAIMediaToGemini(payload, \"/v1/chat/completions\")\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\traw, _ := json.Marshal(got)\n\tfor _, want := range []string{`9007199254740993`, `\"maxOutputTokens\":50`, `\"mode\":\"ANY\"`, `\"functionResponse\"`, `\"mimeType\":\"video/mp4\"`, `\"systemInstruction\"`} {\n\t\tif !bytes.Contains(raw, []byte(want)) {\n\t\t\tt.Fatalf(\"missing %s: %s\", want, raw)\n\t\t}\n\t}\n}\n\nfunc TestInlinePDFToNativeGeminiUsesNativeProtocol(t *testing.T) {\n\tfor _, endpoint := range []string{\"/v1/chat/completions\", \"/v1/responses\"} {\n\t\traw := `{\"model\":\"gemini-test\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"file\",\"file\":{\"filename\":\"a.pdf\",\"file_data\":\"data:application/pdf;base64,JVBERi0=\"}}]}]}`\n\t\tif endpoint == \"/v1/responses\" {\n\t\t\traw = `{\"model\":\"gemini-test\",\"input\":[{\"role\":\"user\",\"content\":[{\"type\":\"input_file\",\"f",
+    "counts": {
+      "o200k_base": 306,
+      "cl100k_base": 301,
+      "gemma3": 354
+    }
+  },
+  {
+    "text": "tModelProbes(KEYS[1], KEYS[2], ARGV[1]) and 1 or 0\n`)\n\nvar discardCompactRouteScript = redis.NewScript(routeHealthLua + `\nreturn discardCompactRoute(KEYS[1], KEYS[2], ARGV[1",
+    "counts": {
+      "o200k_base": 60,
+      "cl100k_base": 60,
+      "gemma3": 61
+    }
+  },
+  {
+    "text": "ever recreate health state for a deleted route.\nvar removeRouteRuntimeScript = redis.NewScript(`\nlocal epoch = tonumber(redis.call('HGET', KEYS[1], 'epoch') or '0') + 1\nfor _, id in ipairs(redis.call('SMEMBERS', KEYS[3])) do\n  redis.call('ZREM', KEYS[4], id)\n  redis.call('DEL', ARGV[2] .. id)\n  redis.call('DEL', ARGV[3] .. id)\nend\nredis.call('ZREM', KEYS[2], ARGV[1])\nredis.call('DEL', KEYS[1], KEYS[3], KEYS[5], KEYS[6], KEYS[7], KEYS[8], ARGV[3] .. ARGV[1])\nredis.call('HSET', KEYS[1], 'epoch', epoch, 'deleted', 1)\nreturn 1\n`)\n\nfunc (l *Limiter) removeRouteRuntime(ctx context.Context, routeID string) error {\n\treturn removeRouteRuntimeScript.Run(ctx, l.redis,\n\t\t[]string{healthKey(routeID), probeDueKey(), routeModelIndexKey(routeID), modelProbeDueKey(), leaseKey(routeID), latencyKey(routeID), manualTestKey(routeID), schedulerBalanceKey(routeID)},\n\t\trouteID, modelHealthKey(\"\"), schedulerQualityKey(\"\")).Err()\n}\n\ntype RemoveRouteModelRequest struct {\n\tModelID  string `json:\"modelId\"`\n\tProtocol string `json:\"prot",
+    "counts": {
+      "o200k_base": 318,
+      "cl100k_base": 317,
+      "gemma3": 347
+    }
+  },
+  {
+    "text": "package model_proxy\n\nimport (\n\t\"errors\"\n\t\"log\"\n\t\"net/http\"\n\t\"strings\"\n\n\t\"github.com/jackc/pgx/v5\"\n\n\t\"transithub/backend/internal/shared/authctx\"\n\t\"transithub/backend/internal/shared/httpjson\"\n)\n\ntype Handler struct {\n\tservice *Service\n}\n\nfunc RegisterRoutes(mux *http.ServeMux, service *Service) {\n\th := &Handler{service: service}\n\tmux.HandleFunc(\"GET /api/proxy-routes\", h.listRoutes)\n\tmux.HandleFunc(\"POST /api/proxy-routes\", h.createRoute)\n\tmux.HandleFunc(\"PATCH /api/proxy-routes/{id}\", h.updateRoute)\n\tmux.HandleFunc(\"DELETE /api/proxy-routes/{id}\", h.deleteRoute)\n\tmux.HandleFunc(\"GET /api/proxy-routes/{id}/key\", h.revealRouteKey)\n\tmux.HandleFunc(\"POST /api/proxy-routes/{id}/rotate-key\", h.rotateRouteKey)\n\tmux.HandleFunc(\"GET /api/proxy-routes/{id}/test-models\", h.routeTestModels)\n\tmux.HandleFunc(\"POST /api/proxy-routes/{id}/test\", h.testRouteModel)\n\tmux.HandleFunc(\"POST /api/proxy-routes/{id}/restore-scheduling\", h.restoreRouteScheduling)\n\tmux.HandleFunc(\"POST /api/proxy-routes/{id}/remove-model\", h.removeRouteModel)\n\tmux.HandleFunc(\"GET /api/proxy-routes/sites\", h.listSites)\n\tmux.HandleFunc(\"GET /api/proxy-routes/sites/{siteId}/groups\", h.listGroups)\n\tmux.HandleFunc(\"GET /api/proxy-routes/cleanup-status\", h.cleanupStatus)\n\tmux.HandleFunc(\"GET /api/model-proxies\", h.listEgressProxies)\n\tmux.HandleFunc(\"POST /api/model-proxies\", h.createEgressProxy)\n\tmux.HandleFunc(\"PATCH /api/model-proxies/{id}\", h.updateEgressProxy)\n\tmux.HandleFunc(\"DELETE /api/model-proxies/{id}\", h.deleteEgressProxy)\n\tmux.HandleFunc(\"POST /api/model-proxies/{id}/test\", h.testEgressProxy)\n\n\tmux.HandleFunc(\"GET /api/proxy-smart-groups\", h.listSmartGroups)\n\tmux.HandleFunc(\"POST /api/proxy-smart-groups\", h.createSmartGroup)\n\tmux.HandleFunc(\"PATCH /api/proxy-smart-groups/{id}\", h.updateSmartGroup)\n\tmux.HandleFunc(\"DELETE /api/proxy-smart-groups/{id}\", h.deleteSmartGroup)\n\tmux.HandleFunc(\"POST /api/proxy-smart-groups/{id}/members\", h.addMember)\n\tmux.HandleFunc(\"PATCH /api/proxy-smart-groups/{id}/members/{routeId}\", h.updateMemberPolicy)\n\tmux.HandleFunc(\"DELETE /api/proxy-smart-groups/{id}/members/{routeId}\", h.removeMember)\n\tmux.HandleFunc(\"GET /api/proxy-smart-groups/{id}/key\", h.revealSmartGroupKey)\n\tmux.HandleFunc(\"POST /api/proxy-smart-groups/{id}/rotate-key\", h.rotateSmartGroupKey)\n\tmux.HandleFunc(\"PATCH /api/proxy-smart-groups/{id}/custom-keys\", h.updateSmartGroupCustomKeys)\n\tmux.HandleFunc(\"GET /api/proxy-smart-groups/{id}/custom-keys/{keyId}\", h.revealSmartGroupCustomKey)\n}\n\nfunc (h *Handler) listEgressProxies(w http.ResponseWriter, r *http.Request) {\n\tuserID, ok := h.userID(w, r)\n\tif !ok {\n\t\treturn\n\t}\n\tproxies, err := h.service.ListEgressProxies(r.Context(), userID)\n\tif err != nil {\n\t\th.writeError(w, err)\n\t\treturn\n\t}\n\thttpjson.Write(w, http.StatusOK, proxies)\n}\n\nfunc (h *Handler) createEgressProxy(w http.ResponseWriter, r *http.Request) {\n\tw.Header().Set(\"Cache-Control\", \"no-store\")\n\tuserID, ok := h.userID(w, r)\n\tif !ok {\n\t\treturn\n\t}\n\tvar input CreateEgressProxyRequest\n\tif err := httpjson.Decode(r, &input); err != nil {\n\t\thttpjson.WriteError(w, http.StatusBadRequest, \"invalid request body\")\n\t\treturn\n\t}\n\tproxy, err := h.service.CreateEgressProxy(r.Context(), userID, input)\n\tif err != nil {\n\t\th.writeError(w, err)\n\t\treturn\n\t}\n\thttpjson.Write(w, http.StatusCreated, proxy)\n}\n\nfunc (h *Handler) updateEgressProxy(w http.ResponseWriter, r *http.Request) {\n\tw.Header().Set(\"Cache-Control\", \"no-store\")\n\tuserID, ok := h.userID(w, r)\n\tif !ok {\n\t\treturn\n\t}\n\tvar input UpdateEgressProxyRequest\n\tif err := httpjson.Decode(r, &input); err != nil {\n\t\thttpjson.WriteError(w, http.StatusBadRequest, \"invalid request body\")\n\t\treturn\n\t}\n\tproxy, err := h.service.UpdateEgressProxy(r.Context(), userID, r.PathValue(\"id\"), input)\n\tif err != nil {\n\t\th.writeError(w, err)\n\t\treturn\n\t}\n\thttpjson.Write(w, http.StatusOK, proxy)\n}\n\nfunc (h *Handler) deleteEgressProxy(w http.ResponseWriter, r *http.Request) {\n\tuserID, ok := h.userID(w, r)\n\tif !ok {\n\t\treturn\n\t}\n\tif err := h.service.DeleteEgressProxy(r.Context(), userID, r.PathValue(\"id\")); err != nil {\n\t\th.writeError(w, err)\n\t\treturn\n\t}\n\thttpjson.Write(w, http.StatusOK, map[string]bool{\"success\": true})\n}\n\nfunc (h *Handler) testEgressProxy(w http.ResponseWriter, r *http.Request) {\n\tuserID, ok := h.userID(w, r)\n\tif !ok {\n\t\treturn\n\t}\n\tresult, err := h.service.TestEgressProxy(r.Context(), userID, r.PathValue(\"id\"))\n\tif err != nil {\n\t\th.writeError(w, err)\n\t\treturn\n\t}\n\thttpjson.Write(w, http.StatusOK, result)\n}\n\nfunc (h *Handler) userID(w http.ResponseWriter, r *http.Request) (string, bool) {\n\tuserID, ok := authctx.UserID(r.Context())\n\tif !ok {\n\t\thttpjson.WriteError(w, http.StatusUnauthorized, \"auth.errors.unauthorized\")\n\t}\n\treturn userID, ok\n}\n\nfunc (h *Handler) listRoutes(w http.ResponseWriter, r *http.Request) {\n\tuserID, ok := h.userID(w, r)\n\tif !ok {\n\t\treturn\n\t}\n\troutes, err := h.service.ListRoutes(r.Context(), userID)\n\tif err != nil {\n\t\th.writeError(w, err)\n\t\treturn\n\t}\n\thttpjson.Write(w, http.StatusOK, routes)\n}\n\nfunc (h *Handler) createRoute(w http.ResponseWriter, r *http.Request) {\n\tw.Header().Set(\"Cache-Control\", \"no-store\")\n\tuserID, ok := h.userID(w, rpackage model_proxy\n\nimport (\n\t\"context\"\n\t\"fmt\"\n\t\"io\"\n\t\"net/http\"\n\t\"net/http/httptest\"\n\t\"strings\"\n\t\"sync/atomic\"\n\t\"testing\"\n\t\"time\"\n)\n\ntype disconnectedStatisticsWriter struct{ *httptest.ResponseRecorder }\n\nfunc (w disconnectedStatisticsWriter) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }\n\nfunc TestProxyRequestStatisticsOnlyCountSuccessfulResponses(t *testing.T) {\n\tconst delta = \"data: {\\\"type\\\":\\\"response.output_text.delta\\\",\\\"delta\\\":\\\"OK\\\"}\\n\\n\"\n\tfor _, smart := range []bool{false, true} {\n\t\tname := \"direct\"\n\t\tif smart {\n\t\t\tname = \"smart-group\"\n\t\t}\n\t\tt.Run(name, func(t *testing.T) {\n\t\t\tfor _, test := range []struct {\n\t\t\t\tname       string\n\t\t\t\tstatus     int\n\t\t\t\tbody       string\n\t\t\t\tstream     bool\n\t\t\t\tretry      bool\n\t\t\t\ttruncated  bool\n\t\t\t\tdisconnect bool\n\t\t\t\twantCount  int64\n\t\t\t}{\n\t\t\t\t{name: \"success\", status: 200, body: `{\"output\":[]}`, wantCount: 1},\n\t\t\t\t{name: \"successful-retry\", status: 200, body: `{\"output\":[]}`, retry: true, wantCount: 1},\n\t\t\t\t{name: \"failed-retries\", status: 503, body: `{\"error\":\"unavailable\"}`},\n\t\t\t\t{name: \"invalid-request\", status: 400, body: `{\"error\":\"invalid request\"}`},\n\t\t\t\t{name: \"http-200-json-error\", status: 200, body: `{\"error\":{\"code\":\"overloaded\"}}`},\n\t\t\t\t{name: \"stream-success\", status: 200, body: delta + \"data: [DONE]\\n\\n\", stre",
+    "counts": {
+      "o200k_base": 1878,
+      "cl100k_base": 1815,
+      "gemma3": 2261
+    }
+  },
+  {
+    "text": "nge: {\n        label: 'Range',\n      ",
+    "counts": {
+      "o200k_base": 10,
+      "cl100k_base": 10,
+      "gemma3": 12
+    }
+  },
+  {
+    "text": "Please review the code and explain the result.\nThe request includes the complete conversation history, system instructions and tool results. Please review the code and expla",
+    "counts": {
+      "o200k_base": 30,
+      "cl100k_base": 30,
+      "gemma3": 31
+    }
+  },
+  {
+    "text": "er) discardRecovery(ctx context.Conte",
+    "counts": {
+      "o200k_base": 8,
+      "cl100k_base": 9,
+      "gemma3": 9
+    }
+  },
+  {
+    "text": "🚀 结果正常 🙂🌍 Unicode ∑∇∫ αβγ\nStatus ✅ processing 🚀 结果正常 🙂🌍 Unicode ∑∇∫ αβγ\nStatus ✅ processing 🚀 结果正常 🙂🌍 Unicode ∑∇∫ αβγ\nStatus ✅ processing 🚀 结果正常 🙂🌍 Unicode ∑∇∫ αβγ\nStatus ✅ pro",
+    "counts": {
+      "o200k_base": 88,
+      "cl100k_base": 104,
+      "gemma3": 71
+    }
+  },
+  {
+    "text": "𪕪𨁗𪍑𨲞𤣲𡟻𡫘𥌮𤢌𩖥𨄯𢨦𦢪𡐤𠒭𧼨𥐄𧀱𣟖𦚶𦑖𩋓𧷼𩕩𨆳𩹼𦥤𩶞𥬋𠜦𤰂𠦬𨟶𢫅𣉋𨽳𠧊𧫅𧸩𤋑𣳀𢑹𡖧𢙞𣁾𨣂𪖵𠘿𪖑𩅃𠺺𣖿𥀜𤂂𥌓𩄦𥠿𦈶𩡠𤃠𩳷𦣤𥭣𤳔𠘚𤥖𣡭𠑯𨸁𤠕𥒐𦼔",
+    "counts": {
+      "o200k_base": 285,
+      "cl100k_base": 286,
+      "gemma3": 288
+    }
+  },
+  {
+    "text": "# TransitHub\n\n<div align=\"center\">\n\n[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8.svg)](https://golang.org/)\n[![Vue](https://img.shields.io/badge/Vue-3.5+-4FC08D.svg)](https://vuejs.org/)\n[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791.svg)](https://www.postgresql",
+    "counts": {
+      "o200k_base": 102,
+      "cl100k_base": 101,
+      "gemma3": 114
+    }
+  },
+  {
+    "text": ".T) {\n\tencoded := base64.StdEncoding.EncodeToString([]byte(\"01234567890123456789012345678901\"))\n\tcipher, err := NewKeyCipher(encoded)\n\tif err != nil {\n\t\tt.Fatalf(\"NewKeyCipher: %v\", err)\n\t}\n\tencrypted, err := cipher.Encrypt(\"sk-th-secret\")\n\tif err != nil {\n\t\tt.Fatalf(\"Encrypt: %v\", err)\n",
+    "counts": {
+      "o200k_base": 87,
+      "cl100k_base": 86,
+      "gemma3": 127
+    }
+  },
+  {
+    "text": "ther, err := repo.ListGroupRoutes(ctx, \"b\", true, \"model\")\n\t\tif err != nil || len(other) != 1 || other[0].ReasoningEffort != \"\" {\n\t\t\tt.Fatalf(\"other group changed: %+v %v\", other, err)\n\t\t}\n\t}\n\teffort := \"low\"\n\tif err := svc.UpdateMemberPolicy(ctx, \"other-user\", \"a\", \"reasoning-route\", UpdateMemberPolicyRequest{ReasoningEffort: &effort}); !errors.Is(err, pgx.ErrNoRows) {\n\t\tt.Fatalf(\"member authorization bypass: %v\", err)\n\t}\n}\n\nfunc TestMemberReasoningEffortRejectsUnsupportedValues(t *testing.T) {\n\tsvc := &Service{accounts: proxyTestAccount{}}\n\tfor _, value := range []string{\"auto\", \"none\", \"minimal\", \"ultra\"} {\n\t\terr := svc.UpdateMemberPolicy(context.Background(), \"user\", \"a\", \"route\", UpdateMemberPolicyRequest{ReasoningEffort: &value})\n\t\tvar invalid *requestError\n\t\tif !errors.As(err, &invalid) || invalid.Status != 400 {\n\t\t\tt.Fatalf(\"invalid effort=%q err=%v\", value, err)\n\t\t}\n\t}\n\tgot, err := normalizeReasoningEffort(\" XHIGH \")\n\tif err != nil || got != \"xhigh\" {\n\t\tt.Fatalf(\"normalize=%q %v\", got, err)\n\t}\n}\np",
+    "counts": {
+      "o200k_base": 305,
+      "cl100k_base": 306,
+      "gemma3": 351
+    }
+  },
+  {
+    "text": "all.Args)\n\t\t\t\tif err != nil {\n\t\t\t\t\treturn nil, fmt.Errorf(\"encode Gemini function call: %w\", err)\n\t\t\t\t}\n\t\t\t\ttoolCalls = append(toolCalls, map[string]any{\n\t\t\t\t\t\"id\": id, \"type\": \"function\",\n\t\t\t\t\t\"function\": map[string]any{\"name\": part.FunctionCall.Name, \"arguments\": string(arguments)},\n\t\t",
+    "counts": {
+      "o200k_base": 79,
+      "cl100k_base": 79,
+      "gemma3": 91
+    }
+  },
+  {
+    "text": "package model_proxy\n\nimport (\n\t\"bufio\"\n\t\"bytes\"\n\t\"encoding/base64\"\n\t\"encoding/json\"\n\t\"fmt\"\n\t\"io\"\n\t\"net/http\"\n\t\"net/url\"\n\t\"strings\"\n\t\"time\"\n)\n\ntype mediaInputError struct{ message string }\n\nfunc (e *mediaInputError) Error() string { return e.message }\nfunc mediaError(message string) error",
+    "counts": {
+      "o200k_base": 76,
+      "cl100k_base": 75,
+      "gemma3": 107
+    }
+  },
+  {
+    "text": "詥畋搴瓍鬷耕堕湝琐衴鄌郋螎鈤穿册儘溲魥鹭霓笟哯樋弡疞婿蓠卹玏颩銍蓚橂瑬羈淶写螊瘄仭羟韈鶶诌辜再炠饒匡毆絍禴脿鎞賥佁蕷褿折鋢莝梬塩琴蚈恴轼訋碧捎蟞誡涺愘伥飔傆潍羜炿繌犋躱坕囁捬牋旜璓矃挟叕藠巬謕",
+    "counts": {
+      "o200k_base": 189,
+      "cl100k_base": 230,
+      "gemma3": 210
+    }
+  },
+  {
+    "text": "irst[0] == '[') {\n\t\treturn len(items) // Batch of texts or token arrays.\n\t}\n\treturn 1 // A single array of token IDs.\n}\npackage model_proxy\n\nimport (\n\t\"bytes\"\n\t\"encoding/base64\"\n\t\"encoding/json\"\n\t\"net/http\"\n)\n\nconst embeddingsPath = \"/v1/embeddings\"\n\n// Embeddings are a local compatibili",
+    "counts": {
+      "o200k_base": 76,
+      "cl100k_base": 76,
+      "gemma3": 99
+    }
+  },
+  {
+    "text": "xNano())\n\troutes := []Route{\n\t\t{ID: prefix + \"temporary-a\", Priority: 2, ConcurrencyLimit: 50},\n\t\t{ID: prefix + \"temporary-b\", Priority: 2, ConcurrencyLimit: 50},\n\t\t{ID: pre",
+    "counts": {
+      "o200k_base": 61,
+      "cl100k_base": 61,
+      "gemma3": 66
+    }
+  },
+  {
+    "text": "ser\", \"a\", \"reasoning-route\", UpdateMemberPolicyRequest{Priority: &priority}); err != nil {\n\t\t\tt.Fatal(err)\n\t\t}\n\t\tfor _, enabledOnly := range []bool{false, true} {\n\t\t\tmodel ",
+    "counts": {
+      "o200k_base": 50,
+      "cl100k_base": 50,
+      "gemma3": 56
+    }
+  },
+  {
+    "text": "e: '邮件模板',\n        templatePlaceholder: '请选择邮件模板',\n        noTemplates: '还没有邮件模板，请先到「系统设置」里创建。',\n        subject: '标题：',\n        adLabel: '标题前加「【广告】」',\n        adLabelHint: '国内规定营销邮件",
+    "counts": {
+      "o200k_base": 65,
+      "cl100k_base": 77,
+      "gemma3": 72
+    }
+  },
+  {
+    "text": "ttp.MethodPost, compactPath, strings.NewReader(`{\"model\":\"model\",\"input\":[]}`)), group)\n\t\tif w.Code != http.StatusOK || highCalls.Load() != 2 || lowCalls.Load() != int64(i+1) {\n\t\t\tt.Fatalf(\"fallback not found/reused: status=%d high=%d low=%d body=%s\", w.Code, highCalls.Load(), lowCalls.L",
+    "counts": {
+      "o200k_base": 84,
+      "cl100k_base": 83,
+      "gemma3": 99
+    }
+  },
+  {
+    "text": "package model_proxy\n\nimport (\n\t\"errors\"\n\t\"log\"\n\t\"net/http\"\n\t\"strings\"\n\n\t\"github.com/jackc/pgx/v5\"\n\n\t\"transithub/backend/internal/shared/authctx\"\n\t\"transithub/backend/internal/shared/httpjson\"\n)\n\ntype Handler struct {\n\tservice *Service\n}\n\nfunc RegisterRoutes(mux *http.ServeMux, service *S",
+    "counts": {
+      "o200k_base": 75,
+      "cl100k_base": 74,
+      "gemma3": 105
+    }
+  }
+]

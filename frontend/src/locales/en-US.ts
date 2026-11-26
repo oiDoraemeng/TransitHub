@@ -133,9 +133,10 @@ export default {
     },
     modelProxy: {
       usageCorrection: {
-        title: 'Input usage correction', enable: 'Enable detection and correction', allowance: 'Allowance above estimate',
+        title: 'Input usage correction', enable: 'Enable detection and correction', allowance: 'Allowance above maximum estimate',
         description: 'Applies only to this smart group; off by default. Saved changes apply to subsequent requests.',
-        help: 'Input limit = fast token estimate from the complete request body byte size × (1 + allowance). 0% allows no excess. Cache usage is reduced first; output tokens stay unchanged. Supports Chat, Messages and Responses; images, files and hosted context that cannot be estimated are skipped. Original and corrected counts remain in audit logs; upstream charges are determined by the upstream provider.',
+        rangeRule: 'Correction limit = maximum of the estimated range × {multiplier}. Only values above the limit are capped.',
+        help: 'Estimate a minimum and maximum from the complete effective input. The allowance applies to the maximum. Example: 150–170k with 40% allowance gives a 238k limit; values up to the limit are preserved, higher values are capped at 238k. At 0%, the maximum estimate is the limit. Cache usage is reduced first; output tokens stay unchanged. Ranges are empirical; Claude and uncalibrated models use a wider byte fallback. Images, files and hosted context are skipped. Audit logs retain ranges, limits and original/corrected counts; upstream charges are determined by the upstream provider.',
         invalidAllowance: 'Allowance must be an integer between 0 and 1000.',
       },
       title: 'Model Proxy',

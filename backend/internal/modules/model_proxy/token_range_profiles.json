@@ -1,0 +1,25 @@
+{
+  "version": "sampled-tokenizer-range-v1",
+  "sample_bytes": 16384,
+  "sample_windows": 64,
+  "kind": "empirical_calibration_range_not_guaranteed_bounds",
+  "sources": {
+    "openai": "https://github.com/openai/tiktoken",
+    "gemini": "https://raw.githubusercontent.com/google/gemma_pytorch/014acb7ac4563a5f77c76d7ff98f31b568c16508/tokenizer/gemma3_cleaned_262144_v2.spiece.model",
+    "gemini_sha256": "1299c11d7cf632ef3b4e11937501358ada021bbdf7c47638d13c0ee982f2e79c"
+  },
+  "profiles": {
+    "o200k_base": {
+      "lower_factor": 0.8384463695687734,
+      "upper_factor": 1.0001068098936479
+    },
+    "cl100k_base": {
+      "lower_factor": 0.8384463695687734,
+      "upper_factor": 1.0001068098936479
+    },
+    "gemma3": {
+      "lower_factor": 0.9391735715723606,
+      "upper_factor": 1.0001068098936479
+    }
+  }
+}

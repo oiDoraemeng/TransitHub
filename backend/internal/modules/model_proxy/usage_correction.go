@@ -18,98 +18,14 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-// Reuse the actual byte count already collected while buffering the request.
-// Sample at most 1 KiB to estimate the non-ASCII byte share; never serialize the
-// parsed input again or scan its text. ASCII uses about 3 bytes/token and CJK
-// about 1.5 bytes/token. This remains an approximation, not a tokenizer.
-// Eligibility checks below inspect JSON structure, not individual text bytes.
-func estimateCorrectionInput(input map[string]any, body *replayBody) (int64, bool) {
-	for _, key := range []string{"previous_response_id", "conversation", "cachedContent", "cached_content", "container", "context_management", "mcp_servers"} {
-		if v := input[key]; v != nil && v != "" {
-			return 0, false
-		}
-	}
-	hasInput := false
-	for _, key := range []string{"messages", "input", "prompt", "system", "instructions", "tools", "functions", "tool_choice", "function_call"} {
-		if v := input[key]; v != nil {
-			hasInput = true
-			if opaqueCorrectionContent(v) {
-				return 0, false
-			}
-		}
-	}
-	if !hasInput {
+// Compatibility helper for callers that only need the conservative upper estimate.
+func estimateCorrectionInput(input map[string]any, _ *replayBody) (int64, bool) {
+	features, known := correctionFeatures(input)
+	if !known {
 		return 0, false
 	}
-	// Hosted tools can add context that is absent from the submitted request.
-	if tools, ok := input["tools"].([]any); ok {
-		for _, item := range tools {
-			tool, ok := item.(map[string]any)
-			if !ok {
-				return 0, false
-			}
-			kind, _ := tool["type"].(string)
-			if kind != "" && kind != "function" && kind != "custom" {
-				return 0, false
-			}
-		}
-	}
-	sampled, nonASCII, ok := sampleCorrectionBytes(body)
-	if !ok {
-		return 0, false
-	}
-	// ceil(size * (1 + nonASCII/sample) / 3), without overflowing size*factor.
-	factor, divisor := sampled+nonASCII, 3*sampled
-	estimate := body.size/divisor*factor + (body.size%divisor*factor+divisor-1)/divisor
-	framing := int64(8)
-	if messages, ok := input["messages"].([]any); ok {
-		framing += int64(len(messages)) * 8
-	}
-	if items, ok := input["input"].([]any); ok {
-		framing += int64(len(items)) * 8
-	}
-	return estimate + framing, true
-}
-
-const correctionSampleBytes = 1024
-const correctionSampleWindows = 8
-
-func sampleCorrectionBytes(body *replayBody) (sampled, nonASCII int64, ok bool) {
-	if body == nil || body.size <= 0 || body.file == nil && int64(len(body.memory)) != body.size {
-		return 0, 0, false
-	}
-	width, windows := int64(correctionSampleBytes/correctionSampleWindows), int64(correctionSampleWindows)
-	if body.size <= correctionSampleBytes {
-		width, windows = body.size, 1
-	}
-	var buffer []byte
-	if body.file != nil {
-		buffer = make([]byte, correctionSampleBytes)
-	}
-	for i := int64(0); i < windows; i++ {
-		offset := int64(0)
-		if windows > 1 {
-			offset = (body.size - width) / (windows - 1) * i
-		}
-		var sample []byte
-		if body.file == nil {
-			sample = body.memory[offset : offset+width]
-		} else {
-			// ReadAt keeps the spool file position intact for request replay.
-			n, err := body.file.ReadAt(buffer[:width], offset)
-			if err != nil || int64(n) != width {
-				return 0, 0, false
-			}
-			sample = buffer[:width]
-		}
-		for _, b := range sample {
-			if b >= 128 {
-				nonASCII++
-			}
-		}
-		sampled += width
-	}
-	return sampled, nonASCII, true
+	model, _ := input["model"].(string)
+	return features.tokenRange(model).Max, true
 }
 
 func opaqueCorrectionContent(value any) bool {
@@ -213,7 +129,7 @@ func capUsage(raw inputUsageSnapshot, limit int64, messages bool) (inputUsageSna
 			ordinary = 0
 		}
 	}
-	if total <= limit && caches <= total {
+	if total <= limit {
 		return raw, false
 	}
 	corrected := raw
@@ -409,12 +325,18 @@ func (c *inputUsageCorrector) audit() {
 			Route                       string `json:"route_id"`
 			Request                     string `json:"request_id,omitempty"`
 			Estimate                    int64  `json:"estimated_input"`
+			Minimum                     int64  `json:"estimated_input_min"`
+			Maximum                     int64  `json:"estimated_input_max"`
+			Method                      string `json:"estimation_method"`
+			Model                       string `json:"upstream_model"`
+			InputBytes                  int64  `json:"input_text_bytes"`
+			SampledBytes                int64  `json:"sampled_text_bytes"`
 			Limit                       int64  `json:"input_limit"`
 			Allowance                   int    `json:"allowance_percent"`
 			Messages                    bool   `json:"messages_input_excludes_cache"`
 			Original, Corrected         inputUsageSnapshot
 			PeakOriginal, PeakCorrected inputUsageSnapshot
-		}{c.routeID, c.requestID, c.policy.Estimate, c.policy.Limit, c.policy.AllowancePercent, c.messages, c.raw, c.corrected, c.peakOriginal, c.peakCorrected}
+		}{c.routeID, c.requestID, c.policy.Estimate, c.policy.Min, c.policy.Max, c.policy.Method, c.policy.Model, c.policy.Features.Bytes, c.policy.Features.Sampled, c.policy.Limit, c.policy.AllowancePercent, c.messages, c.raw, c.corrected, c.peakOriginal, c.peakCorrected}
 		encoded, _ := json.Marshal(record)
 		log.Printf("[usage-correction] %s", encoded)
 	})
@@ -430,7 +352,10 @@ func correctResponseUsage(response *http.Response, policy inputUsagePolicy, path
 	if response.Header == nil {
 		response.Header = make(http.Header)
 	}
-	response.Header.Set("X-TransitHub-Usage-Policy", "estimated-input-cap")
+	response.Header.Set("X-TransitHub-Usage-Policy", "estimated-input-range-cap")
+	response.Header.Set("X-TransitHub-Input-Token-Min", strconv.FormatInt(policy.Min, 10))
+	response.Header.Set("X-TransitHub-Input-Token-Max", strconv.FormatInt(policy.Max, 10))
+	response.Header.Set("X-TransitHub-Input-Estimate-Method", policy.Method)
 	response.Header.Set("X-TransitHub-Input-Token-Limit", strconv.FormatInt(policy.Limit, 10))
 	if isEventStream(response.Header) {
 		response.Body = &correctedUsageBody{source: bufio.NewReader(response.Body), close: response.Body, corrector: c}

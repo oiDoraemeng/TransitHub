@@ -1,0 +1,3487 @@
+{
+  "calibration": 460,
+  "held_out": 116,
+  "validation": [
+    {
+      "profile": "o200k_base",
+      "name": "mixed-159",
+      "bytes": 73684,
+      "actual": 18164,
+      "min": 13631,
+      "max": 19735,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-27-7907",
+      "bytes": 7907,
+      "actual": 2157,
+      "min": 1808,
+      "max": 2158,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-29-65537",
+      "bytes": 65537,
+      "actual": 17718,
+      "min": 14395,
+      "max": 18658,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-14-173",
+      "bytes": 519,
+      "actual": 327,
+      "min": 274,
+      "max": 328,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-155",
+      "bytes": 70095,
+      "actual": 26674,
+      "min": 15633,
+      "max": 35181,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-8-65537",
+      "bytes": 65537,
+      "actual": 21846,
+      "min": 18368,
+      "max": 21919,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-3-1021",
+      "bytes": 1862,
+      "actual": 316,
+      "min": 264,
+      "max": 317,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-124",
+      "bytes": 95396,
+      "actual": 58832,
+      "min": 37956,
+      "max": 71542,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-32-65537",
+      "bytes": 65537,
+      "actual": 18989,
+      "min": 15811,
+      "max": 19467,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-5",
+      "bytes": 104498,
+      "actual": 26771,
+      "min": 20381,
+      "max": 30343,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-57-65537",
+      "bytes": 65537,
+      "actual": 16700,
+      "min": 13522,
+      "max": 17491,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-126",
+      "bytes": 4599,
+      "actual": 1112,
+      "min": 932,
+      "max": 1113,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-16",
+      "bytes": 167341,
+      "actual": 59559,
+      "min": 41993,
+      "max": 69615,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-76",
+      "bytes": 181917,
+      "actual": 59926,
+      "min": 41658,
+      "max": 73252,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-44-1021",
+      "bytes": 1023,
+      "actual": 233,
+      "min": 195,
+      "max": 234,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-31-37",
+      "bytes": 37,
+      "actual": 12,
+      "min": 10,
+      "max": 13,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-23-37",
+      "bytes": 37,
+      "actual": 9,
+      "min": 7,
+      "max": 10,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-125",
+      "bytes": 102783,
+      "actual": 25200,
+      "min": 19437,
+      "max": 27099,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-25-173",
+      "bytes": 173,
+      "actual": 52,
+      "min": 43,
+      "max": 53,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-46-16387",
+      "bytes": 16387,
+      "actual": 4608,
+      "min": 3794,
+      "max": 4768,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-89",
+      "bytes": 101544,
+      "actual": 27704,
+      "min": 20955,
+      "max": 30936,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-27-1021",
+      "bytes": 1021,
+      "actual": 260,
+      "min": 217,
+      "max": 261,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-57-173",
+      "bytes": 173,
+      "actual": 40,
+      "min": 33,
+      "max": 41,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-24-7907",
+      "bytes": 7907,
+      "actual": 2038,
+      "min": 1708,
+      "max": 2039,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-43",
+      "bytes": 85600,
+      "actual": 24479,
+      "min": 20219,
+      "max": 25374,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-8-37",
+      "bytes": 37,
+      "actual": 13,
+      "min": 10,
+      "max": 14,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-35-65537",
+      "bytes": 65733,
+      "actual": 17355,
+      "min": 14240,
+      "max": 18183,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-31-16387",
+      "bytes": 16387,
+      "actual": 4686,
+      "min": 3835,
+      "max": 4870,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-51-1021",
+      "bytes": 1021,
+      "actual": 277,
+      "min": 232,
+      "max": 278,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-39-173",
+      "bytes": 173,
+      "actual": 46,
+      "min": 38,
+      "max": 47,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-58",
+      "bytes": 44901,
+      "actual": 11242,
+      "min": 8885,
+      "max": 12453,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-176",
+      "bytes": 78820,
+      "actual": 19792,
+      "min": 15393,
+      "max": 21712,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-75",
+      "bytes": 110056,
+      "actual": 29652,
+      "min": 22224,
+      "max": 33896,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-6-1021",
+      "bytes": 2491,
+      "actual": 525,
+      "min": 440,
+      "max": 526,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-63-16387",
+      "bytes": 16551,
+      "actual": 3849,
+      "min": 3089,
+      "max": 4093,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-55",
+      "bytes": 126742,
+      "actual": 37315,
+      "min": 27509,
+      "max": 42739,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-12",
+      "bytes": 32879,
+      "actual": 8728,
+      "min": 7159,
+      "max": 9136,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-62-7907",
+      "bytes": 12305,
+      "actual": 3323,
+      "min": 2786,
+      "max": 3324,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-50-16387",
+      "bytes": 16387,
+      "actual": 4850,
+      "min": 4015,
+      "max": 4998,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-24-173",
+      "bytes": 173,
+      "actual": 48,
+      "min": 40,
+      "max": 49,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-43-37",
+      "bytes": 37,
+      "actual": 11,
+      "min": 9,
+      "max": 12,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-82",
+      "bytes": 23426,
+      "actual": 6437,
+      "min": 5279,
+      "max": 6709,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-122",
+      "bytes": 82632,
+      "actual": 22561,
+      "min": 15205,
+      "max": 27514,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-92",
+      "bytes": 87747,
+      "actual": 30326,
+      "min": 20775,
+      "max": 38539,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-87",
+      "bytes": 97265,
+      "actual": 29658,
+      "min": 24260,
+      "max": 31447,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-29-1021",
+      "bytes": 1021,
+      "actual": 314,
+      "min": 263,
+      "max": 315,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-31-173",
+      "bytes": 173,
+      "actual": 45,
+      "min": 37,
+      "max": 46,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-23-1021",
+      "bytes": 1021,
+      "actual": 265,
+      "min": 222,
+      "max": 266,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-13-173",
+      "bytes": 173,
+      "actual": 92,
+      "min": 77,
+      "max": 93,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-37-65537",
+      "bytes": 65537,
+      "actual": 18595,
+      "min": 15327,
+      "max": 19414,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-37-37",
+      "bytes": 37,
+      "actual": 11,
+      "min": 9,
+      "max": 12,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-52-173",
+      "bytes": 173,
+      "actual": 62,
+      "min": 51,
+      "max": 63,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-12-16387",
+      "bytes": 16387,
+      "actual": 1025,
+      "min": 858,
+      "max": 1025,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-24-16387",
+      "bytes": 16387,
+      "actual": 4205,
+      "min": 3441,
+      "max": 4397,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-13-65537",
+      "bytes": 65537,
+      "actual": 34329,
+      "min": 28773,
+      "max": 34402,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-30-7907",
+      "bytes": 7907,
+      "actual": 2053,
+      "min": 1721,
+      "max": 2054,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-12-65537",
+      "bytes": 65537,
+      "actual": 4097,
+      "min": 3434,
+      "max": 4097,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-26",
+      "bytes": 61139,
+      "actual": 27386,
+      "min": 16972,
+      "max": 34692,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-26-37",
+      "bytes": 37,
+      "actual": 13,
+      "min": 10,
+      "max": 14,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-5-173",
+      "bytes": 323,
+      "actual": 44,
+      "min": 36,
+      "max": 45,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-65-65537",
+      "bytes": 65656,
+      "actual": 14847,
+      "min": 12080,
+      "max": 15349,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-24-1021",
+      "bytes": 1021,
+      "actual": 223,
+      "min": 186,
+      "max": 224,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-0",
+      "bytes": 57406,
+      "actual": 12297,
+      "min": 9030,
+      "max": 14485,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-80",
+      "bytes": 80340,
+      "actual": 19904,
+      "min": 13211,
+      "max": 23831,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-58-65537",
+      "bytes": 65605,
+      "actual": 18183,
+      "min": 14716,
+      "max": 18623,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-78",
+      "bytes": 114721,
+      "actual": 42048,
+      "min": 29671,
+      "max": 49290,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-94",
+      "bytes": 55571,
+      "actual": 13120,
+      "min": 10575,
+      "max": 14222,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-34-65537",
+      "bytes": 65537,
+      "actual": 18117,
+      "min": 14635,
+      "max": 18994,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-36-7907",
+      "bytes": 7907,
+      "actual": 2279,
+      "min": 1910,
+      "max": 2280,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-19-16387",
+      "bytes": 16387,
+      "actual": 4573,
+      "min": 3674,
+      "max": 4795,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-162",
+      "bytes": 123822,
+      "actual": 31611,
+      "min": 24656,
+      "max": 33978,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-166",
+      "bytes": 31115,
+      "actual": 6862,
+      "min": 4826,
+      "max": 8076,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-88",
+      "bytes": 186274,
+      "actual": 75859,
+      "min": 44541,
+      "max": 97399,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-21-7907",
+      "bytes": 7907,
+      "actual": 2281,
+      "min": 1912,
+      "max": 2282,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-51-65537",
+      "bytes": 65537,
+      "actual": 17702,
+      "min": 14695,
+      "max": 18177,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-7",
+      "bytes": 97097,
+      "actual": 43030,
+      "min": 26058,
+      "max": 53882,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-71",
+      "bytes": 103449,
+      "actual": 21748,
+      "min": 15991,
+      "max": 25226,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-48-7907",
+      "bytes": 7907,
+      "actual": 2195,
+      "min": 1840,
+      "max": 2196,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-31-7907",
+      "bytes": 7907,
+      "actual": 2305,
+      "min": 1932,
+      "max": 2306,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-29-16387",
+      "bytes": 16387,
+      "actual": 4420,
+      "min": 3581,
+      "max": 4669,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-170",
+      "bytes": 62779,
+      "actual": 12467,
+      "min": 8835,
+      "max": 14733,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-17-16387",
+      "bytes": 16387,
+      "actual": 4530,
+      "min": 3686,
+      "max": 4731,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-10-16387",
+      "bytes": 49161,
+      "actual": 16387,
+      "min": 13739,
+      "max": 16389,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-43-16387",
+      "bytes": 16387,
+      "actual": 4842,
+      "min": 3944,
+      "max": 5058,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-28-16387",
+      "bytes": 16387,
+      "actual": 4515,
+      "min": 3642,
+      "max": 4771,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-10",
+      "bytes": 140323,
+      "actual": 41450,
+      "min": 28734,
+      "max": 49186,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-121",
+      "bytes": 131234,
+      "actual": 35705,
+      "min": 23260,
+      "max": 45325,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-90",
+      "bytes": 131160,
+      "actual": 33681,
+      "min": 25676,
+      "max": 37119,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-48-65537",
+      "bytes": 65537,
+      "actual": 18179,
+      "min": 15359,
+      "max": 18978,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-42-173",
+      "bytes": 173,
+      "actual": 49,
+      "min": 41,
+      "max": 50,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-44-65537",
+      "bytes": 65563,
+      "actual": 17658,
+      "min": 14325,
+      "max": 18666,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-50-7907",
+      "bytes": 7907,
+      "actual": 2339,
+      "min": 1961,
+      "max": 2340,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-65-7907",
+      "bytes": 7915,
+      "actual": 1729,
+      "min": 1449,
+      "max": 1730,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-37",
+      "bytes": 18733,
+      "actual": 5235,
+      "min": 4121,
+      "max": 5607,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-39",
+      "bytes": 129584,
+      "actual": 48125,
+      "min": 33266,
+      "max": 58140,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-61-1021",
+      "bytes": 1021,
+      "actual": 289,
+      "min": 242,
+      "max": 290,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-3-16387",
+      "bytes": 29883,
+      "actual": 5062,
+      "min": 4279,
+      "max": 5183,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-36-16387",
+      "bytes": 16387,
+      "actual": 4783,
+      "min": 3819,
+      "max": 5097,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-21-37",
+      "bytes": 37,
+      "actual": 12,
+      "min": 10,
+      "max": 13,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-59-173",
+      "bytes": 173,
+      "actual": 47,
+      "min": 39,
+      "max": 48,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-59-1021",
+      "bytes": 1021,
+      "actual": 270,
+      "min": 226,
+      "max": 271,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-51-16387",
+      "bytes": 16387,
+      "actual": 4418,
+      "min": 3687,
+      "max": 4556,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-65",
+      "bytes": 23755,
+      "actual": 6920,
+      "min": 5262,
+      "max": 7613,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-81",
+      "bytes": 52585,
+      "actual": 14742,
+      "min": 11955,
+      "max": 15642,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-9-37",
+      "bytes": 37,
+      "actual": 6,
+      "min": 5,
+      "max": 7,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-9-16387",
+      "bytes": 16387,
+      "actual": 2049,
+      "min": 1717,
+      "max": 2049,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-102",
+      "bytes": 49213,
+      "actual": 14324,
+      "min": 11511,
+      "max": 14958,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-56",
+      "bytes": 129744,
+      "actual": 41838,
+      "min": 26901,
+      "max": 52726,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-35-37",
+      "bytes": 37,
+      "actual": 13,
+      "min": 10,
+      "max": 14,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-11-37",
+      "bytes": 37,
+      "actual": 1,
+      "min": 0,
+      "max": 2,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-127",
+      "bytes": 29458,
+      "actual": 7763,
+      "min": 6349,
+      "max": 8188,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-147",
+      "bytes": 42855,
+      "actual": 12007,
+      "min": 9789,
+      "max": 12409,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-8",
+      "bytes": 55609,
+      "actual": 15181,
+      "min": 12303,
+      "max": 15732,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-42-16387",
+      "bytes": 16387,
+      "actual": 4955,
+      "min": 4087,
+      "max": 5108,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "mixed-97",
+      "bytes": 23989,
+      "actual": 4945,
+      "min": 3669,
+      "max": 5633,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "o200k_base",
+      "name": "pattern-60-37",
+      "bytes": 37,
+      "actual": 9,
+      "min": 7,
+      "max": 10,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-159",
+      "bytes": 73684,
+      "actual": 19541,
+      "min": 14771,
+      "max": 21109,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-27-7907",
+      "bytes": 7907,
+      "actual": 2142,
+      "min": 1795,
+      "max": 2143,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-29-65537",
+      "bytes": 65537,
+      "actual": 17801,
+      "min": 14465,
+      "max": 18786,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-14-173",
+      "bytes": 519,
+      "actual": 403,
+      "min": 337,
+      "max": 404,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-155",
+      "bytes": 70095,
+      "actual": 29358,
+      "min": 18261,
+      "max": 37377,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-8-65537",
+      "bytes": 65537,
+      "actual": 21846,
+      "min": 18368,
+      "max": 21919,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-3-1021",
+      "bytes": 1862,
+      "actual": 706,
+      "min": 591,
+      "max": 707,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-124",
+      "bytes": 95396,
+      "actual": 58953,
+      "min": 38092,
+      "max": 71812,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-32-65537",
+      "bytes": 65537,
+      "actual": 18249,
+      "min": 15203,
+      "max": 18728,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-5",
+      "bytes": 104498,
+      "actual": 27210,
+      "min": 20292,
+      "max": 31186,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-57-65537",
+      "bytes": 65537,
+      "actual": 16585,
+      "min": 13464,
+      "max": 17398,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-126",
+      "bytes": 4599,
+      "actual": 1402,
+      "min": 1175,
+      "max": 1403,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-16",
+      "bytes": 167341,
+      "actual": 65140,
+      "min": 43829,
+      "max": 78161,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-76",
+      "bytes": 181917,
+      "actual": 73572,
+      "min": 52261,
+      "max": 87293,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-44-1021",
+      "bytes": 1023,
+      "actual": 225,
+      "min": 188,
+      "max": 226,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-31-37",
+      "bytes": 37,
+      "actual": 11,
+      "min": 9,
+      "max": 12,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-23-37",
+      "bytes": 37,
+      "actual": 9,
+      "min": 7,
+      "max": 10,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-125",
+      "bytes": 102783,
+      "actual": 31449,
+      "min": 24821,
+      "max": 33233,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-25-173",
+      "bytes": 173,
+      "actual": 51,
+      "min": 42,
+      "max": 52,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-46-16387",
+      "bytes": 16387,
+      "actual": 4631,
+      "min": 3816,
+      "max": 4790,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-89",
+      "bytes": 101544,
+      "actual": 27529,
+      "min": 20799,
+      "max": 30723,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-27-1021",
+      "bytes": 1021,
+      "actual": 259,
+      "min": 217,
+      "max": 260,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-57-173",
+      "bytes": 173,
+      "actual": 42,
+      "min": 35,
+      "max": 43,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-24-7907",
+      "bytes": 7907,
+      "actual": 2009,
+      "min": 1684,
+      "max": 2010,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-43",
+      "bytes": 85600,
+      "actual": 25401,
+      "min": 20647,
+      "max": 26760,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-8-37",
+      "bytes": 37,
+      "actual": 13,
+      "min": 10,
+      "max": 14,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-35-65537",
+      "bytes": 65733,
+      "actual": 17479,
+      "min": 14339,
+      "max": 18329,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-31-16387",
+      "bytes": 16387,
+      "actual": 4637,
+      "min": 3790,
+      "max": 4835,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-51-1021",
+      "bytes": 1021,
+      "actual": 275,
+      "min": 230,
+      "max": 276,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-39-173",
+      "bytes": 173,
+      "actual": 46,
+      "min": 38,
+      "max": 47,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-58",
+      "bytes": 44901,
+      "actual": 11242,
+      "min": 8891,
+      "max": 12472,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-176",
+      "bytes": 78820,
+      "actual": 20462,
+      "min": 16347,
+      "max": 21949,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-75",
+      "bytes": 110056,
+      "actual": 32374,
+      "min": 24499,
+      "max": 36623,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-6-1021",
+      "bytes": 2491,
+      "actual": 764,
+      "min": 640,
+      "max": 765,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-63-16387",
+      "bytes": 16551,
+      "actual": 3838,
+      "min": 3079,
+      "max": 4087,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-55",
+      "bytes": 126742,
+      "actual": 41374,
+      "min": 31021,
+      "max": 46934,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-12",
+      "bytes": 32879,
+      "actual": 8710,
+      "min": 7131,
+      "max": 9114,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-62-7907",
+      "bytes": 12305,
+      "actual": 3917,
+      "min": 3284,
+      "max": 3918,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-50-16387",
+      "bytes": 16387,
+      "actual": 4841,
+      "min": 4009,
+      "max": 4992,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-24-173",
+      "bytes": 173,
+      "actual": 51,
+      "min": 42,
+      "max": 52,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-43-37",
+      "bytes": 37,
+      "actual": 11,
+      "min": 9,
+      "max": 12,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-82",
+      "bytes": 23426,
+      "actual": 6487,
+      "min": 5325,
+      "max": 6770,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-122",
+      "bytes": 82632,
+      "actual": 23780,
+      "min": 15983,
+      "max": 29194,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-92",
+      "bytes": 87747,
+      "actual": 32568,
+      "min": 22656,
+      "max": 40645,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-87",
+      "bytes": 97265,
+      "actual": 29524,
+      "min": 24082,
+      "max": 31334,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-29-1021",
+      "bytes": 1021,
+      "actual": 316,
+      "min": 264,
+      "max": 317,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-31-173",
+      "bytes": 173,
+      "actual": 44,
+      "min": 36,
+      "max": 45,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-23-1021",
+      "bytes": 1021,
+      "actual": 265,
+      "min": 222,
+      "max": 266,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-13-173",
+      "bytes": 173,
+      "actual": 92,
+      "min": 77,
+      "max": 93,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-37-65537",
+      "bytes": 65537,
+      "actual": 18864,
+      "min": 15555,
+      "max": 19669,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-37-37",
+      "bytes": 37,
+      "actual": 11,
+      "min": 9,
+      "max": 12,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-52-173",
+      "bytes": 173,
+      "actual": 61,
+      "min": 51,
+      "max": 62,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-12-16387",
+      "bytes": 16387,
+      "actual": 513,
+      "min": 429,
+      "max": 513,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-24-16387",
+      "bytes": 16387,
+      "actual": 4156,
+      "min": 3401,
+      "max": 4354,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-13-65537",
+      "bytes": 65537,
+      "actual": 34329,
+      "min": 28776,
+      "max": 34405,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-30-7907",
+      "bytes": 7907,
+      "actual": 2053,
+      "min": 1721,
+      "max": 2054,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-12-65537",
+      "bytes": 65537,
+      "actual": 2049,
+      "min": 1717,
+      "max": 2049,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-26",
+      "bytes": 61139,
+      "actual": 27456,
+      "min": 17043,
+      "max": 34818,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-26-37",
+      "bytes": 37,
+      "actual": 13,
+      "min": 10,
+      "max": 14,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-5-173",
+      "bytes": 323,
+      "actual": 62,
+      "min": 51,
+      "max": 63,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-65-65537",
+      "bytes": 65656,
+      "actual": 14944,
+      "min": 12143,
+      "max": 15498,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-24-1021",
+      "bytes": 1021,
+      "actual": 223,
+      "min": 186,
+      "max": 224,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-0",
+      "bytes": 57406,
+      "actual": 18018,
+      "min": 14253,
+      "max": 19353,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-80",
+      "bytes": 80340,
+      "actual": 25314,
+      "min": 16963,
+      "max": 29992,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-58-65537",
+      "bytes": 65605,
+      "actual": 18224,
+      "min": 14785,
+      "max": 18727,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-78",
+      "bytes": 114721,
+      "actual": 46768,
+      "min": 31627,
+      "max": 56632,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-94",
+      "bytes": 55571,
+      "actual": 15799,
+      "min": 12855,
+      "max": 16678,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-34-65537",
+      "bytes": 65537,
+      "actual": 18095,
+      "min": 14619,
+      "max": 18955,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-36-7907",
+      "bytes": 7907,
+      "actual": 2327,
+      "min": 1951,
+      "max": 2328,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-19-16387",
+      "bytes": 16387,
+      "actual": 4613,
+      "min": 3707,
+      "max": 4828,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-162",
+      "bytes": 123822,
+      "actual": 35822,
+      "min": 28558,
+      "max": 37833,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-166",
+      "bytes": 31115,
+      "actual": 6976,
+      "min": 4929,
+      "max": 8166,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-88",
+      "bytes": 186274,
+      "actual": 85577,
+      "min": 54158,
+      "max": 105241,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-21-7907",
+      "bytes": 7907,
+      "actual": 2237,
+      "min": 1875,
+      "max": 2238,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-51-65537",
+      "bytes": 65537,
+      "actual": 17489,
+      "min": 14508,
+      "max": 17983,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-7",
+      "bytes": 97097,
+      "actual": 43563,
+      "min": 26586,
+      "max": 54435,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-71",
+      "bytes": 103449,
+      "actual": 29981,
+      "min": 22970,
+      "max": 33065,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-48-7907",
+      "bytes": 7907,
+      "actual": 2214,
+      "min": 1856,
+      "max": 2215,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-31-7907",
+      "bytes": 7907,
+      "actual": 2287,
+      "min": 1917,
+      "max": 2288,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-29-16387",
+      "bytes": 16387,
+      "actual": 4440,
+      "min": 3585,
+      "max": 4687,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-170",
+      "bytes": 62779,
+      "actual": 15895,
+      "min": 11344,
+      "max": 18613,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-17-16387",
+      "bytes": 16387,
+      "actual": 4499,
+      "min": 3667,
+      "max": 4699,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-10-16387",
+      "bytes": 49161,
+      "actual": 16387,
+      "min": 13739,
+      "max": 16389,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-43-16387",
+      "bytes": 16387,
+      "actual": 4820,
+      "min": 3924,
+      "max": 5046,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-28-16387",
+      "bytes": 16387,
+      "actual": 4581,
+      "min": 3718,
+      "max": 4801,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-10",
+      "bytes": 140323,
+      "actual": 45785,
+      "min": 31009,
+      "max": 55217,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-121",
+      "bytes": 131234,
+      "actual": 42156,
+      "min": 29082,
+      "max": 51409,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-90",
+      "bytes": 131160,
+      "actual": 34715,
+      "min": 26433,
+      "max": 38018,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-48-65537",
+      "bytes": 65537,
+      "actual": 18339,
+      "min": 15517,
+      "max": 19149,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-42-173",
+      "bytes": 173,
+      "actual": 49,
+      "min": 41,
+      "max": 50,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-44-65537",
+      "bytes": 65563,
+      "actual": 17405,
+      "min": 14097,
+      "max": 18430,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-50-7907",
+      "bytes": 7907,
+      "actual": 2336,
+      "min": 1958,
+      "max": 2337,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-65-7907",
+      "bytes": 7915,
+      "actual": 1742,
+      "min": 1460,
+      "max": 1743,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-37",
+      "bytes": 18733,
+      "actual": 5221,
+      "min": 4114,
+      "max": 5593,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-39",
+      "bytes": 129584,
+      "actual": 55046,
+      "min": 36859,
+      "max": 67773,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-61-1021",
+      "bytes": 1021,
+      "actual": 290,
+      "min": 243,
+      "max": 291,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-3-16387",
+      "bytes": 29883,
+      "actual": 11327,
+      "min": 9477,
+      "max": 11416,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-36-16387",
+      "bytes": 16387,
+      "actual": 4902,
+      "min": 3924,
+      "max": 5197,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-21-37",
+      "bytes": 37,
+      "actual": 12,
+      "min": 10,
+      "max": 13,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-59-173",
+      "bytes": 173,
+      "actual": 45,
+      "min": 37,
+      "max": 46,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-59-1021",
+      "bytes": 1021,
+      "actual": 270,
+      "min": 226,
+      "max": 271,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-51-16387",
+      "bytes": 16387,
+      "actual": 4366,
+      "min": 3643,
+      "max": 4512,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-65",
+      "bytes": 23755,
+      "actual": 7030,
+      "min": 5165,
+      "max": 7919,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-81",
+      "bytes": 52585,
+      "actual": 16160,
+      "min": 12937,
+      "max": 16995,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-9-37",
+      "bytes": 37,
+      "actual": 6,
+      "min": 5,
+      "max": 7,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-9-16387",
+      "bytes": 16387,
+      "actual": 2049,
+      "min": 1717,
+      "max": 2049,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-102",
+      "bytes": 49213,
+      "actual": 14210,
+      "min": 11373,
+      "max": 14852,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-56",
+      "bytes": 129744,
+      "actual": 46475,
+      "min": 31245,
+      "max": 56762,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-35-37",
+      "bytes": 37,
+      "actual": 13,
+      "min": 10,
+      "max": 14,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-11-37",
+      "bytes": 37,
+      "actual": 1,
+      "min": 0,
+      "max": 2,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-127",
+      "bytes": 29458,
+      "actual": 7674,
+      "min": 6281,
+      "max": 8087,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-147",
+      "bytes": 42855,
+      "actual": 12430,
+      "min": 9942,
+      "max": 13033,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-8",
+      "bytes": 55609,
+      "actual": 16030,
+      "min": 12812,
+      "max": 16832,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-42-16387",
+      "bytes": 16387,
+      "actual": 4939,
+      "min": 4074,
+      "max": 5093,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "mixed-97",
+      "bytes": 23989,
+      "actual": 6893,
+      "min": 5272,
+      "max": 7454,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "cl100k_base",
+      "name": "pattern-60-37",
+      "bytes": 37,
+      "actual": 10,
+      "min": 8,
+      "max": 11,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-159",
+      "bytes": 73684,
+      "actual": 20632,
+      "min": 17017,
+      "max": 23015,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-27-7907",
+      "bytes": 7907,
+      "actual": 2588,
+      "min": 2430,
+      "max": 2589,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-29-65537",
+      "bytes": 65537,
+      "actual": 20644,
+      "min": 18739,
+      "max": 21639,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-14-173",
+      "bytes": 519,
+      "actual": 367,
+      "min": 344,
+      "max": 368,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-155",
+      "bytes": 70095,
+      "actual": 27366,
+      "min": 18055,
+      "max": 36139,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-8-65537",
+      "bytes": 65537,
+      "actual": 65537,
+      "min": 61550,
+      "max": 65544,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-3-1021",
+      "bytes": 1862,
+      "actual": 361,
+      "min": 339,
+      "max": 362,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-124",
+      "bytes": 95396,
+      "actual": 61821,
+      "min": 45786,
+      "max": 73901,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-32-65537",
+      "bytes": 65537,
+      "actual": 23459,
+      "min": 21726,
+      "max": 24174,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-5",
+      "bytes": 104498,
+      "actual": 30815,
+      "min": 25741,
+      "max": 36062,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-57-65537",
+      "bytes": 65537,
+      "actual": 19898,
+      "min": 17716,
+      "max": 20912,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-126",
+      "bytes": 4599,
+      "actual": 1146,
+      "min": 1076,
+      "max": 1147,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-16",
+      "bytes": 167341,
+      "actual": 69350,
+      "min": 54475,
+      "max": 82707,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-76",
+      "bytes": 181917,
+      "actual": 63302,
+      "min": 48809,
+      "max": 77961,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-44-1021",
+      "bytes": 1023,
+      "actual": 285,
+      "min": 267,
+      "max": 286,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-31-37",
+      "bytes": 37,
+      "actual": 14,
+      "min": 13,
+      "max": 15,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-23-37",
+      "bytes": 37,
+      "actual": 10,
+      "min": 9,
+      "max": 11,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-125",
+      "bytes": 102783,
+      "actual": 28882,
+      "min": 24152,
+      "max": 31499,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-25-173",
+      "bytes": 173,
+      "actual": 62,
+      "min": 58,
+      "max": 63,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-46-16387",
+      "bytes": 16387,
+      "actual": 5712,
+      "min": 5200,
+      "max": 5969,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-89",
+      "bytes": 101544,
+      "actual": 32434,
+      "min": 27687,
+      "max": 36307,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-27-1021",
+      "bytes": 1021,
+      "actual": 322,
+      "min": 302,
+      "max": 323,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-57-173",
+      "bytes": 173,
+      "actual": 46,
+      "min": 43,
+      "max": 47,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-24-7907",
+      "bytes": 7907,
+      "actual": 2391,
+      "min": 2245,
+      "max": 2392,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-43",
+      "bytes": 85600,
+      "actual": 27443,
+      "min": 24560,
+      "max": 29514,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-8-37",
+      "bytes": 37,
+      "actual": 37,
+      "min": 34,
+      "max": 38,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-35-65537",
+      "bytes": 65733,
+      "actual": 21987,
+      "min": 20185,
+      "max": 22987,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-31-16387",
+      "bytes": 16387,
+      "actual": 5362,
+      "min": 4912,
+      "max": 5562,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-51-1021",
+      "bytes": 1021,
+      "actual": 322,
+      "min": 302,
+      "max": 323,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-39-173",
+      "bytes": 173,
+      "actual": 54,
+      "min": 50,
+      "max": 55,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-58",
+      "bytes": 44901,
+      "actual": 13306,
+      "min": 11420,
+      "max": 14810,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-176",
+      "bytes": 78820,
+      "actual": 23542,
+      "min": 20122,
+      "max": 26115,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-75",
+      "bytes": 110056,
+      "actual": 34057,
+      "min": 27572,
+      "max": 39692,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-6-1021",
+      "bytes": 2491,
+      "actual": 502,
+      "min": 471,
+      "max": 503,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-63-16387",
+      "bytes": 16551,
+      "actual": 4145,
+      "min": 3665,
+      "max": 4462,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-55",
+      "bytes": 126742,
+      "actual": 40229,
+      "min": 32469,
+      "max": 46786,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-12",
+      "bytes": 32879,
+      "actual": 10590,
+      "min": 9689,
+      "max": 11011,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-62-7907",
+      "bytes": 12305,
+      "actual": 3372,
+      "min": 3166,
+      "max": 3373,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-50-16387",
+      "bytes": 16387,
+      "actual": 5545,
+      "min": 5086,
+      "max": 5740,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-24-173",
+      "bytes": 173,
+      "actual": 65,
+      "min": 61,
+      "max": 66,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-43-37",
+      "bytes": 37,
+      "actual": 13,
+      "min": 12,
+      "max": 14,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-82",
+      "bytes": 23426,
+      "actual": 7645,
+      "min": 6985,
+      "max": 7946,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-122",
+      "bytes": 82632,
+      "actual": 25324,
+      "min": 18981,
+      "max": 30639,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-92",
+      "bytes": 87747,
+      "actual": 32574,
+      "min": 25150,
+      "max": 40869,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-87",
+      "bytes": 97265,
+      "actual": 32400,
+      "min": 29966,
+      "max": 34638,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-29-1021",
+      "bytes": 1021,
+      "actual": 365,
+      "min": 342,
+      "max": 366,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-31-173",
+      "bytes": 173,
+      "actual": 49,
+      "min": 46,
+      "max": 50,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-23-1021",
+      "bytes": 1021,
+      "actual": 324,
+      "min": 304,
+      "max": 325,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-13-173",
+      "bytes": 173,
+      "actual": 100,
+      "min": 93,
+      "max": 101,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-37-65537",
+      "bytes": 65537,
+      "actual": 23338,
+      "min": 21624,
+      "max": 24237,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-37-37",
+      "bytes": 37,
+      "actual": 12,
+      "min": 11,
+      "max": 13,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-52-173",
+      "bytes": 173,
+      "actual": 77,
+      "min": 72,
+      "max": 78,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-12-16387",
+      "bytes": 16387,
+      "actual": 529,
+      "min": 528,
+      "max": 564,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-24-16387",
+      "bytes": 16387,
+      "actual": 5055,
+      "min": 4589,
+      "max": 5303,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-13-65537",
+      "bytes": 65537,
+      "actual": 37449,
+      "min": 35141,
+      "max": 37491,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-30-7907",
+      "bytes": 7907,
+      "actual": 2453,
+      "min": 2303,
+      "max": 2454,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-12-65537",
+      "bytes": 65537,
+      "actual": 2115,
+      "min": 2115,
+      "max": 2256,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-26",
+      "bytes": 61139,
+      "actual": 30042,
+      "min": 21932,
+      "max": 37034,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-26-37",
+      "bytes": 37,
+      "actual": 18,
+      "min": 16,
+      "max": 19,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-5-173",
+      "bytes": 323,
+      "actual": 45,
+      "min": 42,
+      "max": 46,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-65-65537",
+      "bytes": 65656,
+      "actual": 16451,
+      "min": 14941,
+      "max": 17168,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-24-1021",
+      "bytes": 1021,
+      "actual": 267,
+      "min": 250,
+      "max": 268,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-0",
+      "bytes": 57406,
+      "actual": 13555,
+      "min": 10718,
+      "max": 16284,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-80",
+      "bytes": 80340,
+      "actual": 18468,
+      "min": 12953,
+      "max": 22935,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-58-65537",
+      "bytes": 65605,
+      "actual": 22211,
+      "min": 20066,
+      "max": 22804,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-78",
+      "bytes": 114721,
+      "actual": 48160,
+      "min": 38372,
+      "max": 55287,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-94",
+      "bytes": 55571,
+      "actual": 14204,
+      "min": 12421,
+      "max": 16240,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-34-65537",
+      "bytes": 65537,
+      "actual": 22208,
+      "min": 19897,
+      "max": 23290,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-36-7907",
+      "bytes": 7907,
+      "actual": 2638,
+      "min": 2477,
+      "max": 2639,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-19-16387",
+      "bytes": 16387,
+      "actual": 5188,
+      "min": 4693,
+      "max": 5425,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-162",
+      "bytes": 123822,
+      "actual": 41649,
+      "min": 29251,
+      "max": 50788,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-166",
+      "bytes": 31115,
+      "actual": 8392,
+      "min": 6710,
+      "max": 9812,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-88",
+      "bytes": 186274,
+      "actual": 76659,
+      "min": 50545,
+      "max": 98996,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-21-7907",
+      "bytes": 7907,
+      "actual": 2899,
+      "min": 2722,
+      "max": 2900,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-51-65537",
+      "bytes": 65537,
+      "actual": 20148,
+      "min": 18526,
+      "max": 20954,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-7",
+      "bytes": 97097,
+      "actual": 46301,
+      "min": 32307,
+      "max": 56714,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-71",
+      "bytes": 103449,
+      "actual": 24154,
+      "min": 19163,
+      "max": 28930,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-48-7907",
+      "bytes": 7907,
+      "actual": 2556,
+      "min": 2400,
+      "max": 2557,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-31-7907",
+      "bytes": 7907,
+      "actual": 2610,
+      "min": 2451,
+      "max": 2611,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-29-16387",
+      "bytes": 16387,
+      "actual": 5156,
+      "min": 4677,
+      "max": 5418,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-170",
+      "bytes": 62779,
+      "actual": 13995,
+      "min": 10662,
+      "max": 17390,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-17-16387",
+      "bytes": 16387,
+      "actual": 5271,
+      "min": 4798,
+      "max": 5504,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-10-16387",
+      "bytes": 49161,
+      "actual": 16387,
+      "min": 15390,
+      "max": 16389,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-43-16387",
+      "bytes": 16387,
+      "actual": 5648,
+      "min": 5155,
+      "max": 5896,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-28-16387",
+      "bytes": 16387,
+      "actual": 5096,
+      "min": 4608,
+      "max": 5347,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-10",
+      "bytes": 140323,
+      "actual": 45063,
+      "min": 34624,
+      "max": 53682,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-121",
+      "bytes": 131234,
+      "actual": 41810,
+      "min": 29699,
+      "max": 53273,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-90",
+      "bytes": 131160,
+      "actual": 37926,
+      "min": 32096,
+      "max": 42150,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-48-65537",
+      "bytes": 65537,
+      "actual": 21062,
+      "min": 19953,
+      "max": 22119,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-42-173",
+      "bytes": 173,
+      "actual": 57,
+      "min": 53,
+      "max": 58,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-44-65537",
+      "bytes": 65563,
+      "actual": 21461,
+      "min": 19455,
+      "max": 22769,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-50-7907",
+      "bytes": 7907,
+      "actual": 2679,
+      "min": 2516,
+      "max": 2680,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-65-7907",
+      "bytes": 7915,
+      "actual": 1904,
+      "min": 1788,
+      "max": 1905,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-37",
+      "bytes": 18733,
+      "actual": 6169,
+      "min": 5516,
+      "max": 6529,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-39",
+      "bytes": 129584,
+      "actual": 56316,
+      "min": 42751,
+      "max": 67793,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-61-1021",
+      "bytes": 1021,
+      "actual": 359,
+      "min": 337,
+      "max": 360,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-3-16387",
+      "bytes": 29883,
+      "actual": 5785,
+      "min": 5434,
+      "max": 5919,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-36-16387",
+      "bytes": 16387,
+      "actual": 5556,
+      "min": 5010,
+      "max": 5843,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-21-37",
+      "bytes": 37,
+      "actual": 16,
+      "min": 15,
+      "max": 17,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-59-173",
+      "bytes": 173,
+      "actual": 59,
+      "min": 55,
+      "max": 60,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-59-1021",
+      "bytes": 1021,
+      "actual": 318,
+      "min": 298,
+      "max": 319,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-51-16387",
+      "bytes": 16387,
+      "actual": 5042,
+      "min": 4657,
+      "max": 5242,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-65",
+      "bytes": 23755,
+      "actual": 8357,
+      "min": 7204,
+      "max": 9102,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-81",
+      "bytes": 52585,
+      "actual": 17785,
+      "min": 13772,
+      "max": 20843,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-9-37",
+      "bytes": 37,
+      "actual": 6,
+      "min": 5,
+      "max": 7,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-9-16387",
+      "bytes": 16387,
+      "actual": 2049,
+      "min": 1923,
+      "max": 2049,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-102",
+      "bytes": 49213,
+      "actual": 17046,
+      "min": 15393,
+      "max": 17720,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-56",
+      "bytes": 129744,
+      "actual": 44091,
+      "min": 31889,
+      "max": 55484,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-35-37",
+      "bytes": 37,
+      "actual": 17,
+      "min": 15,
+      "max": 18,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-11-37",
+      "bytes": 37,
+      "actual": 2,
+      "min": 1,
+      "max": 3,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-127",
+      "bytes": 29458,
+      "actual": 9548,
+      "min": 8674,
+      "max": 10175,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-147",
+      "bytes": 42855,
+      "actual": 13253,
+      "min": 11910,
+      "max": 14104,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-8",
+      "bytes": 55609,
+      "actual": 17301,
+      "min": 15508,
+      "max": 18272,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-42-16387",
+      "bytes": 16387,
+      "actual": 6101,
+      "min": 5567,
+      "max": 6370,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "mixed-97",
+      "bytes": 23989,
+      "actual": 5355,
+      "min": 4266,
+      "max": 6301,
+      "covered": true,
+      "cap_40_covers": true
+    },
+    {
+      "profile": "gemma3",
+      "name": "pattern-60-37",
+      "bytes": 37,
+      "actual": 13,
+      "min": 12,
+      "max": 14,
+      "covered": true,
+      "cap_40_covers": true
+    }
+  ],
+  "claude": "No current official local tokenizer or count API samples: use conservative UTF-8 byte fallback, not fitted GPT coefficients."
+}
