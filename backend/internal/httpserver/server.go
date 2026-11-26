@@ -754,6 +754,7 @@ var protectedPathPrefixes = []string{
 	"/api/admin-accounts",
 	"/api/upstream-sites",
 	"/api/proxy-routes",
+	"/api/proxy-usage-correction",
 	"/api/proxy-smart-groups",
 	"/api/model-proxies",
 	"/api/group-rates",
