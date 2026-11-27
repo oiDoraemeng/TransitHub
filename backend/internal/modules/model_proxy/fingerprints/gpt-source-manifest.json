@@ -1,0 +1,72 @@
+{
+  "sources": [
+    {
+      "repository": "Ikaleio/lm-detector",
+      "revision": "643587185bf9c54b0c94ec6b2bed600f764177ec",
+      "path": "data/unified_reference.jsonl",
+      "url": "https://raw.githubusercontent.com/Ikaleio/lm-detector/643587185bf9c54b0c94ec6b2bed600f764177ec/data/unified_reference.jsonl",
+      "file": "lm-detector-unified_reference.jsonl",
+      "bytes": 20410032,
+      "sha256": "eadd1d25f5232b6e4b65152b5d953d2656e4372327c2c41754486ca80f880765"
+    },
+    {
+      "repository": "xqy2006/ModelTrace",
+      "revision": "09a0ae5009d943aa6cb5dd3c914b83b7e70826ac",
+      "path": "data/gpt_reference.jsonl",
+      "url": "https://raw.githubusercontent.com/xqy2006/ModelTrace/09a0ae5009d943aa6cb5dd3c914b83b7e70826ac/data/gpt_reference.jsonl",
+      "file": "ModelTrace-gpt_reference.jsonl",
+      "bytes": 4882607,
+      "sha256": "84e0d84736eb14cc64b0477514da315663bfe4cadd0a48b5de5dd5692050c424"
+    }
+  ],
+  "samples": 1638,
+  "models": {
+    "gpt-4o": 36,
+    "gpt-5.4": 71,
+    "gpt-5.5": 72,
+    "gpt-5.6-luna": 65,
+    "gpt-5.6-sol": 72,
+    "gpt-5.6-terra": 71,
+    "gpt-6-astra": 449,
+    "gpt-6-luna": 72,
+    "gpt-6-sol": 70,
+    "gpt-6.1-sol": 492,
+    "gpt-6.1-terra": 54,
+    "gpt-6.2-astra": 57,
+    "gpt-6.2-sol": 57
+  },
+  "minimum_valid_count": 207,
+  "maximum_valid_count": 1418,
+  "rejected": {
+    "incomplete": 11
+  },
+  "candidates": {
+    "gpt-4o": 36,
+    "gpt-6-luna": 72,
+    "gpt-6-sol": 72,
+    "gpt-6.1-sol": 492,
+    "gpt-6-astra": 449,
+    "gpt-5.4": 72,
+    "gpt-5.5": 72,
+    "gpt-5.6-sol": 72,
+    "gpt-5.6-terra": 72,
+    "gpt-5.6-luna": 72,
+    "gpt-6.1-terra": 54,
+    "gpt-6.2-sol": 57,
+    "gpt-6.2-astra": 57
+  },
+  "model_display_corrections": [
+    {
+      "batch": "bb270365-9d92-4207-bee3-1efaffee5dd8",
+      "display_model": "gpt-6-astra",
+      "requested_model": "gpt-6.1-sol",
+      "reason": "Use original request model rather than merged display label"
+    }
+  ],
+  "merged_sequences": 0,
+  "notes": [
+    "Original source labels and original output text retained; labels have not been independently authenticated.",
+    "No truncation, padding, sequence shuffling, synthetic numbers or cross-model sample substitution.",
+    "GPT-6 Astra and GPT-6.1 Sol are independent models with independent histories."
+  ]
+}

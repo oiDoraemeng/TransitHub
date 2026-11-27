@@ -134,7 +134,7 @@ func TestFingerprintAllPinnedTemplatesAndAdversarialRequests(t *testing.T) {
 
 func TestFingerprintReferenceIntegrityAndAliases(t *testing.T) {
 	b := fingerprintTestBank(t)
-	if len(b.Samples) != 652 || len(b.models) != 13 {
+	if len(b.Samples) != 2290 || len(b.models) != 26 {
 		t.Fatal("unexpected reference library size")
 	}
 	for _, s := range b.Samples {
@@ -151,6 +151,29 @@ func TestFingerprintReferenceIntegrityAndAliases(t *testing.T) {
 	}
 	if b.aliases["claude-sonnet-99"] != "" {
 		t.Fatal("unknown version was guessed")
+	}
+	for alias, want := range map[string]string{
+		"gpt-4o": "gpt-4o", "gpt-5-4": "gpt-5.4",
+		"openai/gpt-6.1-sol": "gpt-6.1-sol", " GPT-6-ASTRA ": "gpt-6-astra",
+		"anthropic/claude-sonnet-4-6": "claude-sonnet-4.6",
+		"gpt-4o-mini":                 "", "gpt-6.1": "", "gpt-99": "",
+		"openai/claude-sonnet-4.6": "", "anthropic/gpt-6-sol": "",
+	} {
+		if got := b.canonicalModel(alias); got != want {
+			t.Fatalf("canonical model %q = %q, want %q", alias, got, want)
+		}
+	}
+	counts := map[string]int{}
+	for model, samples := range b.models {
+		if strings.HasPrefix(model, "gpt-") {
+			counts[model] = len(samples)
+			if len(samples) <= fingerprintHistorySize {
+				t.Fatalf("insufficient GPT history pool for %s", model)
+			}
+		}
+	}
+	if len(counts) != 13 {
+		t.Fatalf("GPT models = %d", len(counts))
 	}
 }
 
@@ -261,6 +284,72 @@ func TestFingerprintToggleFailuresAndCancellation(t *testing.T) {
 	w = httptest.NewRecorder()
 	if !serveFingerprintReply(w, request, SmartGroup{FingerprintReplyEnabled: true}, replay, "claude-sonnet-4.6", broken, func(context.Context) error { return nil }) || w.Code != 503 {
 		t.Fatal("history failure must not fall through upstream")
+	}
+}
+
+func TestFingerprintGPTRepliesUseRequestedModelPool(t *testing.T) {
+	b := fingerprintTestBank(t)
+	for model, samples := range b.models {
+		if !strings.HasPrefix(model, "gpt-") {
+			continue
+		}
+		for _, path := range []string{"/v1/chat/completions", "/v1/responses", "/v1/messages"} {
+			for _, streaming := range []bool{false, true} {
+				for _, format := range []string{"integer_sequence", "json_array"} {
+					t.Run(fmt.Sprintf("%s/%s/%t/%s", model, path, streaming, format), func(t *testing.T) {
+						prompt := ""
+						for _, f := range b.Fixed {
+							if f.Format == format {
+								prompt = f.Text
+								break
+							}
+						}
+						requested := "openai/" + model
+						body := map[string]any{"model": requested, "stream": streaming}
+						if path == "/v1/responses" {
+							body["input"] = prompt
+						} else {
+							body["messages"] = []any{map[string]any{"role": "user", "content": prompt}}
+						}
+						encoded, _ := json.Marshal(body)
+						replay, err := newReplayBody(io.NopCloser(strings.NewReader(string(encoded))), 1<<20)
+						if err != nil {
+							t.Fatal(err)
+						}
+						defer replay.Close()
+						calls := 0
+						reserve := func(_ context.Context, _ SmartGroup, canonical string, pool []fingerprintSample) (fingerprintSample, error) {
+							calls++
+							if canonical != model || len(pool) != len(samples) {
+								t.Fatalf("wrong model pool %s", canonical)
+							}
+							for _, sample := range pool {
+								if sample.Model != model {
+									t.Fatal("cross-model sample substitution")
+								}
+							}
+							return pool[0], nil
+						}
+						w := httptest.NewRecorder()
+						if !serveFingerprintReply(w, httptest.NewRequest("POST", path, nil), SmartGroup{FingerprintReplyEnabled: true}, replay, requested, reserve, func(context.Context) error { return nil }) || calls != 1 || w.Code != 200 {
+							t.Fatalf("local GPT reply failed: %d", w.Code)
+						}
+						if w.Header().Get("X-TransitHub-Reference-Model") != model || w.Header().Get("X-TransitHub-Reference-Sample") != samples[0].ID || w.Header().Get("X-TransitHub-Response-Source") != "reference-replay" {
+							t.Fatal("reference provenance missing")
+						}
+						reply := samples[0].Text
+						if format == "json_array" {
+							numbers, _ := json.Marshal(samples[0].Numbers)
+							reply = string(numbers)
+						}
+						quoted, _ := json.Marshal(reply)
+						if !strings.Contains(w.Body.String(), string(quoted)) {
+							t.Fatal("reference sequence changed")
+						}
+					})
+				}
+			}
+		}
 	}
 }
 

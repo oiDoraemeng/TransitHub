@@ -176,6 +176,22 @@ func (b *fingerprintBank) match(text string) (fingerprintMatch, bool) {
 	return fingerprintMatch{}, false
 }
 
+func (b *fingerprintBank) canonicalModel(model string) string {
+	model = strings.ToLower(strings.TrimSpace(model))
+	if strings.HasPrefix(model, "openai/") {
+		model = strings.TrimPrefix(model, "openai/")
+		if !strings.HasPrefix(model, "gpt-") {
+			return ""
+		}
+	} else if strings.HasPrefix(model, "anthropic/") {
+		model = strings.TrimPrefix(model, "anthropic/")
+		if !strings.HasPrefix(model, "claude-") {
+			return ""
+		}
+	}
+	return b.aliases[model]
+}
+
 // Only a complete, standalone user task is eligible. System instructions are
 // never a keyword source, and quoted tasks, history, tools and media are excluded.
 func fingerprintRequestText(input map[string]any, path string) (string, bool) {
@@ -301,7 +317,7 @@ func serveFingerprintReply(w http.ResponseWriter, r *http.Request, group SmartGr
 	if !ok {
 		return false
 	}
-	canonical := bank.aliases[strings.TrimPrefix(strings.ToLower(strings.TrimSpace(model)), "anthropic/")]
+	canonical := bank.canonicalModel(model)
 	samples := bank.models[canonical]
 	if len(samples) <= fingerprintHistorySize {
 		writeOpenAIError(w, http.StatusServiceUnavailable, "reference_unavailable", "no reference library for the requested model")
