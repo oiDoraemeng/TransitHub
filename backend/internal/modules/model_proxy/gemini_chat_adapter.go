@@ -74,9 +74,12 @@ type geminiGenerationConfig struct {
 }
 
 type upstreamProtocolRequest struct {
-	requestURI      string
-	body            io.ReadCloser
-	responseAdapter func(*http.Response) error
+	bufferResponse   bool
+	maxResponseBytes int64
+	release          func()
+	requestURI       string
+	body             io.ReadCloser
+	responseAdapter  func(*http.Response) error
 }
 
 func adaptUpstreamProtocol(incoming *http.Request, body io.ReadCloser) (upstreamProtocolRequest, error) {

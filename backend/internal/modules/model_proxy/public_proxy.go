@@ -300,6 +300,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		return
 	}
 	payload, _ := replay.Object()
+	capabilities := inspectRequestCapabilities(payload)
 	incoming, media := withRequestMedia(incoming, payload, modelID)
 	var keywordStreaming bool
 	var keywordInputTokens int
@@ -311,10 +312,10 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			return
 		}
 	}
-	if s.serveGroupFingerprintReply(w, incoming, group, replay, modelID) {
+	if !capabilities.present() && s.serveGroupFingerprintReply(w, incoming, group, replay, modelID) {
 		return
 	}
-	if s.serveGroupLocalReply(w, incoming, group, replay, modelID) {
+	if !capabilities.present() && s.serveGroupLocalReply(w, incoming, group, replay, modelID) {
 		return
 	}
 	keywordMatches := matchedGroupKeywords(group.Keywords, keywordInputText)
@@ -331,6 +332,14 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		writeOpenAIError(w, http.StatusNotFound, "model_not_found", "no enabled smart group member supports this model")
 		return
 	}
+	if incoming.URL.Path != compactPath {
+		candidates = filterRoutesByRequest(capabilities, candidates, modelID)
+		if len(candidates) == 0 {
+			writeOpenAIError(w, http.StatusServiceUnavailable, "request_capability_unavailable", "no smart group member matches the request capability policy")
+			return
+		}
+	}
+	media.PDF = media.PDF || capabilities.PDF
 	candidates = filterMediaRoutes(candidates, media, incoming)
 	if len(candidates) == 0 {
 		writeOpenAIError(w, http.StatusServiceUnavailable, "media_route_unavailable", "no eligible media input member supports this audio/video request or native file reference")
@@ -374,7 +383,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		eligible = append(eligible, candidate)
 	}
 	if keywordFiltering {
-		eligible = filterRoutesByKeywords(inputText, group.Keywords, eligible)
+		eligible = filterRoutesByKeywordsAndRequest(inputText, group.Keywords, eligible, capabilities, modelID)
 	}
 	if len(eligible) == 0 {
 		writeOpenAIError(w, http.StatusNotFound, "no_eligible_member", "no smart group member matches the request policy")
@@ -790,10 +799,13 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		cleanup()
 		return nil, true, err
 	}
-	protocolRequest, err := adaptMediaUpstreamProtocol(protocolIncoming, protocolBody)
+	protocolRequest, err := adaptMemberUpstreamProtocol(protocolIncoming, protocolBody, route)
 	if err != nil {
 		cleanup()
 		return nil, true, err
+	}
+	if protocolRequest.release != nil {
+		defer protocolRequest.release()
 	}
 	body = protocolRequest.body
 	baseURL := s.mustSiteBaseURL(incoming.Context(), route.SiteID)
@@ -813,6 +825,9 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		cleanup()
 		return nil, true, err
 	}
+	if protocolRequest.bufferResponse {
+		responseMapping.BufferedStream = true
+	}
 	request, err := http.NewRequestWithContext(incoming.Context(), incoming.Method, strings.TrimRight(baseURL, "/")+protocolRequest.requestURI, body)
 	if err != nil {
 		body.Close()
@@ -820,6 +835,12 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		return nil, true, err
 	}
 	copyRequestHeaders(request.Header, incoming.Header)
+	if incoming.URL.Path == "/v1/messages" && protocolRequest.requestURI == "/v1/responses" {
+		// These headers describe the incoming Anthropic protocol, not Responses.
+		request.Header.Del("Anthropic-Version")
+		request.Header.Del("Anthropic-Beta")
+		request.Header.Del("Anthropic-Dangerous-Direct-Browser-Access")
+	}
 	if responseMapping.BufferedStream {
 		request.Header.Set("Accept", "text/event-stream")
 	}
@@ -851,6 +872,12 @@ func (s *Service) performPreparedAttempt(incoming *http.Request, route Route, bo
 		return nil, true, err
 	}
 	retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
+	if protocolRequest.maxResponseBytes > 0 {
+		response.Body = struct {
+			io.Reader
+			io.Closer
+		}{io.LimitReader(response.Body, protocolRequest.maxResponseBytes+1), response.Body}
+	}
 	if policy, ok := incoming.Context().Value(usageCorrectionContextKey{}).(inputUsagePolicy); ok && response.StatusCode >= 200 && response.StatusCode < 300 {
 		// Select per attempt: a member may map a public alias to another model
 		// family. Never infer tokenization from the public name or endpoint.
@@ -1328,9 +1355,18 @@ func matchesAnyKeyword(input string, keywords []string) bool {
 }
 
 func filterRoutesByKeywords(input string, keywords []string, routes []Route) []Route {
+	return filterRoutesByKeywordsAndRequest(input, keywords, routes, requestCapabilities{})
+}
+
+func filterRoutesByKeywordsAndRequest(input string, keywords []string, routes []Route, facts requestCapabilities, model ...string) []Route {
 	matched := matchesAnyKeyword(input, keywords)
 	filtered := make([]Route, 0, len(routes))
 	for _, route := range routes {
+		effective, simulated := effectiveRequestCapabilities(route, facts, model...)
+		if route.RequestMatchMode == KeywordMatchModeRequireMatch && requestPolicyAllows(route, facts, model...) && (effective.matches(route.RequestMatchCapabilities) || simulated) {
+			filtered = append(filtered, route)
+			continue
+		}
 		switch route.KeywordMatchMode {
 		case KeywordMatchModeRequireMatch:
 			if !matched {

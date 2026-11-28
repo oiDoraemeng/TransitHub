@@ -34,9 +34,13 @@ export interface ProxyRoute {
   memberProvidedKey?: boolean
   upstreamKeyPreview?: string
   keywordMatchMode?: 'disabled' | 'skip_on_match' | 'require_match'
+  requestMatchMode?: 'disabled' | 'skip_on_match' | 'require_match'
+  requestMatchCapabilities?: Array<'pdf' | 'code_execution' | 'json_schema' | 'web_search' | 'native_claude'>
   modelMappingEnabled?: boolean
   modelMapping?: Record<string, string>
   reasoningEffort?: ReasoningEffort
+  thinkingEnabled?: boolean
+  simulateThinking?: boolean
   syncKeyDeleteEnabled?: boolean
   syncKeyDeleteDelayMs?: number
   modelSyncedAt: string | null
@@ -159,6 +163,8 @@ export interface SmartGroupInput {
 
 export interface SmartGroupMemberPolicyInput {
   reasoningEffort?: ReasoningEffort
+  thinkingEnabled?: boolean
+  simulateThinking?: boolean
   schedulingPaused?: boolean
   mediaInputEnabled: boolean
   neverAutoPause?: boolean
@@ -171,6 +177,8 @@ export interface SmartGroupMemberPolicyInput {
   useProvidedKey: boolean
   upstreamKey?: string
   keywordMatchMode: 'disabled' | 'skip_on_match' | 'require_match'
+  requestMatchMode: 'disabled' | 'skip_on_match' | 'require_match'
+  requestMatchCapabilities: Array<'pdf' | 'code_execution' | 'json_schema' | 'web_search' | 'native_claude'>
   syncKeyDeleteEnabled: boolean
   syncKeyDeleteDelayMs: number
 }

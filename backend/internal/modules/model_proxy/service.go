@@ -725,6 +725,51 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 		}
 	}
 	input.UpstreamKey = strings.TrimSpace(input.UpstreamKey)
+	var requestCapabilitiesJSON *string
+	if input.RequestMatchCapabilities != nil {
+		values, err := normalizeRequestCapabilities(*input.RequestMatchCapabilities)
+		if err != nil {
+			return err
+		}
+		encoded, err := json.Marshal(values)
+		if err != nil {
+			return err
+		}
+		value := string(encoded)
+		requestCapabilitiesJSON = &value
+		input.RequestMatchCapabilities = &values
+	}
+	if input.RequestMatchMode != nil {
+		mode := strings.TrimSpace(*input.RequestMatchMode)
+		if mode != KeywordMatchModeDisabled && mode != KeywordMatchModeSkipOnMatch && mode != KeywordMatchModeRequireMatch {
+			return &requestError{Status: 400, Message: "invalid requestMatchMode"}
+		}
+		input.RequestMatchMode = &mode
+	}
+	// Validate the effective policy, including partial updates, before persisting it.
+	if input.RequestMatchMode != nil || input.RequestMatchCapabilities != nil {
+		members, err := s.repository.ListGroupRoutes(ctx, groupID, false, "")
+		if err != nil {
+			return err
+		}
+		for _, member := range members {
+			if member.ID == routeID {
+				if member.UserID != userID || member.AdminAccountID != accountID {
+					return pgx.ErrNoRows
+				}
+				mode, capabilities := member.RequestMatchMode, member.RequestMatchCapabilities
+				if input.RequestMatchMode != nil {
+					mode = *input.RequestMatchMode
+				}
+				if input.RequestMatchCapabilities != nil {
+					capabilities = *input.RequestMatchCapabilities
+				}
+				if mode != KeywordMatchModeDisabled && len(capabilities) == 0 {
+					return &requestError{Status: 400, Message: "select at least one request capability"}
+				}
+			}
+		}
+	}
 	if input.KeywordMatchMode != nil {
 		mode := strings.TrimSpace(*input.KeywordMatchMode)
 		if mode != KeywordMatchModeDisabled && mode != KeywordMatchModeSkipOnMatch && mode != KeywordMatchModeRequireMatch {
@@ -732,7 +777,40 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 		}
 		input.KeywordMatchMode = &mode
 	}
-	if input.ReasoningEffort == nil && input.MediaInputEnabled == nil && input.NeverAutoPause == nil && input.SchedulingPaused == nil && input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordMatchMode == nil && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
+	if input.ThinkingEnabled != nil || input.SimulateThinking != nil || input.ModelMappingEnabled != nil {
+		members, err := s.repository.ListGroupRoutes(ctx, groupID, false, "")
+		if err != nil {
+			return err
+		}
+		found := false
+		for _, member := range members {
+			if member.ID != routeID {
+				continue
+			}
+			if member.UserID != userID || member.AdminAccountID != accountID {
+				return pgx.ErrNoRows
+			}
+			found = true
+			thinking, simulated, mapped := member.thinkingAllowed(), member.SimulateThinking, member.ModelMappingEnabled
+			if input.ThinkingEnabled != nil {
+				thinking = *input.ThinkingEnabled
+			}
+			if input.SimulateThinking != nil {
+				simulated = *input.SimulateThinking
+			}
+			if input.ModelMappingEnabled != nil {
+				mapped = *input.ModelMappingEnabled
+			}
+			if simulated && (!thinking || !mapped) {
+				return &requestError{Status: 400, Message: "simulateThinking requires thinkingEnabled and modelMappingEnabled"}
+			}
+			break
+		}
+		if !found {
+			return pgx.ErrNoRows
+		}
+	}
+	if input.ThinkingEnabled == nil && input.SimulateThinking == nil && input.RequestMatchMode == nil && input.RequestMatchCapabilities == nil && input.ReasoningEffort == nil && input.MediaInputEnabled == nil && input.NeverAutoPause == nil && input.SchedulingPaused == nil && input.StreamOnly == nil && input.MinInputTokens == nil && input.RequestsPerMinute == nil && input.Priority == nil && input.ModelMappingEnabled == nil && input.ModelMapping == nil && input.UseProvidedKey == nil && input.UpstreamKey == "" && input.KeywordMatchMode == nil && input.SyncKeyDeleteEnabled == nil && input.SyncKeyDeleteDelayMS == nil {
 		return &requestError{Status: 400, Message: "at least one member policy field is required"}
 	}
 	var routeKeyCiphertext, routeKeyPreview *string
@@ -765,10 +843,17 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 		}
 	}
 	keyUpdated := routeKeyCiphertext != nil
+	boolPolicy := func(value *bool) *string {
+		if value == nil {
+			return nil
+		}
+		encoded := strconv.FormatBool(*value)
+		return &encoded
+	}
 	if err := s.repository.UpdateMemberPolicy(ctx, userID, accountID, groupID, routeID,
 		input.StreamOnly, input.MinInputTokens, input.RequestsPerMinute, input.Priority,
 		input.ModelMappingEnabled, modelMappingJSON, input.UseProvidedKey, routeKeyCiphertext, routeKeyPreview,
-		input.KeywordMatchMode, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS, input.SchedulingPaused, input.NeverAutoPause, input.MediaInputEnabled, input.ReasoningEffort); err != nil {
+		input.KeywordMatchMode, input.SyncKeyDeleteEnabled, input.SyncKeyDeleteDelayMS, input.SchedulingPaused, input.NeverAutoPause, input.MediaInputEnabled, input.ReasoningEffort, input.RequestMatchMode, requestCapabilitiesJSON, boolPolicy(input.ThinkingEnabled), boolPolicy(input.SimulateThinking)); err != nil {
 		return err
 	}
 	if keyUpdated {

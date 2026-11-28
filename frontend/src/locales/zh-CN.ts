@@ -183,6 +183,7 @@ export default {
         customKeys: '自定义入口 Key', customKeyTotal: '当前 {count} 个', noCustomKeys: '尚未设置自定义 Key，系统生成的主 Key 不受影响。',
         addCustomKeys: '新增自定义 Key', customKeyPlaceholder: '每行填写一个自定义 Key', customKeyHelp: '最多 32 个；保存后与系统生成的主 Key 同时有效。留空不会修改现有自定义 Key。', removeCustomKey: '移除此自定义 Key',
         policy: {
+          thinkingEnabled: '开启 thinking', thinkingDisabled: '不接收 thinking', simulateThinking: '模拟 thinking 格式', thinkingHelp: '关闭 thinking 后，该成员不接收含 thinking 的请求。模拟格式需同时开启模型映射，仅适用于 GPT：thinking 使用上游实际推理摘要，signature 从 30 个固定预留标签中随机选择，允许重复；续聊只传正文与普通工具记录。原生签名验证及不透明状态仍需原生线路。',
           reasoningEffort: '上游推理强度', reasoningDefault: '默认策略',
           reasoningHelp: '为当前成员的 Chat / Responses 请求指定推理强度，模型映射后生效。默认：Dora Luna 使用 max，其他模型沿用请求参数。返回给客户端的推理参数保持原请求设置。',
           reasoningSummary: '推理 {effort}',
@@ -200,6 +201,7 @@ export default {
           useProvidedKey: '使用预置上游 Key（不创建临时 Key）', providedKey: '代理路由共享上游 Key',
           providedKeyHelp: '此 Key 保存到代理路由，所有引用该路由的智能分组共用。开启后此成员使用该 Key 调用模型，不会创建或删除临时 Key；留空表示保留当前路由 Key。',
           providedKeyError: '启用预置上游 Key 时必须提供 Key。', providedKeySummary: '代理路由共享 Key {preview}', routeProvidedKeySummary: '路由默认 Key {preview}',
+          requestMatchMode: '请求能力命中策略', matchPDF: 'PDF 附件', matchCode: '服务端代码执行', matchSchema: 'JSON Schema', matchSearch: '网页搜索', matchNative: '原生 Claude（含 thinking）', requestMatchSummary: '{capabilities}：{mode}', requestMatchRequired: '请至少选择一种请求能力。', requestMatchHelp: '按实际附件、Schema 参数、服务端工具、thinking 及原生历史块匹配，不匹配检测题或普通文字。命中跳过：任一条件命中即排除；命中才选择：必须覆盖请求全部能力，并绕过关键词条件。开启模拟 thinking 格式后可映射 thinking；其余原生 Claude 状态仍需原生线路。仍遵守模型、并发等限制，上游须真实支持所选能力。',
           keywordMatchMode: '关键词命中策略', keywordDisabled: '不检测', keywordSkipOnMatch: '命中后跳过此成员', keywordRequireMatch: '命中后才选择此成员',
           keywordStrategyHelp: '关键词在智能分组中统一设置；此处只决定该成员命中或未命中时的处理方式。MP4、WAV/MP3 附件只走已开启音视频入口的成员，不受关键词策略限制。',
           keywordSkipOnMatchSummary: '命中跳过', keywordRequireMatchSummary: '命中才选',

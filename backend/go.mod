@@ -6,6 +6,7 @@ require (
 	github.com/eliben/go-sentencepiece v0.7.0
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/redis/go-redis/v9 v9.21.0
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/tiktoken-go/tokenizer v0.7.0

@@ -36,29 +36,33 @@ type Route struct {
 	RemovedModels       map[string]RemovedRouteModel `json:"-"`
 	// Member policies are populated only when this route is loaded through a
 	// smart-group membership. They are intentionally not route-level settings.
-	StreamOnly            bool              `json:"streamOnly,omitempty"`
-	SchedulingPaused      bool              `json:"schedulingPaused,omitempty"`
-	NeverAutoPause        bool              `json:"neverAutoPause,omitempty"`
-	MediaInputEnabled     bool              `json:"mediaInputEnabled"`
-	MemberPolicyRevision  int64             `json:"-"`
-	MinInputTokens        int               `json:"minInputTokens,omitempty"`
-	RequestsPerMinute     int               `json:"requestsPerMinute,omitempty"`
-	Priority              int               `json:"priority,omitempty"`
-	UseProvidedKey        bool              `json:"useProvidedKey,omitempty"`
-	RouteProvidedKey      bool              `json:"routeProvidedKey,omitempty"`
-	MemberProvidedKey     bool              `json:"memberProvidedKey,omitempty"`
-	UpstreamKeyPreview    string            `json:"upstreamKeyPreview,omitempty"`
-	UpstreamKeyCiphertext string            `json:"-"`
-	KeywordMatchMode      string            `json:"keywordMatchMode,omitempty"`
-	ModelMappingEnabled   bool              `json:"modelMappingEnabled,omitempty"`
-	ModelMapping          map[string]string `json:"modelMapping,omitempty"`
-	ReasoningEffort       string            `json:"reasoningEffort,omitempty"`
-	SyncKeyDeleteEnabled  bool              `json:"syncKeyDeleteEnabled,omitempty"`
-	SyncKeyDeleteDelayMS  int               `json:"syncKeyDeleteDelayMs,omitempty"`
-	ModelSyncedAt         *time.Time        `json:"modelSyncedAt"`
-	ModelSyncError        string            `json:"modelSyncError"`
-	CreatedAt             time.Time         `json:"createdAt"`
-	UpdatedAt             time.Time         `json:"updatedAt"`
+	StreamOnly               bool              `json:"streamOnly,omitempty"`
+	SchedulingPaused         bool              `json:"schedulingPaused,omitempty"`
+	NeverAutoPause           bool              `json:"neverAutoPause,omitempty"`
+	MediaInputEnabled        bool              `json:"mediaInputEnabled"`
+	MemberPolicyRevision     int64             `json:"-"`
+	MinInputTokens           int               `json:"minInputTokens,omitempty"`
+	RequestsPerMinute        int               `json:"requestsPerMinute,omitempty"`
+	Priority                 int               `json:"priority,omitempty"`
+	UseProvidedKey           bool              `json:"useProvidedKey,omitempty"`
+	RouteProvidedKey         bool              `json:"routeProvidedKey,omitempty"`
+	MemberProvidedKey        bool              `json:"memberProvidedKey,omitempty"`
+	UpstreamKeyPreview       string            `json:"upstreamKeyPreview,omitempty"`
+	UpstreamKeyCiphertext    string            `json:"-"`
+	KeywordMatchMode         string            `json:"keywordMatchMode,omitempty"`
+	RequestMatchMode         string            `json:"requestMatchMode,omitempty"`
+	RequestMatchCapabilities []string          `json:"requestMatchCapabilities"`
+	ModelMappingEnabled      bool              `json:"modelMappingEnabled,omitempty"`
+	ModelMapping             map[string]string `json:"modelMapping,omitempty"`
+	ReasoningEffort          string            `json:"reasoningEffort,omitempty"`
+	ThinkingEnabled          *bool             `json:"thinkingEnabled,omitempty"`
+	SimulateThinking         bool              `json:"simulateThinking"`
+	SyncKeyDeleteEnabled     bool              `json:"syncKeyDeleteEnabled,omitempty"`
+	SyncKeyDeleteDelayMS     int               `json:"syncKeyDeleteDelayMs,omitempty"`
+	ModelSyncedAt            *time.Time        `json:"modelSyncedAt"`
+	ModelSyncError           string            `json:"modelSyncError"`
+	CreatedAt                time.Time         `json:"createdAt"`
+	UpdatedAt                time.Time         `json:"updatedAt"`
 }
 
 type EgressProxy struct {
@@ -220,21 +224,25 @@ type AddMemberRequest struct {
 }
 
 type UpdateMemberPolicyRequest struct {
-	SchedulingPaused     *bool              `json:"schedulingPaused,omitempty"`
-	NeverAutoPause       *bool              `json:"neverAutoPause,omitempty"`
-	MediaInputEnabled    *bool              `json:"mediaInputEnabled,omitempty"`
-	StreamOnly           *bool              `json:"streamOnly,omitempty"`
-	MinInputTokens       *int               `json:"minInputTokens,omitempty"`
-	RequestsPerMinute    *int               `json:"requestsPerMinute,omitempty"`
-	Priority             *int               `json:"priority,omitempty"`
-	ModelMappingEnabled  *bool              `json:"modelMappingEnabled,omitempty"`
-	ModelMapping         *map[string]string `json:"modelMapping,omitempty"`
-	ReasoningEffort      *string            `json:"reasoningEffort,omitempty"`
-	UseProvidedKey       *bool              `json:"useProvidedKey,omitempty"`
-	UpstreamKey          string             `json:"upstreamKey,omitempty"`
-	KeywordMatchMode     *string            `json:"keywordMatchMode,omitempty"`
-	SyncKeyDeleteEnabled *bool              `json:"syncKeyDeleteEnabled,omitempty"`
-	SyncKeyDeleteDelayMS *int               `json:"syncKeyDeleteDelayMs,omitempty"`
+	SchedulingPaused         *bool              `json:"schedulingPaused,omitempty"`
+	NeverAutoPause           *bool              `json:"neverAutoPause,omitempty"`
+	MediaInputEnabled        *bool              `json:"mediaInputEnabled,omitempty"`
+	StreamOnly               *bool              `json:"streamOnly,omitempty"`
+	MinInputTokens           *int               `json:"minInputTokens,omitempty"`
+	RequestsPerMinute        *int               `json:"requestsPerMinute,omitempty"`
+	Priority                 *int               `json:"priority,omitempty"`
+	ModelMappingEnabled      *bool              `json:"modelMappingEnabled,omitempty"`
+	ModelMapping             *map[string]string `json:"modelMapping,omitempty"`
+	ReasoningEffort          *string            `json:"reasoningEffort,omitempty"`
+	ThinkingEnabled          *bool              `json:"thinkingEnabled,omitempty"`
+	SimulateThinking         *bool              `json:"simulateThinking,omitempty"`
+	UseProvidedKey           *bool              `json:"useProvidedKey,omitempty"`
+	UpstreamKey              string             `json:"upstreamKey,omitempty"`
+	KeywordMatchMode         *string            `json:"keywordMatchMode,omitempty"`
+	RequestMatchMode         *string            `json:"requestMatchMode,omitempty"`
+	RequestMatchCapabilities *[]string          `json:"requestMatchCapabilities,omitempty"`
+	SyncKeyDeleteEnabled     *bool              `json:"syncKeyDeleteEnabled,omitempty"`
+	SyncKeyDeleteDelayMS     *int               `json:"syncKeyDeleteDelayMs,omitempty"`
 }
 
 type KeyResponse struct {

@@ -157,6 +157,16 @@ func filterMediaRoutes(routes []Route, media requestMedia, incoming *http.Reques
 	}
 	result := make([]Route, 0, len(routes))
 	for _, route := range routes {
+		if incoming.URL.Path == "/v1/messages" && !media.Audio && !media.Video && media.PDF && strings.HasPrefix(routeTargetModel(route, media.Model), "gpt-") {
+			// GPT PDF input is handled by Responses, including Messages mappings.
+			// Capability policy filtering remains independent of protocol support.
+			result = append(result, route)
+			continue
+		}
+		if !media.Audio && !media.Video && media.PDF && route.RequestMatchMode == KeywordMatchModeRequireMatch && (requestCapabilities{PDF: true}).matches(route.RequestMatchCapabilities) {
+			result = append(result, route)
+			continue
+		}
 		if !nativeGeminiModel(routeTargetModel(route, media.Model)) {
 			continue
 		}

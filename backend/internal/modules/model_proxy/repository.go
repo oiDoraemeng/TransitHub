@@ -144,6 +144,7 @@ func scanGroupRoute(row routeScanner) (Route, error) {
 func scanRouteWithPolicy(row routeScanner) (Route, error) {
 	var route Route
 	var mappingJSON []byte
+	var requestCapabilitiesJSON []byte
 	var removedJSON []byte
 	err := row.Scan(&route.ID, &route.UserID, &route.AdminAccountID, &route.Name, &route.SiteID,
 		&route.SiteName, &route.GroupID, &route.GroupName, &route.ConcurrencyLimit, &route.Enabled,
@@ -153,11 +154,14 @@ func scanRouteWithPolicy(row routeScanner) (Route, error) {
 		&route.StreamOnly, &route.MinInputTokens, &route.RequestsPerMinute, &route.Priority,
 		&route.RouteProvidedKey, &route.MemberProvidedKey, &route.UseProvidedKey, &route.UpstreamKeyPreview, &route.UpstreamKeyCiphertext,
 		&route.KeywordMatchMode, &route.ModelMappingEnabled, &mappingJSON,
-		&route.SyncKeyDeleteEnabled, &route.SyncKeyDeleteDelayMS, &route.SchedulingPaused, &route.MemberPolicyRevision, &removedJSON, &route.NeverAutoPause, &route.MediaInputEnabled, &route.ReasoningEffort)
+		&route.SyncKeyDeleteEnabled, &route.SyncKeyDeleteDelayMS, &route.SchedulingPaused, &route.MemberPolicyRevision, &removedJSON, &route.NeverAutoPause, &route.MediaInputEnabled, &route.ReasoningEffort, &route.RequestMatchMode, &requestCapabilitiesJSON, &route.ThinkingEnabled, &route.SimulateThinking)
 	if err == nil {
 		err = json.Unmarshal(removedJSON, &route.RemovedModels)
 	}
 	route.ModelMapping = decodeModelMapping(mappingJSON)
+	if err == nil {
+		err = json.Unmarshal(requestCapabilitiesJSON, &route.RequestMatchCapabilities)
+	}
 	return route, err
 }
 
@@ -529,7 +533,14 @@ func (r *Repository) AddMember(ctx context.Context, userID, accountID, groupID, 
 	return nil
 }
 
-func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, modelMappingEnabled *bool, modelMappingJSON *string, useProvidedKey *bool, routeKeyCiphertext, routeKeyPreview *string, keywordMatchMode *string, syncKeyDeleteEnabled *bool, syncKeyDeleteDelayMS *int, schedulingPaused, neverAutoPause, mediaInputEnabled *bool, reasoningEffort *string) error {
+func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, groupID, routeID string, streamOnly *bool, minInputTokens, requestsPerMinute, priority *int, modelMappingEnabled *bool, modelMappingJSON *string, useProvidedKey *bool, routeKeyCiphertext, routeKeyPreview *string, keywordMatchMode *string, syncKeyDeleteEnabled *bool, syncKeyDeleteDelayMS *int, schedulingPaused, neverAutoPause, mediaInputEnabled *bool, reasoningEffort *string, requestPolicy ...*string) error {
+	var requestMatchMode, requestCapabilitiesJSON, thinkingEnabled, simulateThinking *string
+	if len(requestPolicy) >= 2 {
+		requestMatchMode, requestCapabilitiesJSON = requestPolicy[0], requestPolicy[1]
+	}
+	if len(requestPolicy) >= 4 {
+		thinkingEnabled, simulateThinking = requestPolicy[2], requestPolicy[3]
+	}
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -583,12 +594,16 @@ func (r *Repository) UpdateMemberPolicy(ctx context.Context, userID, accountID, 
 			never_auto_pause=COALESCE($16::boolean,m.never_auto_pause),
 			media_input_enabled=COALESCE($17::boolean,m.media_input_enabled),
 			reasoning_effort=COALESCE($18::text,m.reasoning_effort),
+			request_match_mode=COALESCE($19::text,m.request_match_mode),
+			request_match_capabilities=COALESCE($20::jsonb,m.request_match_capabilities),
+			thinking_enabled=COALESCE($21::boolean,m.thinking_enabled),
+			simulate_thinking=COALESCE($22::boolean,m.simulate_thinking),
 			policy_revision=m.policy_revision+1
 		FROM proxy_smart_groups g, proxy_routes r
 		WHERE m.smart_group_id=g.id AND g.id=$1 AND m.route_id=$2 AND r.id=m.route_id
 			AND g.user_id=$3 AND g.admin_account_id=$4
 			AND r.user_id=$3 AND r.admin_account_id=$4
-	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, modelMappingEnabled, modelMappingJSON, useProvidedKey, keywordMatchMode, syncKeyDeleteEnabled, syncKeyDeleteDelayMS, schedulingPaused, neverAutoPause, mediaInputEnabled, reasoningEffort)
+	`, groupID, routeID, userID, accountID, streamOnly, minInputTokens, requestsPerMinute, priority, modelMappingEnabled, modelMappingJSON, useProvidedKey, keywordMatchMode, syncKeyDeleteEnabled, syncKeyDeleteDelayMS, schedulingPaused, neverAutoPause, mediaInputEnabled, reasoningEffort, requestMatchMode, requestCapabilitiesJSON, thinkingEnabled, simulateThinking)
 	if err != nil {
 		return err
 	}
@@ -656,7 +671,7 @@ const groupRouteSelectQuery = `
 				THEN COALESCE(gm.upstream_key_preview,'') ELSE COALESCE(r.upstream_key_preview,'') END,
 			COALESCE(CASE WHEN gm.use_upstream_key THEN NULLIF(gm.upstream_key_ciphertext,'') END,r.upstream_key_ciphertext,''),
 			CASE WHEN gm.keyword_check_enabled THEN gm.keyword_match_mode ELSE 'disabled' END,gm.model_mapping_enabled,
-			COALESCE(gm.model_mapping,'{}'::jsonb),gm.sync_key_delete_enabled,gm.sync_key_delete_delay_ms,gm.scheduling_paused,gm.policy_revision,r.removed_models,gm.never_auto_pause,gm.media_input_enabled,gm.reasoning_effort
+			COALESCE(gm.model_mapping,'{}'::jsonb),gm.sync_key_delete_enabled,gm.sync_key_delete_delay_ms,gm.scheduling_paused,gm.policy_revision,r.removed_models,gm.never_auto_pause,gm.media_input_enabled,gm.reasoning_effort,gm.request_match_mode,gm.request_match_capabilities,gm.thinking_enabled,gm.simulate_thinking
 		FROM proxy_smart_group_members gm JOIN proxy_routes r ON r.id=gm.route_id
 		LEFT JOIN upstream_sites s ON s.id=r.site_id
 		LEFT JOIN model_egress_proxies p ON p.id=r.egress_proxy_id
