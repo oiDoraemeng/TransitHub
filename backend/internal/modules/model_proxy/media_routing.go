@@ -133,7 +133,9 @@ func mediaMIME(uri, filename string) string {
 func withRequestMedia(incoming *http.Request, payload map[string]any, model string) (*http.Request, requestMedia) {
 	media := inspectRequestMedia(payload)
 	media.Model = model
-	return incoming.WithContext(context.WithValue(incoming.Context(), requestMediaContextKey{}, media)), media
+	ctx := context.WithValue(incoming.Context(), requestMediaContextKey{}, media)
+	ctx = context.WithValue(ctx, requestCapabilitiesContextKey{}, inspectRequestCapabilities(payload))
+	return incoming.WithContext(ctx), media
 }
 
 func nativeGeminiModel(model string) bool {

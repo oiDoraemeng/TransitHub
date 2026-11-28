@@ -7,6 +7,8 @@ type requestCapabilities struct {
 	Thinking, NativeState                                   bool
 }
 
+type requestCapabilitiesContextKey struct{}
+
 func reservedToolVersion(kind, prefix string) bool {
 	version := strings.TrimPrefix(kind, prefix)
 	if !strings.HasPrefix(kind, prefix) || len(version) != 8 {
@@ -177,6 +179,11 @@ func requestPolicyAllows(route Route, facts requestCapabilities, model ...string
 	facts, simulated := effectiveRequestCapabilities(route, facts, model...)
 	matched := facts.matches(route.RequestMatchCapabilities)
 	switch route.RequestMatchMode {
+	case RequestMatchModeMatchOrFallback:
+		// Keywords and the fallback stage are checked separately. Even a backup
+		// must cover every requested capability and target a mapped GPT model.
+		return route.ModelMappingEnabled && len(model) > 0 && strings.HasPrefix(routeTargetModel(route, model[0]), "gpt-") &&
+			(!facts.present() || facts.coveredBy(route.RequestMatchCapabilities))
 	case KeywordMatchModeRequireMatch:
 		return (matched || simulated) && (facts.coveredBy(route.RequestMatchCapabilities) || simulated && !facts.present())
 	case KeywordMatchModeSkipOnMatch:

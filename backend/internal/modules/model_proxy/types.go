@@ -6,9 +6,10 @@ const (
 	OwnerRoute      = "route"
 	OwnerSmartGroup = "smart_group"
 
-	KeywordMatchModeDisabled     = "disabled"
-	KeywordMatchModeSkipOnMatch  = "skip_on_match"
-	KeywordMatchModeRequireMatch = "require_match"
+	KeywordMatchModeDisabled        = "disabled"
+	KeywordMatchModeSkipOnMatch     = "skip_on_match"
+	KeywordMatchModeRequireMatch    = "require_match"
+	RequestMatchModeMatchOrFallback = "match_or_fallback"
 )
 
 type Route struct {

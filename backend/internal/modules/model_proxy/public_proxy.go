@@ -319,6 +319,20 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		return
 	}
 	keywordMatches := matchedGroupKeywords(group.Keywords, keywordInputText)
+	requestID, _ := randomID("req_")
+	keywordIndexes := []int{}
+	for index, keyword := range group.Keywords {
+		for _, matched := range keywordMatches {
+			if strings.EqualFold(strings.TrimSpace(keyword), matched) {
+				keywordIndexes = append(keywordIndexes, index)
+				break
+			}
+		}
+	}
+	decisions := []memberSelectionDecision{}
+	logSelection := func() {
+		logMemberSelection(requestID, group.ID, modelID, incoming.URL.Path, capabilities, keywordIndexes, decisions)
+	}
 	candidates, err := s.smartGroupCandidates(incoming.Context(), group, modelID)
 	if err != nil {
 		writeOpenAIError(w, http.StatusInternalServerError, "proxy_error", "failed to load smart group members")
@@ -332,16 +346,28 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		writeOpenAIError(w, http.StatusNotFound, "model_not_found", "no enabled smart group member supports this model")
 		return
 	}
+	fallbackConfigured := false
+	for _, route := range candidates {
+		fallbackConfigured = fallbackConfigured || route.RequestMatchMode == RequestMatchModeMatchOrFallback
+	}
 	if incoming.URL.Path != compactPath {
-		candidates = filterRoutesByRequest(capabilities, candidates, modelID)
+		filtered := filterRoutesByRequest(capabilities, candidates, modelID)
+		decisions = appendSelectionExclusions(decisions, candidates, filtered, func(route Route) string {
+			return requestExclusionReason(route, capabilities, modelID)
+		})
+		candidates = filtered
 		if len(candidates) == 0 {
+			logSelection()
 			writeOpenAIError(w, http.StatusServiceUnavailable, "request_capability_unavailable", "no smart group member matches the request capability policy")
 			return
 		}
 	}
 	media.PDF = media.PDF || capabilities.PDF
-	candidates = filterMediaRoutes(candidates, media, incoming)
+	mediaFiltered := filterMediaRoutes(candidates, media, incoming)
+	decisions = appendSelectionExclusions(decisions, candidates, mediaFiltered, func(Route) string { return "media_protocol_unsupported" })
+	candidates = mediaFiltered
 	if len(candidates) == 0 {
+		logSelection()
 		writeOpenAIError(w, http.StatusServiceUnavailable, "media_route_unavailable", "no eligible media input member supports this audio/video request or native file reference")
 		return
 	}
@@ -351,7 +377,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 	// text traffic and must not exclude an attachment it is required to handle.
 	if !compact && !media.Audio && !media.Video {
 		for _, candidate := range candidates {
-			if candidate.KeywordMatchMode != KeywordMatchModeDisabled {
+			if candidate.KeywordMatchMode != KeywordMatchModeDisabled || candidate.RequestMatchMode == RequestMatchModeMatchOrFallback {
 				keywordFiltering = true
 				break
 			}
@@ -375,21 +401,37 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		// Compact is a non-streaming maintenance request. Search all enabled
 		// members supporting this model instead of applying inference policies.
 		if !compact && candidate.StreamOnly && !streaming {
+			decisions = append(decisions, memberSelectionDecision{candidate.ID, "stream_required"})
 			continue
 		}
 		if !compact && candidate.MinInputTokens > 0 && inputTokens < candidate.MinInputTokens {
+			decisions = append(decisions, memberSelectionDecision{candidate.ID, "input_below_minimum"})
 			continue
 		}
 		eligible = append(eligible, candidate)
 	}
 	if keywordFiltering {
-		eligible = filterRoutesByKeywordsAndRequest(inputText, group.Keywords, eligible, capabilities, modelID)
+		filtered := filterRoutesByKeywordsAndRequest(inputText, group.Keywords, eligible, capabilities, modelID)
+		decisions = appendSelectionExclusions(decisions, eligible, filtered, func(route Route) string {
+			if len(keywordMatches) > 0 {
+				return "keyword_matched"
+			}
+			return "keyword_required"
+		})
+		eligible = filtered
 	}
+	for _, route := range eligible {
+		reason := "eligible"
+		if !compact && mappedFallbackOnly(route, capabilities, modelID) {
+			reason = "eligible_mapped_fallback"
+		}
+		decisions = append(decisions, memberSelectionDecision{route.ID, reason})
+	}
+	logSelection()
 	if len(eligible) == 0 {
 		writeOpenAIError(w, http.StatusNotFound, "no_eligible_member", "no smart group member matches the request policy")
 		return
 	}
-	requestID, _ := randomID("req_")
 	remaining := append([]Route(nil), eligible...)
 	requestSpec := routeProbeSpec{GroupID: group.ID, ModelID: modelID, Path: incoming.URL.Path}
 	var lastErr error
@@ -400,7 +442,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			lastErr = errSmartGroupStartupBudget
 			break
 		}
-		lease, route, acquireErr := s.limiter.AcquireBest(incoming.Context(), remaining, requestID, requestSpec)
+		lease, route, selectionStage, acquireErr := s.limiter.acquireWithMappedFallback(incoming.Context(), remaining, requestID, requestSpec, capabilities, len(keywordMatches) > 0, lastErr != nil, fallbackConfigured)
 		if errors.Is(acquireErr, errModelPaused) {
 			if lastErr != nil {
 				break
@@ -422,6 +464,7 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 		if route == nil {
 			break
 		}
+		log.Printf("[model-proxy] selected request_id=%s group_id=%s route_id=%s stage=%s target_model=%s", requestID, group.ID, route.ID, selectionStage, routeTargetModel(*route, modelID))
 		remaining = withoutRoute(remaining, route.ID)
 		allowed, rateErr := s.limiter.AllowRequestsPerMinute(incoming.Context(), group.ID, route.ID, route.RequestsPerMinute, requestID)
 		if rateErr != nil {
@@ -471,6 +514,13 @@ func (s *Service) proxySmartGroup(w http.ResponseWriter, incoming *http.Request,
 			return response, err
 		})
 		if attemptErr != nil {
+			var terminal *terminalUpstreamRequestError
+			if errors.As(attemptErr, &terminal) {
+				lease.Release(context.Background())
+				log.Printf("[model-proxy] fallback_stopped request_id=%s route_id=%s reason=%s", requestID, route.ID, terminal.Kind)
+				writeOpenAIError(w, terminal.Status, terminal.Kind, terminal.Error())
+				return
+			}
 			var mediaErr *mediaInputError
 			if errors.As(attemptErr, &mediaErr) {
 				lease.Release(context.Background())
@@ -571,6 +621,12 @@ func attemptSmartGroupMemberWithPolicy(ctx context.Context, policy smartGroupRet
 			return response, nil
 		}
 		if response != nil {
+			if terminal := responseHealth(response).terminalRequestError(); terminal != nil {
+				if response.Body != nil {
+					response.Body.Close()
+				}
+				return nil, terminal
+			}
 			switch {
 			case err != nil:
 				lastErr = err
@@ -620,6 +676,9 @@ func dispatchFailureKind(ctx context.Context, response *http.Response, err error
 	case ctx.Err() != nil:
 		return "client_canceled"
 	case responseHealth(response).failed:
+		if kind := responseHealth(response).requestErrorKind; kind != "" {
+			return kind
+		}
 		return "upstream_error_event"
 	case startupTimeout(err):
 		return "startup_timeout"
@@ -1363,6 +1422,12 @@ func filterRoutesByKeywordsAndRequest(input string, keywords []string, routes []
 	filtered := make([]Route, 0, len(routes))
 	for _, route := range routes {
 		effective, simulated := effectiveRequestCapabilities(route, facts, model...)
+		if route.RequestMatchMode == RequestMatchModeMatchOrFallback {
+			if requestPolicyAllows(route, facts, model...) && (effective.matches(route.RequestMatchCapabilities) || simulated || !matched) {
+				filtered = append(filtered, route)
+			}
+			continue
+		}
 		if route.RequestMatchMode == KeywordMatchModeRequireMatch && requestPolicyAllows(route, facts, model...) && (effective.matches(route.RequestMatchCapabilities) || simulated) {
 			filtered = append(filtered, route)
 			continue

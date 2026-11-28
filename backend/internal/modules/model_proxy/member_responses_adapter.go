@@ -25,11 +25,17 @@ var mappedResponseSlots = make(chan struct{}, 8)
 // format use the same adapter without inheriting any smart-group policy.
 func adaptMemberUpstreamProtocol(incoming *http.Request, body io.ReadCloser, route Route) (upstreamProtocolRequest, error) {
 	media, _ := incoming.Context().Value(requestMediaContextKey{}).(requestMedia)
-	if incoming.URL.Path != "/v1/messages" || !route.ModelMappingEnabled && !strings.HasPrefix(media.Model, "gpt-") {
+	chat := incoming.URL.Path == "/v1/chat/completions"
+	if incoming.URL.Path != "/v1/messages" && !chat || !route.ModelMappingEnabled && !strings.HasPrefix(media.Model, "gpt-") {
 		return adaptMediaUpstreamProtocol(incoming, body)
 	}
 	if media.Model != "" && !strings.HasPrefix(routeTargetModel(route, media.Model), "gpt-") {
 		return adaptMediaUpstreamProtocol(incoming, body)
+	}
+	if chat {
+		if facts, ok := incoming.Context().Value(requestCapabilitiesContextKey{}).(requestCapabilities); ok && !facts.present() {
+			return adaptMediaUpstreamProtocol(incoming, body)
+		}
 	}
 	select {
 	case mappedResponseSlots <- struct{}{}:
@@ -61,6 +67,16 @@ func adaptMemberUpstreamProtocol(incoming *http.Request, body io.ReadCloser, rou
 	}
 	if !strings.HasPrefix(firstString(source, "model"), "gpt-") {
 		return adaptMediaUpstreamProtocol(incoming, io.NopCloser(bytes.NewReader(raw)))
+	}
+	if chat {
+		facts := inspectRequestCapabilities(source)
+		if !facts.present() {
+			return adaptMediaUpstreamProtocol(incoming, io.NopCloser(bytes.NewReader(raw)))
+		}
+		source, err = chatToMappedMessages(source)
+		if err != nil {
+			return upstreamProtocolRequest{}, err
+		}
 	}
 	facts := inspectRequestCapabilities(source)
 	if facts.Thinking && !route.thinkingAllowed() {
@@ -98,7 +114,13 @@ func adaptMemberUpstreamProtocol(incoming *http.Request, body io.ReadCloser, rou
 	handedOff = true
 	return upstreamProtocolRequest{requestURI: "/v1/responses", body: io.NopCloser(bytes.NewReader(encoded)), bufferResponse: true, maxResponseBytes: maxMappedResponseBytes, release: release,
 		responseAdapter: func(response *http.Response) error {
-			return offloadResponseToMessagesChecked(response, firstString(source, "model"), stream, execution, schema, simulateThinking)
+			if err := offloadResponseToMessagesChecked(response, firstString(source, "model"), stream && !chat, execution, schema, simulateThinking); err != nil {
+				return err
+			}
+			if chat {
+				return mappedMessagesToChat(response, stream)
+			}
+			return nil
 		}}, nil
 }
 
@@ -250,8 +272,35 @@ func messagesToResponses(source map[string]any) (map[string]any, bool, error) {
 				return nil, false, mediaError("only one server code execution tool may be mapped")
 			}
 			execution = true
-			tools = append(tools, map[string]any{"type": "code_interpreter", "container": map[string]any{"type": "auto"}})
+			container := map[string]any{"type": "auto"}
+			if kind == "code_interpreter" && tool["container"] != nil {
+				provided, ok := tool["container"].(map[string]any)
+				if !ok || firstString(provided, "type") != "auto" {
+					return nil, false, mediaError("code interpreter container IDs cannot transfer between providers")
+				}
+				for key, value := range provided {
+					switch key {
+					case "type", "memory_limit":
+						container[key] = value
+					case "file_ids":
+						ids, ok := value.([]any)
+						if !ok || len(ids) != 0 {
+							return nil, false, mediaError("code interpreter file IDs cannot transfer between providers")
+						}
+					default:
+						return nil, false, mediaError("unsupported code interpreter container option: " + key)
+					}
+				}
+			}
+			tools = append(tools, map[string]any{"type": "code_interpreter", "container": container})
 			include = append(include, "code_interpreter_call.outputs")
+		} else if kind == "web_search" || kind == "web_search_preview" {
+			if search {
+				return nil, false, mediaError("only one server search tool may be mapped")
+			}
+			search = true
+			tools = append(tools, tool)
+			include = append(include, "web_search_call.action.sources")
 		} else if kind == "web_search_20250305" {
 			if search {
 				return nil, false, mediaError("only one server search tool may be mapped")
@@ -318,10 +367,10 @@ func messagesToResponses(source map[string]any) (map[string]any, bool, error) {
 		case "any":
 			result["tool_choice"] = "required"
 		case "tool":
-			if firstString(choice, "name") == "code_execution" {
+			if firstString(choice, "name") == "code_execution" && execution {
 				result["tool_choice"] = map[string]any{"type": "code_interpreter"}
-			} else if firstString(choice, "name") == "web_search" && search {
-				result["tool_choice"] = map[string]any{"type": "web_search"}
+			} else if name := firstString(choice, "name"); (name == "web_search" || name == "web_search_preview") && search {
+				result["tool_choice"] = map[string]any{"type": name}
 			} else {
 				result["tool_choice"] = map[string]any{"type": "function", "name": choice["name"]}
 			}

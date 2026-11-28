@@ -34,7 +34,7 @@ export interface ProxyRoute {
   memberProvidedKey?: boolean
   upstreamKeyPreview?: string
   keywordMatchMode?: 'disabled' | 'skip_on_match' | 'require_match'
-  requestMatchMode?: 'disabled' | 'skip_on_match' | 'require_match'
+  requestMatchMode?: 'disabled' | 'skip_on_match' | 'require_match' | 'match_or_fallback'
   requestMatchCapabilities?: Array<'pdf' | 'code_execution' | 'json_schema' | 'web_search' | 'native_claude'>
   modelMappingEnabled?: boolean
   modelMapping?: Record<string, string>
@@ -177,7 +177,7 @@ export interface SmartGroupMemberPolicyInput {
   useProvidedKey: boolean
   upstreamKey?: string
   keywordMatchMode: 'disabled' | 'skip_on_match' | 'require_match'
-  requestMatchMode: 'disabled' | 'skip_on_match' | 'require_match'
+  requestMatchMode: 'disabled' | 'skip_on_match' | 'require_match' | 'match_or_fallback'
   requestMatchCapabilities: Array<'pdf' | 'code_execution' | 'json_schema' | 'web_search' | 'native_claude'>
   syncKeyDeleteEnabled: boolean
   syncKeyDeleteDelayMs: number

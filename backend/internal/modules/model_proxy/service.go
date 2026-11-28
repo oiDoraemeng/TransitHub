@@ -741,13 +741,13 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 	}
 	if input.RequestMatchMode != nil {
 		mode := strings.TrimSpace(*input.RequestMatchMode)
-		if mode != KeywordMatchModeDisabled && mode != KeywordMatchModeSkipOnMatch && mode != KeywordMatchModeRequireMatch {
+		if mode != KeywordMatchModeDisabled && mode != KeywordMatchModeSkipOnMatch && mode != KeywordMatchModeRequireMatch && mode != RequestMatchModeMatchOrFallback {
 			return &requestError{Status: 400, Message: "invalid requestMatchMode"}
 		}
 		input.RequestMatchMode = &mode
 	}
 	// Validate the effective policy, including partial updates, before persisting it.
-	if input.RequestMatchMode != nil || input.RequestMatchCapabilities != nil {
+	if input.RequestMatchMode != nil || input.RequestMatchCapabilities != nil || input.ModelMappingEnabled != nil {
 		members, err := s.repository.ListGroupRoutes(ctx, groupID, false, "")
 		if err != nil {
 			return err
@@ -766,6 +766,13 @@ func (s *Service) UpdateMemberPolicy(ctx context.Context, userID, groupID, route
 				}
 				if mode != KeywordMatchModeDisabled && len(capabilities) == 0 {
 					return &requestError{Status: 400, Message: "select at least one request capability"}
+				}
+				mapped := member.ModelMappingEnabled
+				if input.ModelMappingEnabled != nil {
+					mapped = *input.ModelMappingEnabled
+				}
+				if mode == RequestMatchModeMatchOrFallback && !mapped {
+					return &requestError{Status: 400, Message: "match_or_fallback requires model mapping"}
 				}
 			}
 		}

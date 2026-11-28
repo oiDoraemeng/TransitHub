@@ -15,13 +15,14 @@ const healthResponseLimit = 64 << 10
 // buffering a successful stream. Keep only a bounded JSON prefix or SSE line.
 type healthResponseBody struct {
 	io.ReadCloser
-	streaming       bool
-	buffer          []byte
-	failed          bool
-	modelMissing    bool
-	credentialError bool
-	oversized       bool
-	startupLatency  time.Duration
+	streaming        bool
+	buffer           []byte
+	failed           bool
+	modelMissing     bool
+	credentialError  bool
+	requestErrorKind string
+	oversized        bool
+	startupLatency   time.Duration
 }
 
 func trackResponseHealth(response *http.Response) {
@@ -121,6 +122,26 @@ func (b *healthResponseBody) inspectJSON(data []byte) {
 func (b *healthResponseBody) inspectError(raw []byte) {
 	b.failed = true
 	text := strings.ToLower(string(raw))
+	// Decode JSON string escapes before classification. Only an actual error
+	// object is examined; prompt text and successful message content never enter.
+	var decoded any
+	if json.Unmarshal(raw, &decoded) == nil {
+		var messages func(any)
+		messages = func(value any) {
+			switch v := value.(type) {
+			case string:
+				text += " " + strings.ToLower(v)
+			case map[string]any:
+				for _, key := range []string{"message", "code", "type", "error"} {
+					messages(v[key])
+				}
+			}
+		}
+		messages(decoded)
+	}
+	if kind := classifyUpstreamRequestError(text); kind != "" {
+		b.requestErrorKind = kind
+	}
 	for _, marker := range []string{"model_not_found", "unknown_model", "unsupported_model", "model_not_supported", "model does not exist", "model not found", "model is not supported", "模型不存在", "不支持该模型"} {
 		if strings.Contains(text, marker) {
 			b.modelMissing = true
@@ -130,6 +151,48 @@ func (b *healthResponseBody) inspectError(raw []byte) {
 		if strings.Contains(text, marker) {
 			b.credentialError = true
 		}
+	}
+}
+
+type terminalUpstreamRequestError struct {
+	Kind   string
+	Status int
+}
+
+func (e *terminalUpstreamRequestError) Error() string {
+	if e.Kind == "conversation_blocked" {
+		return "upstream rejected this conversation; automatic account fallback stopped"
+	}
+	return "upstream rejected invalid request parameters; automatic account fallback stopped"
+}
+
+func classifyUpstreamRequestError(text string) string {
+	for _, marker := range []string{"permanently blocked by the gateway", "conversation_blocked", "conversation has been blocked", "会话已被封禁", "已被网关永久封禁"} {
+		if strings.Contains(text, marker) {
+			return "conversation_blocked"
+		}
+	}
+	for _, marker := range []string{"context_length_exceeded", "context window is full", "maximum context length", "上下文已满"} {
+		if strings.Contains(text, marker) {
+			return "context_length_exceeded"
+		}
+	}
+	for _, marker := range []string{"cannot both be specified", "invalid_json", "malformed json", "invalid_json_schema", "invalid schema for response_format"} {
+		if strings.Contains(text, marker) {
+			return "invalid_request_parameters"
+		}
+	}
+	return ""
+}
+
+func (b *healthResponseBody) terminalRequestError() *terminalUpstreamRequestError {
+	switch b.requestErrorKind {
+	case "conversation_blocked":
+		return &terminalUpstreamRequestError{Kind: b.requestErrorKind, Status: http.StatusForbidden}
+	case "invalid_request_parameters":
+		return &terminalUpstreamRequestError{Kind: b.requestErrorKind, Status: http.StatusBadRequest}
+	default:
+		return nil
 	}
 }
 

@@ -201,6 +201,7 @@ export default {
           useProvidedKey: '使用预置上游 Key（不创建临时 Key）', providedKey: '代理路由共享上游 Key',
           providedKeyHelp: '此 Key 保存到代理路由，所有引用该路由的智能分组共用。开启后此成员使用该 Key 调用模型，不会创建或删除临时 Key；留空表示保留当前路由 Key。',
           providedKeyError: '启用预置上游 Key 时必须提供 Key。', providedKeySummary: '代理路由共享 Key {preview}', routeProvidedKeySummary: '路由默认 Key {preview}',
+          capabilityOrFallback: '能力命中或无关键词备用', applyMappedFallback: '启用 PDF、代码、Schema、搜索及普通请求备用', capabilityFallbackHelp: '映射备用模式需开启模型映射并指定 GPT 目标。能力命中可直接选；普通号可重试失败后，命中关键词直接走原生备用，未命中则先映射、再原生备用。仍须覆盖全部请求能力，建议普通号优先级 2、映射 1、企业号 0。',
           requestMatchMode: '请求能力命中策略', matchPDF: 'PDF 附件', matchCode: '服务端代码执行', matchSchema: 'JSON Schema', matchSearch: '网页搜索', matchNative: '原生 Claude（含 thinking）', requestMatchSummary: '{capabilities}：{mode}', requestMatchRequired: '请至少选择一种请求能力。', requestMatchHelp: '按实际附件、Schema 参数、服务端工具、thinking 及原生历史块匹配，不匹配检测题或普通文字。命中跳过：任一条件命中即排除；命中才选择：必须覆盖请求全部能力，并绕过关键词条件。开启模拟 thinking 格式后可映射 thinking；其余原生 Claude 状态仍需原生线路。仍遵守模型、并发等限制，上游须真实支持所选能力。',
           keywordMatchMode: '关键词命中策略', keywordDisabled: '不检测', keywordSkipOnMatch: '命中后跳过此成员', keywordRequireMatch: '命中后才选择此成员',
           keywordStrategyHelp: '关键词在智能分组中统一设置；此处只决定该成员命中或未命中时的处理方式。MP4、WAV/MP3 附件只走已开启音视频入口的成员，不受关键词策略限制。',

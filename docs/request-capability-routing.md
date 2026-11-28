@@ -4,13 +4,34 @@ TransitHub 负责协议转换、Schema 校验和调度。PDF 解析、搜索与 
 
 ## 能力条件
 
-成员策略提供 `disabled`、`skip_on_match` 和 `require_match`。条件包括 `pdf`、`code_execution`、`json_schema`、`web_search`、`native_claude`，配置独立保存到每个智能分组成员。
+成员策略提供 `disabled`、`skip_on_match`、`require_match` 和 `match_or_fallback`。条件包括 `pdf`、`code_execution`、`json_schema`、`web_search`、`native_claude`，配置独立保存到每个智能分组成员。
 
 `skip_on_match` 在任一所选条件命中时排除成员。`require_match` 要求至少命中一个条件，并覆盖请求的全部已识别能力，避免 Schema 专用线路接走 Schema + PDF 请求。命中的专用成员不受关键词条件限制，仍遵守模型支持、启用状态、暂停、并发、优先级、限速、流式和输入限制。重试只在筛选后的成员内进行。Compact 保持原有维护请求策略。
 
 识别实际 PDF 内容块、JSON Schema 配置、保留的服务端工具类型及原生 thinking/工具历史。提示词提及 PDF/Python、知识截止日期、signature，或普通客户端函数恰好叫 `web_search` / `code_execution`，均不触发能力条件。历史附件参与判断；工具结果中的示例文档不被当作新附件。
 
 显式 `thinking.enabled/adaptive`、历史 thinking/redacted_thinking、原生服务端工具结果、文件 ID、容器/MCP/上下文状态和需要动态过滤的新版搜索工具默认进入原生能力路径。“模拟 thinking 格式”开关允许普通 thinking 请求及可见续聊走 GPT 映射，thinking 使用 GPT 实际推理摘要，signature 从 30 个固定预留标签中随机选择；其余不透明状态仍排除 GPT。详见 [thinking 格式兼容](thinking-format-compat.md)。
+
+## 映射优先备用（本地改动，尚未上线）
+
+`match_or_fallback` 用于目标为 GPT 的映射成员，须显式开启。匹配且覆盖全部所选能力时，该成员参与首次选择；请求没有关键词命中时，也可承接普通文本的备用。请求同时包含 PDF、Schema 等多项能力时仍须全部覆盖，不能借备用模式绕过原生状态限制。未配置此模式的组保留原有优先级调度。
+
+普通成员失败并进入跨成员备用时，关键词分支优先于映射能力命中：
+
+| 条件 | 备用顺序 |
+| --- | --- |
+| 命中分组关键词 | 跳过 GPT 映射，选择剩余原生成员（kiro 组为企业号） |
+| 未命中关键词 | 先尝试符合能力策略的映射成员，再尝试原生成员 |
+| 映射暂停、满载、限速或失败 | 在剩余符合条件的原生成员中选择 |
+| 明确的会话永久封禁、JSON/Schema 无效或互斥参数错误 | 返回明确错误，停止自动跨账号备用 |
+
+同一普通成员原有的短暂故障重试保留；上下文已满允许尝试其他供应商。选成员仍遵守模型目录、并发、限速、手工暂停、模型隔离和总启动时间预算。关键词匹配沿用现有文本范围与规则，不新增检测题关键词。
+
+建议 kiro 普通 / 映射 / 企业优先级分别为 2 / 1 / 0。映射成员将能力策略改为 `match_or_fallback`，选择 PDF、服务端代码执行、JSON Schema、网页搜索，关键词策略关闭。管理页新增按钮可填入这组能力和备用模式，保存后才生效；已有模型映射、thinking 开关和优先级须按实际配置核对。数据库迁移 000050 仅扩展模式约束，不会自动更新生产成员策略。
+
+首次筛选写入 `[model-proxy] selection` 日志：请求 ID、分组 ID、路径、能力、命中的关键词下标（从 0 开始）、逐成员排除原因。每次选择另记 `[model-proxy] selected`，含成员 ID、实际目标型号及 `primary` / `mapped_fallback` / `native_backup` / `keyword_native_backup` 阶段；终止备用记 `fallback_stopped`。日志不写请求正文、密钥、thinking 内容或签名。模型目录/启用状态在加载候选成员时已筛除，因此本日志不能解释未进入候选集的成员。
+
+此前十分钟窗口的 7 次企业号请求均为首次直接选中，原日志缺少逐成员筛选原因，无法断言全部由关键词触发。新增日志只能追踪启用后的请求，不能补回历史原因。
 
 ## 此前部署策略（2026-11-28，历史记录）
 
@@ -27,6 +48,8 @@ TransitHub 负责协议转换、Schema 校验和调度。PDF 解析、搜索与 
 ## GPT 映射协议
 
 模型映射后的目标为 GPT 时，TransitHub 自动把 `/v1/messages` 转为 `/v1/responses`，保留客户端模型别名。协议转换不再依赖 `requestMatchMode=require_match` 或是否命中特定能力；能力策略只负责选成员，不能让已映射为 GPT 的请求继续使用 Messages 上游接口。直接使用线路 key、请求模型为 `gpt-*` 时，同样支持 Messages 转换；直接线路不会继承其他智能分组成员的 Claude 别名映射。
+
+本地新增的 `/v1/chat/completions` 能力适配把实际 PDF、服务端代码、Schema、搜索请求也转至 Responses，再还原为 Chat JSON 或完整 Chat SSE。普通文本 Chat 保持原转发方式，不占用这条能力缓冲路径的 8 个名额。兼容 Chat 的 `file.file_data` / `file_url`、`response_format.json_schema`、普通函数调用历史；原生 `web_search` / `web_search_preview` 工具保留其过滤参数，`code_interpreter` 支持自动容器及上游内存规格。供应商容器 ID、容器内文件 ID、无法表示的输出选项明确拒绝。所有 PDF 处理和 Python 执行仍在上游完成。
 
 响应头 `X-TransitHub-Upstream-Model` 和响应扩展 `transithub.upstream_model` 披露实际发送的上游型号；扩展中的 `tool_records`、`citations` 保留真实搜索证据。这是功能适配，不表示返回内容来自请求别名对应的 Claude 型号。
 
@@ -45,6 +68,10 @@ Schema 转换到 Responses strict JSON Schema，同时在 instructions 中附上
 这些限制控制输入与响应体上界；JSON 解析、序列化和运行时另有额外内存开销，因此不能将 8 × 8 MiB 当作进程总内存上限。应用现有 1.5 GiB 容器限制保持不变，没有运行生产并发压力测试。
 
 ## 验证与剩余限制
+
+本地新增模式已用独立 PostgreSQL / Redis 运行完整模块及迁移测试，通过普通号短暂故障后的两个关键词分支、映射失败后的企业备用、手工暂停、跨分组策略隔离、Messages/Chat PDF 和代码执行路由。协议测试覆盖四项能力的 JSON/SSE 请求与响应、大整数函数参数、实际执行记录保留及普通 Chat 的并发名额隔离。前端类型检查与构建通过。上述使用本地模拟上游，未调用生产模型，也未上线；不代表当前 Dora 映射账号已通过实际 Python 或 PDF 能力验证。
+
+以下保留此前版本的线上验证记录：
 
 完整 `model_proxy` PostgreSQL/Redis 集成测试、迁移测试、前端类型检查与构建通过。独立真实映射测试中，Schema 和搜索均通过。上线后从实际智能分组入口测试：
 
