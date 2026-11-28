@@ -188,6 +188,11 @@ func (b *fingerprintBank) canonicalModel(model string) string {
 		if !strings.HasPrefix(model, "claude-") {
 			return ""
 		}
+	} else if strings.HasPrefix(model, "google/") {
+		model = strings.TrimPrefix(model, "google/")
+		if !strings.HasPrefix(model, "gemini-") {
+			return ""
+		}
 	}
 	return b.aliases[model]
 }

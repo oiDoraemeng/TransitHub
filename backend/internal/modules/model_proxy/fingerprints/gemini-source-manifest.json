@@ -1,0 +1,3971 @@
+{
+  "source": {
+    "repository": "Ikaleio/lm-detector",
+    "revision": "643587185bf9c54b0c94ec6b2bed600f764177ec",
+    "path": "data/unified_reference.jsonl",
+    "url": "https://raw.githubusercontent.com/Ikaleio/lm-detector/643587185bf9c54b0c94ec6b2bed600f764177ec/data/unified_reference.jsonl",
+    "sha256": "eadd1d25f5232b6e4b65152b5d953d2656e4372327c2c41754486ca80f880765",
+    "bytes": 20410032
+  },
+  "samples": 389,
+  "models": {
+    "gemini-2.5-pro": 36,
+    "gemini-3.1-pro-preview": 36,
+    "gemini-3.5-flash": 36,
+    "gemini-3.5-flash-lite": 33,
+    "gemini-3.6-flash": 36,
+    "gemini-3.7-flash": 36,
+    "gemini-3.8-flash": 36,
+    "gemini-4-argon": 33,
+    "gemini-4-carbon": 36,
+    "gemini-4-hydrogen": 35,
+    "gemini-4-neon": 36
+  },
+  "candidates": {
+    "gemini-2.5-pro": 36,
+    "gemini-3.1-pro-preview": 36,
+    "gemini-3.5-flash": 36,
+    "gemini-3.5-flash-lite": 36,
+    "gemini-3.6-flash": 36,
+    "gemini-3.7-flash": 36,
+    "gemini-3.8-flash": 36,
+    "gemini-4-argon": 36,
+    "gemini-4-carbon": 36,
+    "gemini-4-hydrogen": 36,
+    "gemini-4-neon": 36
+  },
+  "rejected": [
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-15",
+      "reason": "incomplete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-32",
+      "reason": "incomplete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-36",
+      "reason": "incomplete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-24",
+      "reason": "incomplete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-26",
+      "reason": "incomplete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-27",
+      "reason": "incomplete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-23",
+      "reason": "incomplete"
+    }
+  ],
+  "records": [
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-01",
+      "sequence_sha256": "746736ebedd8f0075f9e79ac8622a82f42ab5f41b3eb875d59f04958f6e29452",
+      "text_sha256": "746736ebedd8f0075f9e79ac8622a82f42ab5f41b3eb875d59f04958f6e29452",
+      "source_line": 63,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-02",
+      "sequence_sha256": "9d6b0ed5dd06c3cfa317f98d074fe22a6793d9a9c885ab08de653ac868212871",
+      "text_sha256": "9d6b0ed5dd06c3cfa317f98d074fe22a6793d9a9c885ab08de653ac868212871",
+      "source_line": 64,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-03",
+      "sequence_sha256": "def19571a449c936cd73337c600dd26f22bfe1289fe7a5b88e4b24f724cba24b",
+      "text_sha256": "def19571a449c936cd73337c600dd26f22bfe1289fe7a5b88e4b24f724cba24b",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-04",
+      "sequence_sha256": "8c1862037aca79323a1484b260b0382bff13c44d3601d31f565ac12398501e62",
+      "text_sha256": "8c1862037aca79323a1484b260b0382bff13c44d3601d31f565ac12398501e62",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-05",
+      "sequence_sha256": "64297f2748ce39079732f127c81cfb243e4a63768ec49e52dcc61a89cd8bc458",
+      "text_sha256": "64297f2748ce39079732f127c81cfb243e4a63768ec49e52dcc61a89cd8bc458",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-06",
+      "sequence_sha256": "d0647b10acdb423f2d775d0f221b5d3ffea8ecad5eb9a54db0de590d7ec8beab",
+      "text_sha256": "d0647b10acdb423f2d775d0f221b5d3ffea8ecad5eb9a54db0de590d7ec8beab",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-07",
+      "sequence_sha256": "9d05b21eea264faace1ab9af59fb5e38b20c9d88278ff543878138939cae6bef",
+      "text_sha256": "5f7e271161a1c3b2fe32e4a2d0242598c9218dd88ac8cc9e3504ac010e235380",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-08",
+      "sequence_sha256": "ade5b60c79acaf0329ee588cd260ea0359c933e66c904c923dc13de8589fec7d",
+      "text_sha256": "6ebe88ecfcdccd81654812c9737d4550b55693437cee6fbb91dc1d89c50640b5",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-09",
+      "sequence_sha256": "fc6d7b042fbce216599a9c5292d5180b6f4d22a93e7d1e7a2539fdd8b81639cf",
+      "text_sha256": "fc6d7b042fbce216599a9c5292d5180b6f4d22a93e7d1e7a2539fdd8b81639cf",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-10",
+      "sequence_sha256": "9efef6247f1011071c4454d927a81fe9688fb272f6fbbdcb06b75132db8e3d8f",
+      "text_sha256": "ece14fa06b0acebcfca4fe80f395e9687abb2f1a90474a8e3a40e8192520ad52",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-11",
+      "sequence_sha256": "99a47a8abde038fe80924955003894aec9c9eab3437f665c44d4d48830e254b2",
+      "text_sha256": "91b625625c7a17f1c86fc6685fe4ec49a9bcacd2f6ed573e550ddbf5cfd0b655",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-12",
+      "sequence_sha256": "d8c5c5dec979b5243b1b311863a90620699bd5650a77840e185e8dd2a8ab22e3",
+      "text_sha256": "e6212172f8a40b901eafe5f2220a8bb4286dd7c2c6c3c9499bada66269b3c564",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-13",
+      "sequence_sha256": "6f278fc7c01abf712be878e4fea2b4df0ae4ae4db3557d8b89d5e498da5c0ff2",
+      "text_sha256": "7c9057c080bc15779c1f67ae04e62c2b71973078eb027832f4606a7a7bd14ac1",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-14",
+      "sequence_sha256": "73c33f03b0d5cfd0554f7f8ee12163f80525fb36d9b8bbf17e44cebe248f4f43",
+      "text_sha256": "4d8a7ef1701ec6cdac4186b96b9f42e2338843d5b71c8cfa350b71d2ea97a396",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-15",
+      "sequence_sha256": "b110c0bae5326df0481d9848d2ea3ce0a697a1b8967a1edb8af049168f476445",
+      "text_sha256": "252f6b6ef1d908af71c103ebe218ea10190a94fbc3b11adfcd20712b04d9b2e4",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-16",
+      "sequence_sha256": "fc435429b260d27f83d63eb4ef442a8ea702899b08142a83be9095336947bf8b",
+      "text_sha256": "fc435429b260d27f83d63eb4ef442a8ea702899b08142a83be9095336947bf8b",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-17",
+      "sequence_sha256": "7ce503673d45384340ed8b7ae47a593e0005f401838c5f0b8bc14a8d707ecc40",
+      "text_sha256": "7ce503673d45384340ed8b7ae47a593e0005f401838c5f0b8bc14a8d707ecc40",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-18",
+      "sequence_sha256": "4b8010e350c0e617d3d01b63dfcdfa24d0b8acc4f69e6f415f62b18006545cb5",
+      "text_sha256": "4b8010e350c0e617d3d01b63dfcdfa24d0b8acc4f69e6f415f62b18006545cb5",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-19",
+      "sequence_sha256": "dfdeafd6826acca143042be59cd0e716772471e9f75e626adf88879dab7d3b0d",
+      "text_sha256": "0098484842e61f1e78329ff921987d49fa781908f551a2757184f791d3e7e76c",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-20",
+      "sequence_sha256": "bf1ab514f835bc5fd72c02149c8b36b755aa7d8f8d1639d6b0144297049dd24c",
+      "text_sha256": "fb66e7f75569027bf83a48800516ea715cb9067bec51fbfd8303423c637b48a1",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-21",
+      "sequence_sha256": "57ff23c7f60b7d009dfebe0a3dfec3704a9d4e0dcba609f93c55840d29912df3",
+      "text_sha256": "c19b96b1b05b828062a94f77eeae4ada467cf213eabb190361e7369298287b72",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-22",
+      "sequence_sha256": "9f00d4b15cfc84cbb58fde5e58e0bce2ecfe91a6b773622920a1fba5b5ecc817",
+      "text_sha256": "6e880e95c80810161217fdd1a4fefb47025b97ccb766390622689b36d704a66a",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-23",
+      "sequence_sha256": "bd92eccc4cb1ea93703421a610ab5591da85f59accc4f60d7799708395581e09",
+      "text_sha256": "6d5a320d163d8a03ff95efca2e231f2a2a0cbcbb5332f490d4a05207c30a6bad",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-24",
+      "sequence_sha256": "98c272bfe804a896a589f93f4c21edc3be9fc2c2696777dd728dc009d4b8b7f9",
+      "text_sha256": "71442bbd334caa5d9e9bc598d61199ae17a42470e570371f50d735b4af8f97c5",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-25",
+      "sequence_sha256": "4deb319bdebb696c00b848b7bc9397d8ca5cb98013a00aaca6881de4b472a62e",
+      "text_sha256": "3de8345b0268f601407b479554966807f2a334ff7cd677cb5c32f5a027b5c47a",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-26",
+      "sequence_sha256": "4a73bb6f71f5e0154b83c8d1e2e8e520a879638f0d89c1ec40c6cec987f9361b",
+      "text_sha256": "8c3e44342b5defd6487470be23ae3e4566168b74c1da85359d5e3401683e65f3",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-27",
+      "sequence_sha256": "e4349361440d78f4bf4583081a5e1c6ad98fccc86b6591fed4a0afe4d9c2a50e",
+      "text_sha256": "c2ea52e59fad9098e931944ce41444ec3a8a6aada3544bbdfcd8de373afeba24",
+      "source_line": 65,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-01",
+      "sequence_sha256": "cc2c999a104e65361d68247dacba840b6226455f4fc569e93a009b08b7a1b4c2",
+      "text_sha256": "cc2c999a104e65361d68247dacba840b6226455f4fc569e93a009b08b7a1b4c2",
+      "source_line": 66,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-02",
+      "sequence_sha256": "8daa5253a3dedc2a8a3f28363849d1a442db92305a12c76ffea0cc7e209604bc",
+      "text_sha256": "8daa5253a3dedc2a8a3f28363849d1a442db92305a12c76ffea0cc7e209604bc",
+      "source_line": 66,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-03",
+      "sequence_sha256": "fc465d96172cfb55dedf3b2ab808be95de8a5e77baef5bf0c651c6025a5799b8",
+      "text_sha256": "dc45a89afa3720041e8680578d65d621eda1d2e7ef9552e152d6238f35e074e2",
+      "source_line": 66,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-04",
+      "sequence_sha256": "f0a3410c772943fb47760e1d810b621fe41ab7c60b1f90b2b48b3b051f92acbc",
+      "text_sha256": "f0a3410c772943fb47760e1d810b621fe41ab7c60b1f90b2b48b3b051f92acbc",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-05",
+      "sequence_sha256": "d5c88035c3c938f40894f5ae3bfd0d6fefbf7c861a9bd153b47bc61167af96d4",
+      "text_sha256": "d5c88035c3c938f40894f5ae3bfd0d6fefbf7c861a9bd153b47bc61167af96d4",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-06",
+      "sequence_sha256": "1d588b7e6ccaa2260bc1e850d01e5a64b9ed26c10824fff4ae4af31ad25d4ef7",
+      "text_sha256": "e69e798459f2010fdd573f6956e57648b941b81aa10b5b8c2e59cfa48bae63e2",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-07",
+      "sequence_sha256": "9e6fd1c9ec3cbec38ff8f6a96262b04c93a975fcabe136ad25c87fb33d984567",
+      "text_sha256": "9e6fd1c9ec3cbec38ff8f6a96262b04c93a975fcabe136ad25c87fb33d984567",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-08",
+      "sequence_sha256": "6848aca436ccd2089ff82d302ba7f7dee8cc4cd00ecff7ac6d0efc10f45874d3",
+      "text_sha256": "6848aca436ccd2089ff82d302ba7f7dee8cc4cd00ecff7ac6d0efc10f45874d3",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-09",
+      "sequence_sha256": "ce11c2baf78a264921d470a74c77046fd609af3fc39d08ec4579fa5d0491a8eb",
+      "text_sha256": "9c2a07bd0d60bdcf13cb1fb0ad95b8c69dc33387d870f5ec09c9712001f5f82c",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-10",
+      "sequence_sha256": "4ec5e235b3d459a605649fc5e682e4fa3a59853ba4d1232e25398b70078ada3d",
+      "text_sha256": "bd0dc0df351ed0a57fdb6b98b7a40b8e93bf52451cb89f3928f8875ef84713bc",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-11",
+      "sequence_sha256": "f57eec03a67fd9d731767adb2308045a5ca2b6413ff59dfc078a141f5c99d2fc",
+      "text_sha256": "bc5b50ef42433f6f3519fbd71384ec6b034c375928672e32b71fa244625afb9e",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-12",
+      "sequence_sha256": "785fe7cd9af6a3cb4e87c3fa9c94cf909d0f895924526b8e00579701d193f369",
+      "text_sha256": "b3a1779068f95e33817e4a3cc64e707494bae68fcfbe28e2cf755c22332c02d9",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-13",
+      "sequence_sha256": "f8d3520968df58dd16cca145989398d56ae813983f8f898104b6b6dd0e87200b",
+      "text_sha256": "db5b908782827c34c7968012a519b85fff872e20a0ee988521558c61964c4d63",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-14",
+      "sequence_sha256": "bcf68ae55357bea730169522a470245725461468540230fc7fb1fc11cdba058b",
+      "text_sha256": "6c6ee4e9b8497a08dd8ab22ce7267f04b6ae4f67644806e1c0a1296d446b9817",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-15",
+      "sequence_sha256": "353b226d9abdd1700c298ee3d304c33a50d38bfb9c4849ced36a032179bf47d2",
+      "text_sha256": "127ddc4900314a69f7a9195e7c30a74969f42a50422ad28bec4cb26512c35044",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-16",
+      "sequence_sha256": "5c870943e619713fb689e2f2d4fa8b687fcc9e43decb71acd472d5994cd196dc",
+      "text_sha256": "5c870943e619713fb689e2f2d4fa8b687fcc9e43decb71acd472d5994cd196dc",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-17",
+      "sequence_sha256": "9213fa5e7f4861ef655ec5000c4b8dad1afd1a68b695e8fe0197f361b813aa75",
+      "text_sha256": "d5067426b45b6a7b027e6b7ed07d499ac209f537c046f419b70c5edceb7a5d30",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-18",
+      "sequence_sha256": "4db736413ca195f41c32f55bfa82dedfee25fed1491b829d064fe552ca9f893f",
+      "text_sha256": "78fdc738d6eade95968ab6e87e200ca46d7a20f815f57d79a65133a5099b6fef",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-19",
+      "sequence_sha256": "63ea1cce436d79dd9ff3aadc021aaf59734246d26448479e7c209e048085ceed",
+      "text_sha256": "95a8f915f2993ed5c2e9dec935baa66210d728407b92ebc945a04cb2bd1954ac",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-20",
+      "sequence_sha256": "7b275ac91fe757c36cb73cbe5a60c97fc074c7bb41a3f7fbde8b96a738665c46",
+      "text_sha256": "7cefa77167540032a9343ad1e7ee4880231b72fdc1d0dc53f4626695edea16f3",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-21",
+      "sequence_sha256": "5ecd742ba5001f126547558c8e6c793c81bcd505d186f7828f9769be19fb1d8f",
+      "text_sha256": "e9654a7ee6b53a3109ffdd7532ffd56194b8ea44243563faf2e2c49355b67d9e",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-22",
+      "sequence_sha256": "30518ac0e1b52f3201e8fe13756566d407a699c788fbeaf71ab36b779af6134c",
+      "text_sha256": "18e8537d6f516fbb4ed7eb2d0ff2419d801ac331b8a71313278591bdbe5e4504",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-23",
+      "sequence_sha256": "1f91b5562f945309f2d30b2268e741d0a2da2112111a2845d3bd485ee2f6d7b5",
+      "text_sha256": "d98114b1ab87674a952dcf59a6a46fb966b71265c541ca4762e71c70dc64028a",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-24",
+      "sequence_sha256": "9a9b92650a8650f61bed07b605448102b0c0375095306de6fc380fa6ebc59cc6",
+      "text_sha256": "62688f592f71112f227fbded4bba7146ab8ecf37d8ff5156a724ec2dc4f43292",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-25",
+      "sequence_sha256": "681482e84f6b1b0456edca139ec247ffd2a20f7b844f3bdb4d295d5224af03a3",
+      "text_sha256": "3a69940212620121ad1b9f760aad98c110795488db80f94e07d71ba4ca40455f",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-26",
+      "sequence_sha256": "6e9e5546b291d6a4c02d957d1c4a57e12278cb03239d3c9f21f13dce43dbf8a6",
+      "text_sha256": "0ed4057ca6eb6e917fdf00c3e7ac125d28101c6b7361f7e094279415f9719208",
+      "source_line": 67,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-01",
+      "sequence_sha256": "6dfdb7c341769e6898650f6cc3bc52397258b650bd764c62c59b968c6b620ed6",
+      "text_sha256": "fdddc2ce1e68a699e40e650bc54f5af4baf30c97aa45d9d130f439bfd6339d31",
+      "source_line": 68,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-02",
+      "sequence_sha256": "b0f877256522b2797c7bfa32919f0dbedb27c1d116c1b14cf5cd2cfcbcfadee1",
+      "text_sha256": "b0f877256522b2797c7bfa32919f0dbedb27c1d116c1b14cf5cd2cfcbcfadee1",
+      "source_line": 68,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-03",
+      "sequence_sha256": "c139273a3c8b633ea4e2cc855e041b4bc1e6de961c8554f2e2195d4f2055d1ed",
+      "text_sha256": "c139273a3c8b633ea4e2cc855e041b4bc1e6de961c8554f2e2195d4f2055d1ed",
+      "source_line": 68,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-04",
+      "sequence_sha256": "df3c00c1d80a785d7f396c27c476a3d61a7874304610a578459b062f30c95f7b",
+      "text_sha256": "df3c00c1d80a785d7f396c27c476a3d61a7874304610a578459b062f30c95f7b",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-05",
+      "sequence_sha256": "3a676c5c715e2e71f0703417bc038233d77a447e747c0a97519c0dd07bc38003",
+      "text_sha256": "4fbb15ea153ae06822a680a536af089a68440f7bfe6e4b0ad756bc83e4c35557",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-06",
+      "sequence_sha256": "e41007efcd987c329e5920b0594a9803c4ac1fdc2d8410e8ef67df11f9226680",
+      "text_sha256": "e41007efcd987c329e5920b0594a9803c4ac1fdc2d8410e8ef67df11f9226680",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-07",
+      "sequence_sha256": "052a4d5701000bd0642952158a1451dd676889ab8c6b9cfe927e32cfd51aaa5f",
+      "text_sha256": "052a4d5701000bd0642952158a1451dd676889ab8c6b9cfe927e32cfd51aaa5f",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-08",
+      "sequence_sha256": "c0e1f3423abd4662ef18d0c8aa563e01aac9a9eab5514555c2215376213e78e9",
+      "text_sha256": "c0e1f3423abd4662ef18d0c8aa563e01aac9a9eab5514555c2215376213e78e9",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-09",
+      "sequence_sha256": "d8d13c7b64676d06a119ddfa2222ac4369ae47c8a44f9f5e1de4df8d68ccb35d",
+      "text_sha256": "d8d13c7b64676d06a119ddfa2222ac4369ae47c8a44f9f5e1de4df8d68ccb35d",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-10",
+      "sequence_sha256": "5ce276e34a9225101026454e31d82ce8bf07e89854164bcb6f1205c9d04e76e6",
+      "text_sha256": "48bfa5fdf61ea66af12b444c5af0315de0e59408811afb7995f79623311fb27f",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-11",
+      "sequence_sha256": "827fe452003f302292cb7e0c76bee6cf2dc254597e7f657d01f6235d66a0cc94",
+      "text_sha256": "46b466272f906962edf7726036555af3f027502d2b37adb67d4756446e9a8881",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-12",
+      "sequence_sha256": "5b53022d78467feab0cc3790a14269cb848c668e0288353dfa85679f66eede45",
+      "text_sha256": "a367ef64b4efd303ee81ca3e333e0f6a52b270c6989aa6ec343db4ee28348498",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-13",
+      "sequence_sha256": "60af711b94d8cba3b1d80d1b643366e9865a6cc37d86086c97cc229c982b7cd9",
+      "text_sha256": "92cce7b125443be99ed3fda907e801def6fd96efedf8eae7b1a9f6be41871395",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-14",
+      "sequence_sha256": "7aaf2352662e946ae019b044b06e459d2ff6c4ff7c5d7d8ac9db961b4004ae3a",
+      "text_sha256": "99a69313fbdc979946eb1821384e4d79e7fb597090f8b0b26c1923050b993033",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-15",
+      "sequence_sha256": "dafa4424953f5e279ff81d5daacc71a12f836066245015abd6c5e2c9f5eaec70",
+      "text_sha256": "bf8da1881d548cd37bb3e8e22d937de90d64044ab8bd07cdb7d558023ed4e796",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-16",
+      "sequence_sha256": "73643e10457aa1920701b9104e2d89def58bf7a708f5c4f498b72faa9cc034e7",
+      "text_sha256": "8f8833adc95c19e23196352694b137873b3568309169e68f72a02970f1765e00",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-17",
+      "sequence_sha256": "25ebae79acd0ab0737a4838cbe629f1c81cd3d3de4dc83f512cbb6e0b24f5639",
+      "text_sha256": "25ebae79acd0ab0737a4838cbe629f1c81cd3d3de4dc83f512cbb6e0b24f5639",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-18",
+      "sequence_sha256": "ddc32c4dd11c150be6358ebb3a51b142f0ed9f15a680f9a6e872a2a6f4bb7cb8",
+      "text_sha256": "bd125b6b5e59dcaaf4dd50e2b93394b190d4697442be88fb41b013c3060bc350",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-19",
+      "sequence_sha256": "c3eaa7222fe3d0d73773588a8ac3ca4ad9615e4fec5aacf9193cece8d8620a89",
+      "text_sha256": "fde641e2ab58a4c83a2d8045fd07e7dc7b7c40e2e684caab0385b5e129539d5d",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-20",
+      "sequence_sha256": "39e3aa547545930cfc789ce9be7d9d86928639c92ba75b6d2522d56415300b67",
+      "text_sha256": "66d40f9232628c731fbf0f40e7cac4160506794ac20ebd135837f402200c5564",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-21",
+      "sequence_sha256": "480eb99af61b7e319e39a7a0cc5ba211a4b0a251772b1b982e3a566a298ef5d1",
+      "text_sha256": "feb9618efa2f318b1a662a8703f040ef3030a212e1a518566a38447a02bcf50a",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-22",
+      "sequence_sha256": "c4b6e9e016959306560d6c5d6751272a2d6396844ead0425f91ae612eacad5ec",
+      "text_sha256": "cc889c78ed2a7f47ce1e8f80a051a782835cdab94bb24ec939b67c160d9f149b",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-23",
+      "sequence_sha256": "3b6e0ae032359c2a2abb9bfd8fab56bd70b3d6ded8b60df935358903f4e8fafb",
+      "text_sha256": "7ac602f7395e56b471f30ea6866dbc3fe792d63372b5e27b2f907da1195e0326",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-24",
+      "sequence_sha256": "4041ad5fb50df10b2cc781439683da75da1e9326c06e279ab71ccf6ee7c0d6d3",
+      "text_sha256": "efa1cc96326ca44be897fd0db7fd2929e2cc06782dc106d0fad04d299456b37c",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-25",
+      "sequence_sha256": "fe95cc2b4aac24a4f4a3fb99f6ee6771267d95798064775aec6d54c17a755a2a",
+      "text_sha256": "df6d4c25c4b9bced01a76da308ff798df7de9ff645f36c2cab112f584e954633",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-26",
+      "sequence_sha256": "cd9e566811b862437331d6298080a34a5d3387d9fcdc45e31075bd228b9b75f8",
+      "text_sha256": "1120c460cade225634b124d9b4b154c2140b962dd07f3d649e6ce0157e59740d",
+      "source_line": 69,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-01",
+      "sequence_sha256": "04af69b4e5b71e3d937425a144cbe5dfc5fedf0f22393e5e7b7b6fc56ccaa837",
+      "text_sha256": "04af69b4e5b71e3d937425a144cbe5dfc5fedf0f22393e5e7b7b6fc56ccaa837",
+      "source_line": 70,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-02",
+      "sequence_sha256": "11bfb847f822440718ba04eb4cb82d1567088a90558d3d8ec99d64d0697cc581",
+      "text_sha256": "11bfb847f822440718ba04eb4cb82d1567088a90558d3d8ec99d64d0697cc581",
+      "source_line": 70,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-03",
+      "sequence_sha256": "46406907e7d5765d4255726f6d55ead182e36759dc55424214ab9daa0da3aff9",
+      "text_sha256": "46406907e7d5765d4255726f6d55ead182e36759dc55424214ab9daa0da3aff9",
+      "source_line": 70,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-04",
+      "sequence_sha256": "cbc0dd1098871517fb42283c22c163591bcc51ac5e02a4214c202c606d3c3e24",
+      "text_sha256": "cbc0dd1098871517fb42283c22c163591bcc51ac5e02a4214c202c606d3c3e24",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-05",
+      "sequence_sha256": "2ae49264f9c2b8c8e70974503da2fc43b0f1630e379739c41e00b05f9178159a",
+      "text_sha256": "2ae49264f9c2b8c8e70974503da2fc43b0f1630e379739c41e00b05f9178159a",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-06",
+      "sequence_sha256": "0c74a42d974a0e796f81b7a0c83d95d4868eac82d1a86b032707487a28e99152",
+      "text_sha256": "0c74a42d974a0e796f81b7a0c83d95d4868eac82d1a86b032707487a28e99152",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-07",
+      "sequence_sha256": "583a06e973374dac0f45704613d190207dd76082a278151a085e318c13dc904c",
+      "text_sha256": "583a06e973374dac0f45704613d190207dd76082a278151a085e318c13dc904c",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-08",
+      "sequence_sha256": "0805111f828406ceebd20aaa5188e0771feae1199653dba846e552227662f7dd",
+      "text_sha256": "0805111f828406ceebd20aaa5188e0771feae1199653dba846e552227662f7dd",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-09",
+      "sequence_sha256": "9f0ac805436f3897bf202ff45f64dc9efdaa5608f1d30ca3e3fa417b468f7b5b",
+      "text_sha256": "9f0ac805436f3897bf202ff45f64dc9efdaa5608f1d30ca3e3fa417b468f7b5b",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-10",
+      "sequence_sha256": "ac7683b2d7e52cd356fb7704e394048980d9a0a1920f758c2b75a77a26f6be95",
+      "text_sha256": "939a93426c683f08509087eee53f444540e0f9b642532ebe499e17fb1165847c",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-11",
+      "sequence_sha256": "0896af07818cf44c9dd14e89869182be5c56ca682565c7c30090e94b135bc0bf",
+      "text_sha256": "c85f75c493e31db4a60b5e40387b7f8933f762257466f18acdccf9a1ee27c02b",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-12",
+      "sequence_sha256": "0a4002cd3c5d83dbfa0144bfc9c7686f764471e828cf7e55cf967c120ad924fc",
+      "text_sha256": "1f4fb390aee7cd167bc3ed21b94038cba87faff44b55a295440d8af236e37183",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-13",
+      "sequence_sha256": "acd304a88e578b072874aa382e14d96475c15a3c34e08a3222536ad808db6fb9",
+      "text_sha256": "7e2ea81078e1808f8a2add24f855b0331965bd20bda235537fd0298c917ddbc9",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-14",
+      "sequence_sha256": "fda1083284f22fa3e27a26d089adbb061b62543ba878c16dca80cb5eee9f232e",
+      "text_sha256": "3ea6c6750e50fe0355574ab0aae9ff2073812742fe15d76cfbbb9b70abeb2257",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-15",
+      "sequence_sha256": "72b4f572503b5a5d2f47205ee451a8546edc2c8fb3ab432c04606284452981c9",
+      "text_sha256": "f9b593fdc03c9d0d3b651ea4d56e8e8b9db0c3c48d0fe4cf12c27ea9d8e9c1f0",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-16",
+      "sequence_sha256": "59bf98915b9f8d26babbd9b19bb6dfcbbc5a4581ea2c0743c68dcd70a5533083",
+      "text_sha256": "59bf98915b9f8d26babbd9b19bb6dfcbbc5a4581ea2c0743c68dcd70a5533083",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-17",
+      "sequence_sha256": "37113c323e004fe6e8dabc4ddb7c87db286e4658003ae479811976b24630add1",
+      "text_sha256": "37113c323e004fe6e8dabc4ddb7c87db286e4658003ae479811976b24630add1",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-18",
+      "sequence_sha256": "a73d4f4353eab5b15d7fdc66df4cfde22914c27311eac7bf773098b3f0b4dd24",
+      "text_sha256": "a73d4f4353eab5b15d7fdc66df4cfde22914c27311eac7bf773098b3f0b4dd24",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-19",
+      "sequence_sha256": "42904223170759322c4c5c64395e6f4a6bbcf7335414fab1f9d7caed75053e74",
+      "text_sha256": "a7b16341d381a053438ecb7be621e15000fd43bd608642bba120f714cbaa55d5",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-20",
+      "sequence_sha256": "9fccc9f0916dd94f6365085801361422baa3f810bb5cd3911b56899fd5ef5cc9",
+      "text_sha256": "517b271cad82a4ad728bfa82824918514af29c4a7683b10405f2ba1f8e422191",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-21",
+      "sequence_sha256": "91ba147c8e98d6ad6a8845f43a96fed032c4614b4209fd7ba2f421259c5aef45",
+      "text_sha256": "c18db6465e367f88cdb39a77700d07043c8faee9916b96eadc0959105bde5b3e",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-22",
+      "sequence_sha256": "706bd019c2a10c43ba029149632e72924425df903845c73c1f1fb87fc0c3714e",
+      "text_sha256": "6774bcff21ea5ea22d86c642522762bc85e00acd5ff31f12538c5f506db95822",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-23",
+      "sequence_sha256": "c847f4991375cf2361c6e74058dec363584167477b36f4c504277820a51d51ab",
+      "text_sha256": "122f5899c85aaa555a367e8ce2979c9acabc6ff1a84b67b04b6bab92de3e95f7",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-24",
+      "sequence_sha256": "1ec4fc57bda7b9973b2b985c8c213d509fd9ef5f4ee40fba4f46993df660fdbc",
+      "text_sha256": "5420cb5644dad1dc865909ac390a99eb6caa5bd7e94fb545a3f41df7234ff007",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-25",
+      "sequence_sha256": "a5797db76584a381b1e2d941a87ab31b193ae55b9745a8b2010ad2f6248b3e3f",
+      "text_sha256": "eed4511870f32be9d3d1db807f819ac6800c6b9aa6bbb251514b4cefcb801786",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-26",
+      "sequence_sha256": "592d0473f861600537c2cabff08eb0f6e8c6bce3419336f07630d1e3c45cd213",
+      "text_sha256": "b8dcc8850c43bec65d1390f8db109e4f09eda99618e2df1c8fa7de3d1b018575",
+      "source_line": 71,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-01",
+      "sequence_sha256": "ea8cce0d39bed997286946e97d933ae92bee6b5ba3fb2d1d3780e5821e96aef6",
+      "text_sha256": "3a1007ed9ef41ccba8fddb75fcf534e142dd802ef21655b4790c3ca3d9726dc9",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-02",
+      "sequence_sha256": "e0e16c05bb581d2e39532c8242c4c7c6d296c16f180555eb443980d7d04d85d2",
+      "text_sha256": "e0e16c05bb581d2e39532c8242c4c7c6d296c16f180555eb443980d7d04d85d2",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-03",
+      "sequence_sha256": "b0eb235a43aa8951b6e15954a37fa63de769cca15ccbd733b53ae4634756a489",
+      "text_sha256": "b0eb235a43aa8951b6e15954a37fa63de769cca15ccbd733b53ae4634756a489",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-04",
+      "sequence_sha256": "50183eac08baf0da6fa8c0c7c46eda828d31d453bef617308c5d9e6ace1a8853",
+      "text_sha256": "50183eac08baf0da6fa8c0c7c46eda828d31d453bef617308c5d9e6ace1a8853",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-05",
+      "sequence_sha256": "e849b561f86bd7344e5ebd3eb86268ac97bd5dd269a2e7b641a15a5141f2bde4",
+      "text_sha256": "e849b561f86bd7344e5ebd3eb86268ac97bd5dd269a2e7b641a15a5141f2bde4",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-06",
+      "sequence_sha256": "eb67a0d8eb278914c1d2a9adfc02d91b6c09e10652ea75115ba264aa6f0e27d9",
+      "text_sha256": "eb67a0d8eb278914c1d2a9adfc02d91b6c09e10652ea75115ba264aa6f0e27d9",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-07",
+      "sequence_sha256": "71b88c3a3a9efffc5e14efba8d2c32c499d71eac78af21ee910604f736322675",
+      "text_sha256": "ab9ff26e60119508fac0b3b24bcdfaf89d6893bf03cc0312c869ee476cfb2d31",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-08",
+      "sequence_sha256": "a85a647a4b854662347fd30328407f56c878e549c497d45246eecab2d63003e1",
+      "text_sha256": "35f0ac8ea14291a812ea8514a9846ad603fa9a1db3b24f458ddadfe9f2552584",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-09",
+      "sequence_sha256": "81c52832fa9a56d316bf578c4f1d020fa98cc2a81873b1b2dc7b4d655101b900",
+      "text_sha256": "81c52832fa9a56d316bf578c4f1d020fa98cc2a81873b1b2dc7b4d655101b900",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-10",
+      "sequence_sha256": "42fd3e02f68d4bad5420dbec15d39487f9157a0b16edf4070c842322e71ea8f5",
+      "text_sha256": "e24b39be0bcb9b2288bb64fa0420f42995ba3f962864f2a50708fa138735e7df",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-11",
+      "sequence_sha256": "7b972fb1cd1a19140a287896fc8f0db95bf9532f048133699cc2c3cd6ed284e1",
+      "text_sha256": "e1b72d099d7640ed359996c5a3353201e90c02be235d8ccbc0c427977dfbc094",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-12",
+      "sequence_sha256": "e88d8ec2153e7d87de1205778a5671c618cdc621bda82464ea4ba8eb20649768",
+      "text_sha256": "98aae22e559b95097deb4b67635de36b6748f01f225fb551af26c13f5a1892c2",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-13",
+      "sequence_sha256": "434bc1496107e6001b5546ac5004f1e76fafddbb2051c7031e7329b1bb92e3e3",
+      "text_sha256": "af0c8fd5273624647edc0f591deb68bc10b0f5401a1ba7897bfe741a978b8b9d",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-14",
+      "sequence_sha256": "51b8e16f9a39b0ffbfa52262571407fc6d34ddced47331de543ff65a271bdd70",
+      "text_sha256": "14baac2ad333323d44a798a0ffbf2bb3ca970befd012429fd46e01c8d3597b9c",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-15",
+      "sequence_sha256": "62f1ce03f7a7c508d1702659477f5b90404a8c68efb66379c3e6c85fd887235e",
+      "text_sha256": "11b366697b72a64c20c25bfc74fcdae8ba6e41cafe393487432c3c1272996585",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-16",
+      "sequence_sha256": "830f0cf61d00d773d29c16a7d02bde145d3621b18fdaac22f5d5481729677890",
+      "text_sha256": "830f0cf61d00d773d29c16a7d02bde145d3621b18fdaac22f5d5481729677890",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-17",
+      "sequence_sha256": "d6b32a2a3625720432ee6c3450241ac48fa13fa19cec7a77a9c840c5b74c7853",
+      "text_sha256": "d6b32a2a3625720432ee6c3450241ac48fa13fa19cec7a77a9c840c5b74c7853",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-18",
+      "sequence_sha256": "6e01be26eb9aa714d3e6c578cd0cb231d84712638973232ca60d352a679f39d7",
+      "text_sha256": "6e01be26eb9aa714d3e6c578cd0cb231d84712638973232ca60d352a679f39d7",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-19",
+      "sequence_sha256": "2123b33d3707f59e380ea0be137e9c214ab83edd4d3de8e9c5e1ae0c760a6cff",
+      "text_sha256": "23ce65edabe8f5b04a678df76d10baa369134a6a1510dd90d43e7e5049950359",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-20",
+      "sequence_sha256": "0ea3cd94274719fbd429dd5f28ea071ba02d47ca353e2f084e3470713dfbd364",
+      "text_sha256": "c1783dcdb10f9f877f60239c5456f344fa7be8c102a3e58b08fb7b17dd2526b8",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-21",
+      "sequence_sha256": "344a6a82383908794c0df67d3103205dfa570fc65fe62838caa69f3f19b3b401",
+      "text_sha256": "10eda1250f7f6271bd2b10ea51df7870bdb9ec950213ba6942941521743e0c58",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-22",
+      "sequence_sha256": "90e2e24bd4c07095dd1ce942fe4c6429df2d226abb46956ade6da4b2cdf26fbc",
+      "text_sha256": "fbe5e7cb44db876bffdb7b5ecad50c8cda54915f4069fdee66373bddddf49e2c",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-23",
+      "sequence_sha256": "bcbd7571462031248d3358ed1763b925e54e1bb1d55acb1ec324b3fd61bcc1dd",
+      "text_sha256": "a3318ec390ceb2ce954427eb803b970ecd84eba7e36130527f22150b209f85df",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-24",
+      "sequence_sha256": "250f5c9ecec696ed86e1b6d5bd98ec735c9cd9c5ac152a6da4062f6196a30b32",
+      "text_sha256": "82b2e8b2ff52bb551ad4623b8bd46085c4d39169b78a35bc5bedf19e076f703a",
+      "source_line": 72,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-25",
+      "sequence_sha256": "f5186892910c5c6801aca58c7df94090ab5c688ef5f29ef92116657faf6e61d3",
+      "text_sha256": "5f59eb10586a379bfa20051a1cf9162aeb0bf49fd8fdb5a572c858e30fcc5e03",
+      "source_line": 73,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-26",
+      "sequence_sha256": "581fc9d0b97bbb83fb7caccc3ee3e3b21b7145ee7019182b12ec0064702b7048",
+      "text_sha256": "d8521af3f997153f06817349e7c3dcbc2eb1a19af5230b8a86d1c83f5fdf054a",
+      "source_line": 73,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-27",
+      "sequence_sha256": "4f311105381037499d7684b7230ac054c56f22f8816e1682d233a5d784a407d2",
+      "text_sha256": "4bcaacc518bd65d52a918560868ad96fb657e3964389eb25c8d0228311219e7f",
+      "source_line": 73,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-01",
+      "sequence_sha256": "89017f4f3b99691a821d5ced92ccbd3dce56349a7e672a37bf778d027343ef2a",
+      "text_sha256": "89017f4f3b99691a821d5ced92ccbd3dce56349a7e672a37bf778d027343ef2a",
+      "source_line": 74,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-02",
+      "sequence_sha256": "3a8adc12f0ef3a2c997465690c3e5f5ba3cd50d2a86535fa92314e89b31f9e26",
+      "text_sha256": "992f9e494d1d1be0ab9850dea2841bdc7bd95e0648b7ef07d9ba775dca16ac38",
+      "source_line": 74,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-03",
+      "sequence_sha256": "f518358bbe621ae2db4f2574d1d0c33bdf286f0bbfeb80767f30026f12d5c51f",
+      "text_sha256": "1d00bf1138b1af713e46ade827e12f1acc0440601fe223cda087d50adf136da7",
+      "source_line": 74,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-04",
+      "sequence_sha256": "db32f31d3f71c4d4ce62e91ed01d699fe2804f991a36736f4d8ecc132f59d388",
+      "text_sha256": "5443c117dc48f3dbf12e0ae9b9ed5fba4ed42a303e1ec40865f027d9ccdb4158",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-05",
+      "sequence_sha256": "2fca836512af602a62d72aca780749090de0501d4925000e46939ab11c955967",
+      "text_sha256": "2fca836512af602a62d72aca780749090de0501d4925000e46939ab11c955967",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-06",
+      "sequence_sha256": "34b29817ef3103d13f0b130e94d0f2ae5b5a6401c94974be901ece3101ac2543",
+      "text_sha256": "34b29817ef3103d13f0b130e94d0f2ae5b5a6401c94974be901ece3101ac2543",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-07",
+      "sequence_sha256": "25b89f79c09e077b1f90866f96bef26ae6ebd2286f3dfcfe93a9030925492fe0",
+      "text_sha256": "25b89f79c09e077b1f90866f96bef26ae6ebd2286f3dfcfe93a9030925492fe0",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-08",
+      "sequence_sha256": "c352f5d1a080df1a18b55952f2bf2cdc73b60d63b819c58be387c6aef20b0bf7",
+      "text_sha256": "c352f5d1a080df1a18b55952f2bf2cdc73b60d63b819c58be387c6aef20b0bf7",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-09",
+      "sequence_sha256": "4aa476b9ca4c8b7ea5a92af6b48e5be06e8d5d2f14c699a918faab7be4612543",
+      "text_sha256": "4aa476b9ca4c8b7ea5a92af6b48e5be06e8d5d2f14c699a918faab7be4612543",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-10",
+      "sequence_sha256": "8435b72a1c4894106c4edc1816c345b2f57cab51b5996ea3fc3eaa42dda990f1",
+      "text_sha256": "2d8c74f550fd5fe0ff744b042215b4fb08c3ee4a6db7d7fc13f2d926cc9341e4",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-11",
+      "sequence_sha256": "e79e90d3f6d913a0f869faf4c7363356dcfa388da7b285c88687ee430146675c",
+      "text_sha256": "5f4bda6387683263fa8d0a4a85722c9449aa0d85d78a0345567fa5f89794257d",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-12",
+      "sequence_sha256": "ac31059676140a71e98aefafcb1c97101dc1607560bf5d3229dd2e1c12ab7ddc",
+      "text_sha256": "a6c05cec956a08eecc2d8cba546c7339532803b26d8576e5a4bd0ab1377b8f50",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-13",
+      "sequence_sha256": "25f682f7abe63fdb14323410d3ae806fd0ef78f2e1b084a871ba42a90558606f",
+      "text_sha256": "c3347363a5637a3d1d8957fcfeebb1514ded69ece7a10e918ee996ac9d9464d2",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-14",
+      "sequence_sha256": "9b4b591453d6b0dc772231b910b80a3dad7eb60020811ced63e8b8105e304aad",
+      "text_sha256": "b49ab270bb7aa1dbad40cacd4918ce1360509cf048d4627c45db97f422c746ee",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-15",
+      "sequence_sha256": "736369e638f95417f9b5c11679420963f60ab97875940941c5fb845e6186a8a8",
+      "text_sha256": "0cf05e2aec2e7fc977a380f9769de491efa3e85d4d76a05e9c3e175f36e04dd7",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-16",
+      "sequence_sha256": "8313c6f89c0f6d57b445c010a1386b2486f91ed08fd391a7684c29c9e15f8c93",
+      "text_sha256": "8313c6f89c0f6d57b445c010a1386b2486f91ed08fd391a7684c29c9e15f8c93",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-17",
+      "sequence_sha256": "3c22aae7ebc53418948f040ff9a7b75412f7e09dd48f86550316c677be8ff1a4",
+      "text_sha256": "3c22aae7ebc53418948f040ff9a7b75412f7e09dd48f86550316c677be8ff1a4",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-18",
+      "sequence_sha256": "7fdac710645a33b9d551f95c89406d1e2609c7e9e7a08d47f363ccab2f6b26a6",
+      "text_sha256": "d79f21e2f06fbbdfc37b9267fa811260c2cea518516c397931e0f075aac1bf87",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-19",
+      "sequence_sha256": "c0be2a953eefd3236164989b16ea3f025a8b9902e91afb8ee0cca5cfea377fae",
+      "text_sha256": "7331d8e40ab1e6f34160ea9cc734b42a364f626f918acf002ce837f8dcd03936",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-20",
+      "sequence_sha256": "85a95f093b2f98b2f17315c31edf2106a57ebbdb8cdc8e2a7a4d02495ced31d3",
+      "text_sha256": "c1582ed36887ad9503b58447ab14b4eeb3eacce490f562dbb5b1b23ed25951d0",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-21",
+      "sequence_sha256": "06a23d19104d21c66e232dca0f2d98dcde7ea4365b75e6f76c9d3512a08306a2",
+      "text_sha256": "ee78241ea84adaef9730d47e67e18d101beac48ba76f5a7054b9d36e487868fd",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-22",
+      "sequence_sha256": "10a4ea78fc4980699f48236a9f1b50f76e9da7099e6ead550ce5af5d3448063f",
+      "text_sha256": "60bc81db24d819dd0dedd347661437dba42616d7959aabf536e17359962bd26f",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-23",
+      "sequence_sha256": "bf673af18e2fdb9cd13f70ae87b33023de89f882a60ea59878c3509732787781",
+      "text_sha256": "c236924b3e20a1d94b5d2cb5acfc4eff573fc135ad4777038a3062e979d249da",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-24",
+      "sequence_sha256": "600a1a4c0ad54ceae98093af0e284abef38e6046d363486d025421cb4aa2aa92",
+      "text_sha256": "2d7a8990bcf340b45abd0516470f62fc5dea33613bcb1faabab08ca8aa3a7c72",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-26",
+      "sequence_sha256": "18a56c4eb39004032c7e20ba3167fbd182c599301633d5af73824394d3279ee2",
+      "text_sha256": "61e78386b702719d4cb128d6c090e01da422930da75e7947907b33ce6cf1ab5c",
+      "source_line": 75,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-28",
+      "sequence_sha256": "aaa2bfede8ed11e2e47427cf81144a7d37955c73e09fd75b1d84ea7273a076c5",
+      "text_sha256": "c9d0591aa77a8a9080a2af2f929d4d52993fafe5b4549322aff183c594d9611b",
+      "source_line": 79,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-29",
+      "sequence_sha256": "335cee1f19c21a44b30aa01d4072476d4d641060355e38e052e0dea664bb0599",
+      "text_sha256": "177764602d66ee74cc8b01952d57a5fbd89389975c82a93b335ad8f500105bad",
+      "source_line": 79,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-30",
+      "sequence_sha256": "0aa6befab9a7d6b7190284ec9e6f6a93fb0d8f74df0acfe190c9ebef32eceaac",
+      "text_sha256": "1b32569de3511c49953c2fb670fa0542da6f9c89aa9d64423528f1e85072d8a5",
+      "source_line": 79,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-31",
+      "sequence_sha256": "02e95660d2a37026f53794d2f9bfffd4412fe2e6d285567ed8147e5c159d90fe",
+      "text_sha256": "7d8a027af77f837665147045847c3c3d201714dbd3ce40cdb209e20edc253fba",
+      "source_line": 79,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-32",
+      "sequence_sha256": "d90904b2e912df8bed7ded4b2350761b0965de954030865b386354f499d38158",
+      "text_sha256": "525427e87ffb8f57b0eb07160c72aa59cef69b5b6c51975f32e38dea2d0d937d",
+      "source_line": 79,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-33",
+      "sequence_sha256": "f6af8b5b13e2dd8da2fc76dbee04e916c3a262c6c145c3191381b0c370073beb",
+      "text_sha256": "3094eba6d59249cd32c142de108e779cfdd1ea6dbcb5919c22c47ebcbdb8834e",
+      "source_line": 79,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-34",
+      "sequence_sha256": "3158e7ab78c02ed2a945606c8c8039a8aa7d4abc928ee9a8e2a5960f042b4f75",
+      "text_sha256": "9cda3b2272d4dfb33dc4bb5281f832d1c0b0ac242fa35cbf90b992cbbeb64ff7",
+      "source_line": 79,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-35",
+      "sequence_sha256": "adc68d67722e8cffc678f3e7e05dc1a7250387c2fc566bc6663254113faa5c05",
+      "text_sha256": "39e71c8d7011b59d8c549caf2db3149c7d9b7e5f98b615e5a3c3e866aef4074f",
+      "source_line": 79,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "sample_id": "openrouter-grok-20260910:gemini-2.5-pro:query-36",
+      "sequence_sha256": "f47fa407372f4e367e4a59550e63766b58b8ce04d6ce53df13697dcf281f6559",
+      "text_sha256": "a8b98d9009ec08f3cda5c786e6811e2cfd36e0d57dd2bf1be7f44eb1ec44c719",
+      "source_line": 79,
+      "request_model": "gemini-2.5-pro",
+      "response_model": "gemini-2.5-pro",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-27",
+      "sequence_sha256": "51fecc998c92723d7760aeaf71dda1923de44f9776f1bd85e61bec5a280feef1",
+      "text_sha256": "dff402d486bed6349fe670f61dffd8190745890e6ab8a55d9b5caf643971cca2",
+      "source_line": 80,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-28",
+      "sequence_sha256": "d773e4225151e439c38473a55dbbe391c1c36018200385fd93248daf4b4e919d",
+      "text_sha256": "7cc3d6f46fcb6c392715670ffe85dd782f797cff60d2dd31f4889ba02550cca8",
+      "source_line": 80,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-29",
+      "sequence_sha256": "dc567e4685c0c536f147db7919b65f5199a27bec29cee8dc0c58f53ee2891383",
+      "text_sha256": "2bea1fc8287642e9a21565a3bd3e5218cb2ed28cf4b766a70607f2f28b09eddf",
+      "source_line": 80,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-30",
+      "sequence_sha256": "aa9d53de41de9ba69e14376ec8cb29d163741e7fdb0aa3f7a5d275832450b4fc",
+      "text_sha256": "a5e64cbf990756931cbfe058173273f181ba6562c38a0170ac2020d77f2f55e8",
+      "source_line": 80,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-31",
+      "sequence_sha256": "77d09e0cfc362c37a9d5b70dfa4f9c353dd546332fc3ef415fdabdaf334f7974",
+      "text_sha256": "8ef47adc5e8d6cc494aa58a5106f2fda567c5763abe6be3fa08b3d0c2715da69",
+      "source_line": 80,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-32",
+      "sequence_sha256": "9e7f75e2fc55d604514e6f19579b8212756c3e3f1b124b266e0e8988fbb1794e",
+      "text_sha256": "fc23d09341e441de3311486c371184fdeacdd3b4ba5451f26a6cc17d92e2afe6",
+      "source_line": 80,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-33",
+      "sequence_sha256": "ae731e5af886123056602714166a62ad2d5c413481328c8aaf1d8081a90a244c",
+      "text_sha256": "2ab907bee988319f5b08420dbc0bc67078ef35b4d78e19863486631dd4d7d733",
+      "source_line": 80,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-34",
+      "sequence_sha256": "84c465e1742ae99cc77eeee3073713de1545fa6e8f81c5ead2607f0e8ad1a6c7",
+      "text_sha256": "05621729fcf4f585189058756618580af772ae3ace7342afffb5f5a9d4b6128f",
+      "source_line": 80,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-35",
+      "sequence_sha256": "e96e14eec47bf506b9a828da1c7b59805dc27c902bf4023c8c4fb7aac14b48f4",
+      "text_sha256": "b08170adf2dc9781d62b41e2e651e3658d5e54526ca7a8febf884ecb3120c064",
+      "source_line": 80,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "sample_id": "openrouter-grok-20260910:gemini-3.1-pro-preview:query-36",
+      "sequence_sha256": "8d1bb779dae2c57a92ed2717d73f3cd4e358857627419f65aff0044e592aac6d",
+      "text_sha256": "4fb4461a2f21402ea3f5e13366cec5aa72b147b0821f5114e51e7683621be671",
+      "source_line": 80,
+      "request_model": "gemini-3.1-pro-preview",
+      "response_model": "gemini-3.1-pro-preview",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-27",
+      "sequence_sha256": "c792e56d3532910103d7a21c462d6a890f57be1429208bf188c844ab27cf62b9",
+      "text_sha256": "bd914b70faa5574db4e2b94226e6ad354054569b50a8d70810b7329534e24b04",
+      "source_line": 81,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-28",
+      "sequence_sha256": "4400586849f8e79e6eec778e015759351ab12e2544e1d2ee37887149f5db1822",
+      "text_sha256": "5782e3dd6b58f17caad3b1b7de8a80c72c35d5915975f4ea6c2cfb3261909fa1",
+      "source_line": 81,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-29",
+      "sequence_sha256": "c900d63cb3a6b907f288168de93d6a8324546b0694b214a7b5d2a581c991ba90",
+      "text_sha256": "727278655db49eb6c3ee67a5db7bc00bbb87dd806c2565ec40c81b6ffa991eec",
+      "source_line": 81,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-30",
+      "sequence_sha256": "7573226bd1cff5ac95bf56fd0c723888a9bc7df2db24b083bbda85642d5012b5",
+      "text_sha256": "d29bdc2929f13dcf51eee4e9fbb783aacc7cdb77b7da1f462474b5088e050271",
+      "source_line": 81,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-31",
+      "sequence_sha256": "926d1c1b5eb72c7826317594321e9694f9ec15ec24d65b06e6b636c03b91e190",
+      "text_sha256": "c9d9c7948ba0da91399443ceabf436b3b2ce1128f20a519fa7a80eeb95e38df5",
+      "source_line": 81,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-32",
+      "sequence_sha256": "79d15d709b6ac1703b914b450df4325f83bced5554972c8a927599ad62392b04",
+      "text_sha256": "6dfe23689d6204a54fd74e7cb1ee1c8f67bb135e66768bbc6b57ebd681d42029",
+      "source_line": 81,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-33",
+      "sequence_sha256": "704f88dc2f485fd00658eb1f883767701713baa633421d6c55cadb8afcba37d8",
+      "text_sha256": "5edac66686c9b0050bb645c04911ce5e8811337e5e9af05dee9e82910119f8c1",
+      "source_line": 81,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-34",
+      "sequence_sha256": "e5bf11751422e39cb95c9b11ecbd37655b611e2939038618ed124ec82fd07779",
+      "text_sha256": "fdff1e9ee5bd847fd856022e86b7eff4cd2f2fd5caa78e21c4001944629d8572",
+      "source_line": 81,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-35",
+      "sequence_sha256": "82e04ab342130106c101dcfe68ccb2d0c158564aeacf6c90a7094f8cd37f1e80",
+      "text_sha256": "34af82b4ba4c86431cc74d9c5ee2065650a4b3be1012dd388e18373a9351aca5",
+      "source_line": 81,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.5-flash:query-36",
+      "sequence_sha256": "6c87a43237f82234e1e067d2924b79c29a41b082a3c849cf4c46c88b3274131c",
+      "text_sha256": "c14b2e993c6b9a32610d4a75ca4eb93031713fdf5b6334789b32002de0cb0423",
+      "source_line": 81,
+      "request_model": "gemini-3.5-flash",
+      "response_model": "gemini-3.5-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-27",
+      "sequence_sha256": "7cdb072fea4f926fbdde04a9651036582e357bd553d5fdfc078a256716104d39",
+      "text_sha256": "d71fd1d6d019d2b747b19b498b68907c480b5227a8ece1827a2632b7b825dc6c",
+      "source_line": 82,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-28",
+      "sequence_sha256": "6e2fc3355e56a90538a14ecb45d34af19f50482f13eac732f41caa99720d3c02",
+      "text_sha256": "35ecfa7e65d48e4e5b07805c60887792d4314b83adff9102764a39ce15234190",
+      "source_line": 82,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-29",
+      "sequence_sha256": "653bd31c5b9313f38845ab2e99cda04d340d6ea777a5f2aeca8bbc83b539f750",
+      "text_sha256": "6f4c68571874ca61073cb8433ed28cba7362b0bccbf3db30d30a27dfdbeb5e70",
+      "source_line": 82,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-30",
+      "sequence_sha256": "0570e99f0a9e255e986c894de8a1d3b1e5ce4a3653a632fed7c6e908da53b674",
+      "text_sha256": "7beff1fb72e4fc19049b2bf696bbd282a8bae3f06e64c7a033623d19b62d1df4",
+      "source_line": 82,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-31",
+      "sequence_sha256": "7794fad4f56cc19d3d8acd91f39183956767afd183105b7b0a4c1d23f60c0b00",
+      "text_sha256": "60d0efc0b8d42d127aea9ab74c8236330cf8aabc1aab32cb774f6e7048035f00",
+      "source_line": 82,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-32",
+      "sequence_sha256": "ed319dcdd3a01ca0366b914c672424db1322aebe4aa418af0fe91016a5ecbc59",
+      "text_sha256": "d611c182660ec7764b0366afd842ff112c3e2993ebbc90af05e1fa787c47f136",
+      "source_line": 82,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-33",
+      "sequence_sha256": "1713e805681db95af80154ff0ea7a4d937e4cbb7b112dd300b58fe93c5154351",
+      "text_sha256": "238787bb905cd9966f4c05b8124835853dda891c9a6a8ce5bb3bede68764926a",
+      "source_line": 82,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-34",
+      "sequence_sha256": "555b9018f8269efe29609a77efd4260318a262c810944d21f3361925db48e3fe",
+      "text_sha256": "57f1405ac3abd3fb0531c944edd17f8e314f1d4c1ebcaf835ba2a38b70588bec",
+      "source_line": 82,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-35",
+      "sequence_sha256": "3f814413d7882383d252526d2fbab20f4d42fe9de80e6b356ec04a969ef9143a",
+      "text_sha256": "303113a6a734838431979ea89b74d6d30c4750546f19de11e0c9f557dab10d56",
+      "source_line": 82,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-28",
+      "sequence_sha256": "b58135f374b6ecc7f63180cb40db07f0864a0cfcc50f9cb6ce818777c0ca8b65",
+      "text_sha256": "15737e16c79de7995c6b356f530ffb98b70d853285c67c7b39e0808b4f7ddf16",
+      "source_line": 83,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-29",
+      "sequence_sha256": "8cfb608115b280a39e9cce2934f59f1985510d867e9e0b5d0fd0d5a6c699dd5a",
+      "text_sha256": "fa46043eec14bd3acc448acb8b01da174549cbba0009614df115027e90dc7993",
+      "source_line": 83,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-30",
+      "sequence_sha256": "626f015a699dc1e9e87d76693f228f93d97d01a2416c45d34f97957e1d26787b",
+      "text_sha256": "1929b59cc027b342aba3f61d51693c0fe8902d39a782cc9cb249d94342e057ae",
+      "source_line": 83,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-31",
+      "sequence_sha256": "9d75dbd9e8c48b822efadddeb8a67664df92808a66f5db04262de17cec6a7774",
+      "text_sha256": "c62ff2d0428fd895c08640633ac3cdd1374902dbe2427111ae323353cb9316bf",
+      "source_line": 83,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-32",
+      "sequence_sha256": "94b5289a3eb24a0a6617910e32d179dfb34f6738cb45d2902b2e20fd34aab9a2",
+      "text_sha256": "cc7e632cebfbc5ae61046ab912d180aa9222c557da1825fc96e02c64c67d8975",
+      "source_line": 83,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-33",
+      "sequence_sha256": "1c5dffc2f387cc5b2487159bce96afa500309f3f2114f3b547e86579cecbc21c",
+      "text_sha256": "ba7d0a6a92a6edcd56c3bab3a2596090251de75d51d60b5ed0b6a096c447f2cd",
+      "source_line": 83,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-34",
+      "sequence_sha256": "df3e6963d8c81466b22e976a629cf3b06335c60add8651626f513437e16ba644",
+      "text_sha256": "36b3ec6a65213f365ecf69fb087dafeaea99db4c76753ab8b517c0c7e2ddbe6b",
+      "source_line": 83,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-35",
+      "sequence_sha256": "4a2c3beb6bd722cc7a068657cfd6762e59eff4d8b3b09ec5ca90b7179b5ef0a2",
+      "text_sha256": "3209158158a23cc1bc9b370b4b1ccccc24e9707053e713182a0f0695e315239c",
+      "source_line": 83,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.7-flash:query-36",
+      "sequence_sha256": "06d5df371a61b603444c0597024d2cae176af52a9914052d10fc58d983e66493",
+      "text_sha256": "2f66e0ede8a66cfb9dd57ddab9930bffa1857d2a749cc9c0ae01f47537916dff",
+      "source_line": 83,
+      "request_model": "gemini-3.7-flash",
+      "response_model": "gemini-3.7-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-25",
+      "sequence_sha256": "585b004e2722207468642cc157cacbeb6260713ff39a9bb775cc651725d52130",
+      "text_sha256": "b3c05b9e49ffcd1285a90cb07315c1653ac0159b0765692199a3692f7a496edb",
+      "source_line": 84,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-27",
+      "sequence_sha256": "dc9a4debc7037786ff8cf4df1d468a2e8af5f80b50cabd6e43836f3cefec6681",
+      "text_sha256": "99b03735a33e382b54637bd9967de710e7b6ff3d50599780bcfcf0fa73666e2c",
+      "source_line": 84,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-28",
+      "sequence_sha256": "c4aea772bfb450a56fd6184f4dc0aace060391861ad9f11d8043102e546e3da4",
+      "text_sha256": "0e09e21971e4bcea19c20cee1d2bd77488b670efb41ff6c446536eb095ad825e",
+      "source_line": 84,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-29",
+      "sequence_sha256": "4585473ff3c175b8068c777f8a1afe54f9f9efd6947d344bfc63320149d27ad3",
+      "text_sha256": "b27c11e84c1af2c89f579085e3b0fffbf69a533551328cd74dca52e3f010b6f1",
+      "source_line": 84,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-30",
+      "sequence_sha256": "b0c4e294d3c4498dc97ae727bc545877b40387da163d33bd48cc35c5535a603e",
+      "text_sha256": "2aa51d52e77235997fa38f4919df37180a2c7026afa94607258649655dfb1810",
+      "source_line": 84,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-31",
+      "sequence_sha256": "67032cd9f52a9248b62081e652ce2293e56f94a42218e34058f91214247a64bc",
+      "text_sha256": "eadf8a034e1496e9e5c5e2642c8f98a37b45a867f3b1c1a55c3dda63677f4ad7",
+      "source_line": 84,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-32",
+      "sequence_sha256": "7d9c84b00986ba24d2e454a4fac2ac872bbe6c3d3c3ec1562969a2f65b0517ab",
+      "text_sha256": "1cf3c3a021fd2608b54bcc78ed0dfc36ffd2f69a78607f14a5b620cce0ff4df4",
+      "source_line": 84,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-33",
+      "sequence_sha256": "da28ac3777701a67cae36cef0b9a164fd42214a68820efa180a9fde24dc62274",
+      "text_sha256": "d9b0cfb6275ed2c6923ee32ecf9fb4246be882dca1115a15b94bd8276b91f266",
+      "source_line": 84,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-34",
+      "sequence_sha256": "3200923ea27466fc50397ce5f268e40b57dfe2e438c1617f40a66848defa0621",
+      "text_sha256": "3f07bce2d8202f4ea45e0e16ffcb285fa08a2ddc7d1626ee162315cf95245df1",
+      "source_line": 84,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-35",
+      "sequence_sha256": "1c338d6bab3ec1d821e3d132259cb8028c0634226a06b3c1569f0ab0b7262cdc",
+      "text_sha256": "87d184c2d4762a01290f15e951509568a865fc7f4b49c4f84737aa8c0df0eb2c",
+      "source_line": 84,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.6-flash:query-36",
+      "sequence_sha256": "5f007dc3ce89da5c140ac3e19bfd383fb7f24e71ff6676b88d49b078df80711c",
+      "text_sha256": "cd342019352b4f2a8c6eb2aabf9b3800ffffd5bc66a64124b6d0fb6f37fe8b08",
+      "source_line": 87,
+      "request_model": "gemini-3.6-flash",
+      "response_model": "gemini-3.6-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "sample_id": "openrouter-grok-20260910:gemini-3.8-flash:query-36",
+      "sequence_sha256": "8cfb27fa5b4dca7ba6c572fefb0c52abab4f599f66668fd6a866b6d4ec7315dd",
+      "text_sha256": "28b71a211a19d22717918d5bdde93d75a6c83e20cd72287d1e1335cd5ab83260",
+      "source_line": 88,
+      "request_model": "gemini-3.8-flash",
+      "response_model": "gemini-3.8-flash",
+      "completion": "unknown"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-01",
+      "sequence_sha256": "2432abc22f6f65ddf99df0e3879026d85d9f8ea779cdb6e4d42a26a45f2a1ff2",
+      "text_sha256": "9b5abcbb746b000cdce0140818912908b85af1c94e503efe02cf2b3ec91e0e35",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-02",
+      "sequence_sha256": "6d9a769130bbdcbea9ec8ea1b326d358724c032024bbc1d341699a0efa035b95",
+      "text_sha256": "82b10cf1068a4e9174192367e7e1b09431af6ea461683111d747947ac23d0206",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-03",
+      "sequence_sha256": "822147bfa4ce1062c63221ea818025508628528e2337c1868465ba7442853932",
+      "text_sha256": "30d4469d22399506ed0a16908d1c6283f1d292c687699617bce734bd699d86b5",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-04",
+      "sequence_sha256": "8c93be3d7bf32643c674b7b16699f92d3f122085a9c00718bee1e440638a2acc",
+      "text_sha256": "12d53459dcc1fe3b9f503fdda64ec96553b83b8712fad67c379a5abb1d0b3123",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-05",
+      "sequence_sha256": "9f7bc1606b0ef86fb9e2a617c7adeccd43191dba6ee064655de3293545792bd0",
+      "text_sha256": "a343c63debacff7b46ffe9eed13e5533003d57b9bd41a8d910894b2df79b7a6f",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-06",
+      "sequence_sha256": "fb711a5155777b857843e591f904eabc1465d3e77dd6117ca25d26facf88fe4b",
+      "text_sha256": "293f929afbbeb2117fa0e35c9cbea83659e6022f5aae8f946a850bc7c793a877",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-07",
+      "sequence_sha256": "01ed3859f95487787b05dd5f5ae62fcad3fe4473cf22efdb3d794c7393f29e68",
+      "text_sha256": "886623b27bf28d86f72f48a68842bfd3044c46d5435adcd90dfe7de3b2293625",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-08",
+      "sequence_sha256": "54e2c66db45efd0e3e9665b27b09affa60eaf707a80a10dca38671c7212e77f4",
+      "text_sha256": "ad0f4a66dc057838cf3d3dffd15d1ba48f23b37fb78596779419664a99ff1b88",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-09",
+      "sequence_sha256": "0f16816e0a394544436b9f9c1ab89504e9178dec97d417a5abf5ece22522f091",
+      "text_sha256": "b3256acd67d260f07499a94dc54af6fe71889332a6d45f803de1e956fa0f7718",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-10",
+      "sequence_sha256": "a6ce2752ed9f1750ed9af4f59c07fc9701930e73b4585b8fef34509f4faeeee7",
+      "text_sha256": "192a7636f18e9412d763f394a029ca7c6a91526f99d67857add7d2ecda131238",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-11",
+      "sequence_sha256": "bc267b8c07ba0c30fe6cd0e765903387efed9b6cff04221c72e0189ece954121",
+      "text_sha256": "1ec27a111bdaa9e13077c15f1f1d2346caac3b9f568b5834ffd01a3c35b2f354",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-12",
+      "sequence_sha256": "5ac2233ba524ac48f480ac8e69abe0f8d318f47426e91796a06f60b5ad2ac6dd",
+      "text_sha256": "082d3d4c42c03bf00a4f89654104ae8c1e6a0833489af5349b561d3467b7df6d",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-13",
+      "sequence_sha256": "0414d91c0574971bc04f14d89508df05676bbd55d986443f29c5e2371c683976",
+      "text_sha256": "9884163e5bcd0a9fe9dad489c66f342fa482dd8fe25e1cdd7aa004a655e262cc",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-14",
+      "sequence_sha256": "bf26c2aaf2c8bc5d83d1352508d44fb1dc36a85cc97798cbf94fd8109b53e035",
+      "text_sha256": "ef854b61f543c9536ccb3a453bfd1ce7597e0889d891fa98c423d8ad30f92d1f",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-16",
+      "sequence_sha256": "7664d1fe51e326ad1bfe31eacc068b725d9e1d208c1913340156a60d90c65f24",
+      "text_sha256": "d2ab3ed5be40a29a7b56e67a19171dd3de630b8edb537af085f590d8377fe2c5",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-17",
+      "sequence_sha256": "e0957cebc24b155e80a5c43e6f5a0a9fea96bd384c541294555722f05cc5253e",
+      "text_sha256": "36f7ccacbc619a9f36a075f68ed6456c2351254ef619300c0923025e16352c4d",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-18",
+      "sequence_sha256": "c4675b1b027a060c66d7d9c4e9f5e6024bc7a1baeacce3fd4114bab75a6fcc5c",
+      "text_sha256": "d93cc212af09b175a82060bcb0f9deea4c15401bfa397023a679aa45c67f6b67",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-19",
+      "sequence_sha256": "5d7c6badc440ccaa589024199c9c3c53302b36c2bcceaae6985a57f76cf5946e",
+      "text_sha256": "9dd0d604637cfb733a476df72e0a2253c53d605f8175cf288cfb0eced28fe0b0",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-20",
+      "sequence_sha256": "b6600e636f357426232c9ac9885894577e0b7cec69d5de5c13c7a8fa96cb96a7",
+      "text_sha256": "a8c6c7e769d084a3d3a969cd21de2a727372b2f3dbaf15266c1d2dabbc4e8228",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-21",
+      "sequence_sha256": "b7fd4a3ee6b13e60f1979fc1ebe9dbd23f88733e01b9a3f1d4100f33bb37d6a3",
+      "text_sha256": "244e8291a6aba26f59db438d7e59a451157aae4254ff2024ac85edf510d5f773",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-22",
+      "sequence_sha256": "9463045ad8c6c668bc69ac6cb355027e507b19b4a66862e387ff1da1a9da29e6",
+      "text_sha256": "83864761336f5e146a6fed44e62fa0b7cf7692a0687448b3f134318b5598ed64",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-23",
+      "sequence_sha256": "12bfd6f8ddc29ae696ede8b59b6c90a9c66a8d6e102324ccfb09e21ea6e596ae",
+      "text_sha256": "a51df32e131cb58d3835a8c2a172af33af5d3b2fc15a672c8c150fbb9a6c449e",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-24",
+      "sequence_sha256": "2ec113b844ef46986947bd0311337246cab32f14fa17ca1490b8321dbe818430",
+      "text_sha256": "471e64c1333ebf3403dc5fce68668f0b5448f7f23c13ce2aab9be410bb9ea838",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-25",
+      "sequence_sha256": "77747e673b45071dc40363933ec6457945d28152bb53bfee864ee371d25e6d20",
+      "text_sha256": "1b4b3b122fb67ba5f9f6644e34b1377c1e6c5e0294df6dd30721c2c514fece89",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-26",
+      "sequence_sha256": "63c850dadc609e17d021838d7158d310faed2b21ac27bf9dc9b729e0ef5cd493",
+      "text_sha256": "03d184fa669b8abffa51b926121fa746ad5cc372e9ca1e015573cb1f14bc9d2c",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-27",
+      "sequence_sha256": "bce9e382aa86f752c78b41337d29f9d989b43dc514c28ea4ac161239c2cda629",
+      "text_sha256": "b7bc4d4351484d722da7c1d721fe986a8932f389574bb6b2ab68debb773308d3",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-28",
+      "sequence_sha256": "64cb23fd79c821decd9df9248c5b22132144ba15a8f26fd1a2ff5de7741efac0",
+      "text_sha256": "fdf296467e87fc28234ffc072cd7e021919c49713a10fe8c2b2dc6f1f42c0a25",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-29",
+      "sequence_sha256": "c6e44823625e273e414fec839c537f067aa07b4e3e9f771fb89cb7941e392db5",
+      "text_sha256": "0b0a769349957d0f4eb9e96a3d1db268420627154feadeea7546e45b287fed60",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-30",
+      "sequence_sha256": "8b65cc3eb76300977c636067db81dedf77bfe97d602c60920f0c1badf1ff9bfb",
+      "text_sha256": "879b76a814eb01bed9e7143c9341b59030800925d2e2ac14a4c7100891bff145",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-31",
+      "sequence_sha256": "a907fd11cd15dfc50547c5b5fd6ab9a17c44d1ab7efaca08e9af2b9b578fa7b9",
+      "text_sha256": "442957d2cef5f8a2734dd128dc4fed7d4d52d7e6643c79b7192f2f3311902d1d",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-33",
+      "sequence_sha256": "a99790a150a683f33853b606d7f93f27d3cd08222bac3b16a8b2eb6ab2626105",
+      "text_sha256": "83e3185f9da11393058ac8b8b21a238311c1c2d28de5fb29485227e49b7b24f6",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-34",
+      "sequence_sha256": "bb283e16ab3e7cbb1d09b19fa43aeda77fb734a29d8018ff4fa3a122a24e8db6",
+      "text_sha256": "af6ff1da31755445b982c3a03a161b9f8d647e60d931aba395238714652cc29a",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "sample_id": "325e3d79-8b4b-4fea-bf46-809db9a013f9:query-35",
+      "sequence_sha256": "a8a852fbc320badb0e3dab2f2431f96831ea4689de3d1e35d8e95163ff03eaa7",
+      "text_sha256": "b2d8453e86f03af364d92bd671a75f92c20128aa8858306e078e9d8d390bbe85",
+      "source_line": 160,
+      "request_model": "gemini-3.5-flash-lite",
+      "response_model": "google/gemini-3.5-flash-lite",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-01",
+      "sequence_sha256": "06a8ad20c898d52e3ac6872a045c1ee6c87c64bd37c56c488772afb159767c9b",
+      "text_sha256": "06a8ad20c898d52e3ac6872a045c1ee6c87c64bd37c56c488772afb159767c9b",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-02",
+      "sequence_sha256": "c22fa4bb59b129e9ec99095c406fe211a86487e6e4e3143bd4f2d59ce30c43ad",
+      "text_sha256": "c22fa4bb59b129e9ec99095c406fe211a86487e6e4e3143bd4f2d59ce30c43ad",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-03",
+      "sequence_sha256": "908cea298f7724f3fb5da9cfcc19b3c6a94480b0bae3a0c11dc477625f61d8ea",
+      "text_sha256": "908cea298f7724f3fb5da9cfcc19b3c6a94480b0bae3a0c11dc477625f61d8ea",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-04",
+      "sequence_sha256": "4a89e4911d12e6174c24b6b5bb293ccf356ddbf45c12865ae622510767670488",
+      "text_sha256": "4a89e4911d12e6174c24b6b5bb293ccf356ddbf45c12865ae622510767670488",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-05",
+      "sequence_sha256": "4b2019516a0a06e1b253dd84f45a48f3cef4f84cefa950fe1c93d2f378ea1248",
+      "text_sha256": "4b2019516a0a06e1b253dd84f45a48f3cef4f84cefa950fe1c93d2f378ea1248",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-06",
+      "sequence_sha256": "d16e1ae5d2a752f6987516961e00f43e3b68006388ee158e0c011534dbc4972c",
+      "text_sha256": "d16e1ae5d2a752f6987516961e00f43e3b68006388ee158e0c011534dbc4972c",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-07",
+      "sequence_sha256": "8ec34b650b3e7053a421dfcf1fd0f5ec4691c4821a790f04099be265a4e61a0b",
+      "text_sha256": "8ec34b650b3e7053a421dfcf1fd0f5ec4691c4821a790f04099be265a4e61a0b",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-08",
+      "sequence_sha256": "dc46837fd1ea542ee5364a222418a3d7d7aa8e9d76bdfc604f85cba9cf9cf213",
+      "text_sha256": "dc46837fd1ea542ee5364a222418a3d7d7aa8e9d76bdfc604f85cba9cf9cf213",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-09",
+      "sequence_sha256": "eae44cd555e3fc30e85b3280e4fa1b9b8b8887e10c3785c5d0febcf410a1fb0a",
+      "text_sha256": "eae44cd555e3fc30e85b3280e4fa1b9b8b8887e10c3785c5d0febcf410a1fb0a",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-10",
+      "sequence_sha256": "65b2f500b241d05859d6b0e54d9fd492bf250eabd1c99259cc42ad96fa6ddd27",
+      "text_sha256": "0f4ff704e875e2efd35d02a2105ffeb05d9cb2b9838de62ecb48a82fc45ba53b",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-11",
+      "sequence_sha256": "a59efc69ed8c84ee91d3dbe39e4261b6bbf270b94e782c79fbe07cbc4f621fa0",
+      "text_sha256": "f6c68ce9f98044feffd999c95827d474cd48b64c36f11c7305b4e612598e60e4",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-12",
+      "sequence_sha256": "1eb101c3fd24763e87be8da19effd967fdc13d9f8725ebe2207cde9ebbe324ad",
+      "text_sha256": "06aa4a97a6ae22fc191d2ad5156a88ca9fb027429fad3805d42741875ad42487",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-13",
+      "sequence_sha256": "744f505885006948e86c992a9415f865e18fd4672bc168bf4850a6a2cb5f1ff8",
+      "text_sha256": "ae62ad554b4fa64ccc0ef7a76a51ddb7966626aab0ae8c9b49759613103b9f5a",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-14",
+      "sequence_sha256": "d6fe418a909f8b18f79ba1b762def443decacb6bed3fc5c6b3e09e2a7331ae09",
+      "text_sha256": "db2075f75284d3e5127e4d71d0db609054e4092fa4f7f5c42d1579d9033a9e4a",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-15",
+      "sequence_sha256": "4d4b287e4767d53ea33b42660114289e5c2ec71660e2cae45af36571688d6373",
+      "text_sha256": "778db38ffe2ef0b31d38ba884e3ee9a038a63b401ebea98e8e439c015a2f1c47",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-16",
+      "sequence_sha256": "4d1d13c3299564943a31231e06da0f46c23a834e14150ec1c942d3b400fa5cea",
+      "text_sha256": "4d1d13c3299564943a31231e06da0f46c23a834e14150ec1c942d3b400fa5cea",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-17",
+      "sequence_sha256": "2bf28337e34131a32354a29bd782cf55ed20926c62e7422787ab9f99116660c4",
+      "text_sha256": "2bf28337e34131a32354a29bd782cf55ed20926c62e7422787ab9f99116660c4",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-18",
+      "sequence_sha256": "08eaabdcb6cf4db57c5c0ec63a3f625005f46918b8e93247ab07fb59af3ecc78",
+      "text_sha256": "08eaabdcb6cf4db57c5c0ec63a3f625005f46918b8e93247ab07fb59af3ecc78",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-19",
+      "sequence_sha256": "7b96fdc902791bf2c7175608061503add67f5c314f0a3742f1a191f41950e6fe",
+      "text_sha256": "fa6fef7cb57cc788c9b61884ec0a3fae99ed52499d8e906b9e9a6a5f3738ed94",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-20",
+      "sequence_sha256": "1b8c34d1a3f2fd1c6447fd263a8b823ad84ec69f595bdb9531276f16c5c14d93",
+      "text_sha256": "788e4307e03cd14446a0b367ec232c55b08c1ec640171d764ce3b0788a53f6d8",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-21",
+      "sequence_sha256": "0d668c880f32ae7c5c5d2f0471f0fc12707c78fc7d5b6e5c17a7adbb2761dab2",
+      "text_sha256": "1bda7955ab10540371402f60a18deb2dd4cf276496091885e965c4202ca472c5",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-22",
+      "sequence_sha256": "49f09fdf1c5b218f9c5ec02f38ddec0ebd9d27587366d5ea73392572c22dfc74",
+      "text_sha256": "95f5c2ba0f148fb6acf0bf00410d84b891e8fc75e3b2e80b21a2171b78a65aa5",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-23",
+      "sequence_sha256": "cfa954890efb63a3200fcd55126d1c92c509d658cd99daa5a0eed385b1a83411",
+      "text_sha256": "530cba0e189282eb913c93adbd974ae39e18c068581efead94aec78c7d148e16",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-24",
+      "sequence_sha256": "bd9b90236a56a7df956d8decaadbbd7e9615a5946e40a1dc6273014c102625b5",
+      "text_sha256": "f67f0ebd389d7a24e43efbe8c9a773fe5485578d730f9d3e6365e93708376a30",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-25",
+      "sequence_sha256": "6d2f32f2333a0e1664bed205b03d3a9272053c5be5fedb8d99c7113f0dec16ee",
+      "text_sha256": "178db85f2adee59506eeaaf73e783d95da7bea96a1ffcbb2e51724ed1140381b",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-26",
+      "sequence_sha256": "fc4d37ed171f7099123eeceac8b4fcf3821a030d0558adffc3633777eeb4a09e",
+      "text_sha256": "3e6ed361a9c410c233e13566007c7109b57d5b0d8b683b3530797d8c740ba280",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-27",
+      "sequence_sha256": "8d4a4dbe750430a002d5c9d570d44c1bf02657aa6edd606b458546305696b998",
+      "text_sha256": "6e846f1907acb03389b7b08f8db66069c80370cb90d7fcaa187f31467b626cc9",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-28",
+      "sequence_sha256": "b44c23c90240baf20fe1579791cd2832609251051056b388d6545f6a120d8c67",
+      "text_sha256": "747171153022ea19eecbef6f4d128e2421e4410a425637d2bf6e5d2e64c63eb1",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-29",
+      "sequence_sha256": "8745e050c9828c817c2240aecc8cefb71284962d39565798851fd2bbf78a72e1",
+      "text_sha256": "64442e9d7818784e2ceaa8347559682fdcf1d2e582637fc772ebf197bfa073e0",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-30",
+      "sequence_sha256": "7780d81756c55034f5c7ab3e5b6314acae080a4387c6296748e817ee4ecb2338",
+      "text_sha256": "fec1a3510ba93c539cdc4f958b5de1479e9c166eafbea9679f0a526bbe1d7a3d",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-31",
+      "sequence_sha256": "891d6ef81ff33c0915798bd3fd27e81f30cc441902f68b4adc67ab745f70818c",
+      "text_sha256": "054cbc744b601bea83cc40563927be145495ff35eeac012ff16cd79a9bf84456",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-32",
+      "sequence_sha256": "6ba37e118d452cd617868ddd2eeb53982952578b62532844fcb15d81e2a2c7b4",
+      "text_sha256": "b676ab62028178b5b004f8c58fccd2b42d164d17eab4a9f40a701dfac32e41d9",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-33",
+      "sequence_sha256": "fdea46b650c3ef6e0fbae6e5e8c061f73a47abc974d5c6ccb52c9d89cc493361",
+      "text_sha256": "212d44573a53bdebb2cd7b93f9c2d315100d5c155457f8bdf0ef72d4055429b1",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-34",
+      "sequence_sha256": "43f94293569d0847a9d02804b3b25604e194f3bfc2f9e275ce485ebde0947725",
+      "text_sha256": "b33b68ebeeb732454bee496b27cc4da5483aecab92ace85e11254cbcc67c2631",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-35",
+      "sequence_sha256": "672ca5e4f94a5ecac9d02025d98208f3e311b8a0bbe9157dd3f71c3ebc633c55",
+      "text_sha256": "a63cb8f6c642cedde3e15ec6e162840ba85362945ffd10ee13127fe6c3b2664c",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-carbon",
+      "sample_id": "b612f359-df9f-4d31-9b8c-808fc92fb827:query-36",
+      "sequence_sha256": "4398e0f2ccb3ce128a9d76f8f11e6af39c3ed866300e5a5ea74c974731d3fa39",
+      "text_sha256": "ecf7cca14443fcee183f0ab99bbac827f5a0b47ebbe579574d65dd1feb8ebe21",
+      "source_line": 167,
+      "request_model": "gemini-4-carbon",
+      "response_model": "google/gemini-4-carbon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-01",
+      "sequence_sha256": "df3a913948301efdcfabf182cf646dcf32c2e9d7e1c976d85b06e603194ae9ad",
+      "text_sha256": "df3a913948301efdcfabf182cf646dcf32c2e9d7e1c976d85b06e603194ae9ad",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-02",
+      "sequence_sha256": "d1cfffd482612929a4e0c8438a6a50b427134add64ed3cb51efe756b328c7672",
+      "text_sha256": "d1cfffd482612929a4e0c8438a6a50b427134add64ed3cb51efe756b328c7672",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-03",
+      "sequence_sha256": "3bd784ec5e3ec3843667a1577a7342291cf51ff9e0177926ec6ef28e8930769b",
+      "text_sha256": "3bd784ec5e3ec3843667a1577a7342291cf51ff9e0177926ec6ef28e8930769b",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-04",
+      "sequence_sha256": "624bdb78fe90fe1095383f56c91d615a726b6a317faa43bced40ee6ce93ef81e",
+      "text_sha256": "624bdb78fe90fe1095383f56c91d615a726b6a317faa43bced40ee6ce93ef81e",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-05",
+      "sequence_sha256": "079db1401da5957d4628227ee75ed1a8434624fb9859642c0c808b39d40f9b87",
+      "text_sha256": "079db1401da5957d4628227ee75ed1a8434624fb9859642c0c808b39d40f9b87",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-06",
+      "sequence_sha256": "f4a799f6ba246e2ab9fed1e2635640d3a0bdd47ea64ce93911fdf56e6790f1b4",
+      "text_sha256": "f4a799f6ba246e2ab9fed1e2635640d3a0bdd47ea64ce93911fdf56e6790f1b4",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-07",
+      "sequence_sha256": "8f0373f15f58f6413b5344b3fdc79842823d4dc3b9a4847fa5915ea6b56786ec",
+      "text_sha256": "8f0373f15f58f6413b5344b3fdc79842823d4dc3b9a4847fa5915ea6b56786ec",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-08",
+      "sequence_sha256": "050772ece49374dc853a6288a4c1edd73f501f11760ae1970bddbb26b7f48b5f",
+      "text_sha256": "050772ece49374dc853a6288a4c1edd73f501f11760ae1970bddbb26b7f48b5f",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-09",
+      "sequence_sha256": "9dbcd8716b0210e7c3e7e785b70c68049e416a0d0b2c0fff106892f77f9df1ed",
+      "text_sha256": "9dbcd8716b0210e7c3e7e785b70c68049e416a0d0b2c0fff106892f77f9df1ed",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-10",
+      "sequence_sha256": "d4b618efa537c3674b2e7ae7b43e5911f1005c01bc5e9778463fbe9f69ec6a68",
+      "text_sha256": "8720c16588c24323bceaa7f8683f77807c7bc5cf4fcbfb5bfff61b601752e1de",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-11",
+      "sequence_sha256": "885e5e83b8409babdd8f22e689776abb087f4e9acfd4f59f5b967d8065207162",
+      "text_sha256": "e58fc8ce6f0d31e54d98490bb65d3b7f941b76abe38291b43e4b70fe631ea477",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-12",
+      "sequence_sha256": "40d7398e980bcad54cb4b7766c53166c726d27a67f761d8db0e157b18320aa8e",
+      "text_sha256": "effc6a6ba22134dd6651d49331f37f747337ea6ba452c04297c7e5e8141830c9",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-13",
+      "sequence_sha256": "4679100a8f54e8b4c4db8fbe71c7557ab60b92e3b69f9f8f8ca4aa7a4a41fdcb",
+      "text_sha256": "58c50163a823b1a4375dd718eb4716a1e835e0daa51ab43b1825635fe1cafa0d",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-14",
+      "sequence_sha256": "53e4ff097a6c9d7c100c682e5b5a90e61537efb91c887b3259de84386447f5fd",
+      "text_sha256": "e97bcba3cfe3eb54a562cb4351adef8f8f0f8e792a7474194bb447b4e7cd111a",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-15",
+      "sequence_sha256": "929b4c9101e70162f0179bcdcb4aeac543a33f1585bcf306bd8ae9711f34bf6e",
+      "text_sha256": "d83b02410939d04c5794a2951a1e80cedb00f2acd0033320c2f892a5fc5ae6c8",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-16",
+      "sequence_sha256": "ff93cb9501fbf7b9b556154f869cf077da2e78a3ea6601ff17560b757a5c06df",
+      "text_sha256": "ff93cb9501fbf7b9b556154f869cf077da2e78a3ea6601ff17560b757a5c06df",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-17",
+      "sequence_sha256": "5f5fcdf4aa459deff426c018bf545214b22e0a6da82d9bf745c9eab8298b374a",
+      "text_sha256": "5f5fcdf4aa459deff426c018bf545214b22e0a6da82d9bf745c9eab8298b374a",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-18",
+      "sequence_sha256": "0f33099e2f0f68f648d36e37a5c7f13b51f880f3537b2c3a680325d95a778fa9",
+      "text_sha256": "0f33099e2f0f68f648d36e37a5c7f13b51f880f3537b2c3a680325d95a778fa9",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-19",
+      "sequence_sha256": "5bc38cd3be090cd09e5af92233e1966f6f291f39eab145c1ac0bd88070554ff1",
+      "text_sha256": "7051839af7a2559fdf5baaea835b5b18d01b2e63bba2d418cd1ddaf804196a2a",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-20",
+      "sequence_sha256": "664a5af8a604187136a8e56bbe0e18d4d7877fe1ad76026e590e842d32db7ffa",
+      "text_sha256": "ab837d781cf2504ea0ab15fd986a8fedbd1ed824189d8602088690b0440d76f6",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-21",
+      "sequence_sha256": "51de35f94f098ad78ea558856d98c6f85baa046a512514898540a933f8445d0f",
+      "text_sha256": "2f9b0853b580a4c8fe52c7eb93c873118ffbd8fcb812fdc3d1bd6fc0b48cee3b",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-22",
+      "sequence_sha256": "5a7da51be261767f5087eebe1d75e6c17066d5ab232014fb290f3b242b7a8814",
+      "text_sha256": "d91b8813339c4515e0dc8c4e36273f2ddf74192e626072add6ba93f627e4a949",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-23",
+      "sequence_sha256": "29c53bbd71b2ea2a8db85d46dac8f909592ce54b34b8dd017c5aa2c34fdb169a",
+      "text_sha256": "48bca29fd13ee6abb61fc1f362c317fcef08c0d46c33bd22b8137869e9914221",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-25",
+      "sequence_sha256": "beca21dae568a94ee03c5ff92846ac1999823cf0a68d80d8279d2a3cecc3a58b",
+      "text_sha256": "711b0e50d36f1998c7b215c5fd451598f66a2b8904ef9d0ad08916dfd5ce6c41",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-28",
+      "sequence_sha256": "e28e9204e05def0724938fe153c62b9f2f21e17ef287a6fa48bed60abadf02ce",
+      "text_sha256": "870a6956987de9f552e97cf33078b9cbfd0600a84c88233454b5b98655a98cdf",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-29",
+      "sequence_sha256": "0404b7257cc45c3ff07045f14a5f1789e970749d424f6464dad872bc3c4e5ed3",
+      "text_sha256": "ea346ddc75902784e25f5bb003358c1ef34fb4dbdde0fd5df07be0a98ab85a5a",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-30",
+      "sequence_sha256": "b37099c6eedb2a76776c1938ca76514537f6ff07162e579840a0c398b7f8ff5c",
+      "text_sha256": "90d5836a052b11e347ba81279f330f52ffc7b644a98e348def9beab64ed0492e",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-31",
+      "sequence_sha256": "e74cb142824e5b5341ab0ba62b9c03305295b833208a68622239d112a9f486ca",
+      "text_sha256": "5f6d3c227adf6201ee1ea47da2c8f443c75476b5025c55677894352b5e8b94a1",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-32",
+      "sequence_sha256": "f077c4315f88bc4759d68598789666674af086c3853f89ac4db8e38a2835c766",
+      "text_sha256": "66ccb8101ba1b6beef17f3ef278929b458f86d73203d012d5ecc6caffb0ea504",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-33",
+      "sequence_sha256": "7cbce664bf53a961a1d873b8511c6704c0e505ffb246712dff0fc03ef1697780",
+      "text_sha256": "aa9edac5499ae185f54dc2a3691428482a15d696b17184320f2f3a2e6286831e",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-34",
+      "sequence_sha256": "2ce31599357f5917b551dc9b8e48b1e6d9e079b846efb23885c4ee9bd7c5b326",
+      "text_sha256": "17633c0997021dd60311185403041509b2ebecdec5ce0b54515cc47eedc548f2",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-35",
+      "sequence_sha256": "feed7120a42f8d8562f9fcc4e1ad1f6f0096278da29437e9cab2f582c8750fd4",
+      "text_sha256": "be95b353d92e7608aa70d9de002cd478e44b07aa2f3e81709e616567e124c9ff",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-argon",
+      "sample_id": "1d0cecb1-0e56-4daa-8f86-90bf54fc65c4:query-36",
+      "sequence_sha256": "652a65d74ca59e6945ed864bd348a1cf8d513d505931b1fc3eb7c5153b6573a0",
+      "text_sha256": "06cea5178852f16e09614b7e6b88465080253d98daf28b828ec55dd3e7a5d73b",
+      "source_line": 168,
+      "request_model": "gemini-4-argon",
+      "response_model": "google/gemini-4-argon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-01",
+      "sequence_sha256": "c3a312378ced611591400f3be58856ba5fd8b0bbd7b3f915bee5ee46b6313fed",
+      "text_sha256": "c3a312378ced611591400f3be58856ba5fd8b0bbd7b3f915bee5ee46b6313fed",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-02",
+      "sequence_sha256": "26b571308945e001778f9d8bb02815c01101eaa44034df00c4515d05b26d900c",
+      "text_sha256": "26b571308945e001778f9d8bb02815c01101eaa44034df00c4515d05b26d900c",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-03",
+      "sequence_sha256": "ae19a113329800577189b6892b125aff6d07ba0ca673a0d1112534c03d4c0813",
+      "text_sha256": "ae19a113329800577189b6892b125aff6d07ba0ca673a0d1112534c03d4c0813",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-04",
+      "sequence_sha256": "21a2f67dba183b8ee25129d4fc3fc6a1621809095f00964d4f885619ca46619e",
+      "text_sha256": "21a2f67dba183b8ee25129d4fc3fc6a1621809095f00964d4f885619ca46619e",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-05",
+      "sequence_sha256": "5d258d41ba53dca59d5f1012140f027a1721e07900892b5f1a6dc91c56846591",
+      "text_sha256": "5d258d41ba53dca59d5f1012140f027a1721e07900892b5f1a6dc91c56846591",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-06",
+      "sequence_sha256": "292b5e1636b59b59d4993b6990927e8da2322123ab52805c1b9d846bb6e32f6e",
+      "text_sha256": "292b5e1636b59b59d4993b6990927e8da2322123ab52805c1b9d846bb6e32f6e",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-07",
+      "sequence_sha256": "395e21dc072239dde35852cc4cbb54272bbe036f5d8228feb5fda2d724adffa8",
+      "text_sha256": "395e21dc072239dde35852cc4cbb54272bbe036f5d8228feb5fda2d724adffa8",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-08",
+      "sequence_sha256": "eba184d4baf773ee620cd7dd65362c2757e5f3cada4f6b3c755177db0f2ab79c",
+      "text_sha256": "eba184d4baf773ee620cd7dd65362c2757e5f3cada4f6b3c755177db0f2ab79c",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-09",
+      "sequence_sha256": "46df93f2bdb8f56d8ecad434a1d47f484f3fd7b4e25340ad00eec4dcba2e3a80",
+      "text_sha256": "46df93f2bdb8f56d8ecad434a1d47f484f3fd7b4e25340ad00eec4dcba2e3a80",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-10",
+      "sequence_sha256": "ce248fb1bdf3b6d0858b09f22c111d435920b0b84793ee5a1ba44458c60fb78b",
+      "text_sha256": "a2802b67d2fe6cc9cf9f5d1f7c11c4cd947da50677ef47ef1acfb4c85b3818a8",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-11",
+      "sequence_sha256": "26ffca73473be0b76169adf18f4191906d9153663b5fe03035b3ac9fb55165a7",
+      "text_sha256": "ab384bbeb63b6dc4bae206ce86d4a90beaf1649f3b56e73724914f673d072e3e",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-12",
+      "sequence_sha256": "c765196f94ef941eac954db0c77f0b94d1a210596c12ced3763f544024e8f390",
+      "text_sha256": "0fb33b3ae2685e10451c3372e2fa926ed47ac42b5cfdad0e6f7244e1ee01eddb",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-13",
+      "sequence_sha256": "014e1319f61ee7fc7d31026ce2ff6eb4176decbdf39dce786022b51d9eb32d90",
+      "text_sha256": "9fb003162af3cc4ca957ad08b5cb16723d9d08be41b73d85b0e445595682aa14",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-14",
+      "sequence_sha256": "47fcf2212ab7d1fca0595fa6bb3cf09c40be3d25df5631d11ca98af7b7b56bd1",
+      "text_sha256": "11ab54650bd884db6453f1b9f00d5b51495e8dc693eb88d4334f87f0c0d04321",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-15",
+      "sequence_sha256": "ce60650faa87047319625817089f2011c7a874cf02f6d32e54abf1b4c5ff4c76",
+      "text_sha256": "8fa28a591ae2db64afbb13e0ede099cd7c24d5803904a486738838237dc79a01",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-16",
+      "sequence_sha256": "532ed6916357c5a2a5f032e397ae0905c06ccb80b81e83c6a3903facdcafc5c8",
+      "text_sha256": "532ed6916357c5a2a5f032e397ae0905c06ccb80b81e83c6a3903facdcafc5c8",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-17",
+      "sequence_sha256": "c66fd420d92cea353a4bd15a7740636632e0c8872aae9dad7d0e4cc61d6755d8",
+      "text_sha256": "c66fd420d92cea353a4bd15a7740636632e0c8872aae9dad7d0e4cc61d6755d8",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-18",
+      "sequence_sha256": "52233f422ad17e2d4d2daf6d468f821e8d2e8469d33ca17c12200f86ce1341d1",
+      "text_sha256": "52233f422ad17e2d4d2daf6d468f821e8d2e8469d33ca17c12200f86ce1341d1",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-19",
+      "sequence_sha256": "3e1d96b9c2e6448c3f3d1d352e5b57d1c0aff6ee13b2ce57ce183f731a817f43",
+      "text_sha256": "6301d5292f2a1bf4c9484b5b4f9e26c32d4846bc93023009d9828906ad382208",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-20",
+      "sequence_sha256": "4216dc3fce82ae4a8538e0a5591ba872f701d3bb3bc76fe33ceea66f7eb0c400",
+      "text_sha256": "678784c101eb906f938f60d7d2f7551e982c77d37f9848562e99e2e840414a27",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-21",
+      "sequence_sha256": "6e886772207541da281e998df5a223778eef63cda50ce6cd6e60410ff9e8a7fe",
+      "text_sha256": "5e9bb38a7c85744fa29a3782f87a12a7d00cdfe971fe107085e89102e0d82a54",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-22",
+      "sequence_sha256": "eaed49a9dbdcd559024f2b8da7f3496acb81c0e2aa2ea2e7dfbe3cbfb890bda3",
+      "text_sha256": "022a25fa3d153c5637f65b77a52ed1d22e560031e683c150ed95901f4c95ea80",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-24",
+      "sequence_sha256": "50aa6954bad8eb6afa11681b9ce85c76d22a109964b81e956d3697f310e88e00",
+      "text_sha256": "d00284fa2b7f592ccd8a4bc08dc84a83216822488ae0f1be0487806796e82a3b",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-25",
+      "sequence_sha256": "cb9f6e177591b6f354e43cd100e10753b632f86dd5d94276a0d02346006b5af7",
+      "text_sha256": "3e3a7e85a30068f426e088e7a325dc9f5ad9502791e16eb0229b02829b02e589",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-26",
+      "sequence_sha256": "4c61111f18a63aeedba81943d8183cc9eaa027c0ecf6e7b8d52c97a6754e3d0b",
+      "text_sha256": "029432ed37b52eb91d7914445119d0df7c6bdba3d5418986e7991f701a07e52a",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-27",
+      "sequence_sha256": "ebf1de27dac389375fc2eab7eefa64908dd0a8dabb7ceb78a6f11be048614215",
+      "text_sha256": "102946e20936d0d461a6e221dae9f9943f3c78a232bf7fb93dcbc31fc2e59549",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-28",
+      "sequence_sha256": "ba705c918938f4b310b9134407ff307a232b4de517e6bc051490b504016576d2",
+      "text_sha256": "76c255276de632dfa62162e3f3ea61b44b68da32634cb54816c005fc88a75e97",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-29",
+      "sequence_sha256": "9f8238661163053ff2384feaa8f268a6a994f6110cad00328fe5212146d1b9e3",
+      "text_sha256": "090878c660574ed3e46be6ea82e7169bdbb58ff4ec4d213315637a0101e7adcc",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-30",
+      "sequence_sha256": "b5594825961cbb36d43ce1c4a64ecfa2f9ab571cf0c965273a21956dfabb6d84",
+      "text_sha256": "6a23bffba14bbb47d853be37e900aeaf63faa9ea2a0cf4cfc2c4b49df691c221",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-31",
+      "sequence_sha256": "f304b50fc62de6170642da8b02b00fe390bd566cd71504f2704a36bc83fc3fef",
+      "text_sha256": "74797ba7f0dc14f360fd7a0739f973f6a439fb76d9e3a75de0a16b5bcd8017ed",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-32",
+      "sequence_sha256": "26d978eac802d3a6bd2d3e069381a76717d9431ddae87db70937d9d24ec9adea",
+      "text_sha256": "ff7f8aaef7edf9fa33a342b902c8ae6fdbc4034b615a91c793aff7e05119961d",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-33",
+      "sequence_sha256": "990582e10fc56c9962c6f8d9724c06a74de6b54fd7b5d9655b622a2ea0e2fd64",
+      "text_sha256": "bc2b360494dd881e08afdeb106cb7bb7d8142de8de80bdef407eda2a7c99212f",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-34",
+      "sequence_sha256": "543a2e5c4caf8b91fc3b281d40d66005f410381feb02783dcaa5960202b6a58d",
+      "text_sha256": "7df05a595d91527e416b552211ab16b527ef424e3732fb561e38fa10aa1617e0",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-35",
+      "sequence_sha256": "0802fd6c62763f0ce253c55d9333bc8fcc4142f6113ff5a87e4c3dd01fd799d7",
+      "text_sha256": "d0cc4a46533e50425a1d2e4e60f7e838df1974a70afbf533f1aead7539f8db24",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-hydrogen",
+      "sample_id": "2dfd9827-ad4e-401c-ab92-55a55bb609f1:query-36",
+      "sequence_sha256": "4347013423364113c9aed30cfc87ff275a2676cf7c3b82a4d5af1ed5d09bd333",
+      "text_sha256": "cce8b17bbdebd4365be20780ea11fcc73f00e9c1520958ccd17e98c772896f2f",
+      "source_line": 169,
+      "request_model": "gemini-4-hydrogen",
+      "response_model": "google/gemini-4-hydrogen",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-01",
+      "sequence_sha256": "b66db63f884aebd1575ea01914071e6f2104a1f94eabf97f85200b925529ddf9",
+      "text_sha256": "b66db63f884aebd1575ea01914071e6f2104a1f94eabf97f85200b925529ddf9",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-02",
+      "sequence_sha256": "037879cecf22bfe772df64cff2ebf3d7deaa76a9bf40bb09546669bf50014332",
+      "text_sha256": "037879cecf22bfe772df64cff2ebf3d7deaa76a9bf40bb09546669bf50014332",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-03",
+      "sequence_sha256": "0dcfc86b752444751c5f9d24b590058059294ef30259a8276104d5b1f36ff738",
+      "text_sha256": "0dcfc86b752444751c5f9d24b590058059294ef30259a8276104d5b1f36ff738",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-04",
+      "sequence_sha256": "6827db44a98283e24ab54ed0a93273c82aa4ab1f06c71b42c4c4f1a77c5aafda",
+      "text_sha256": "6827db44a98283e24ab54ed0a93273c82aa4ab1f06c71b42c4c4f1a77c5aafda",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-05",
+      "sequence_sha256": "011cd5fd63f479f8ee6fc4a1f3a6fee042d358cc28894daec828a01f3aec2a7a",
+      "text_sha256": "011cd5fd63f479f8ee6fc4a1f3a6fee042d358cc28894daec828a01f3aec2a7a",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-06",
+      "sequence_sha256": "3e032cfb2dc79f72a56a0e4d42600864892fcd197eeec61feef8cb4fe5cba04e",
+      "text_sha256": "3e032cfb2dc79f72a56a0e4d42600864892fcd197eeec61feef8cb4fe5cba04e",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-07",
+      "sequence_sha256": "45b4363be99d524d87a2666f4cc40e2cda96d8ae6df48b3d95245db61aa50946",
+      "text_sha256": "45b4363be99d524d87a2666f4cc40e2cda96d8ae6df48b3d95245db61aa50946",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-08",
+      "sequence_sha256": "8857f843af9c3330200820429c54a6fae9d715f3d4cfd6115d14cfd0c9544a1d",
+      "text_sha256": "8857f843af9c3330200820429c54a6fae9d715f3d4cfd6115d14cfd0c9544a1d",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-09",
+      "sequence_sha256": "744e8d2912be6c6fe849d136b930ced7e2ad36e392e94481e89f8a95f4ba47da",
+      "text_sha256": "744e8d2912be6c6fe849d136b930ced7e2ad36e392e94481e89f8a95f4ba47da",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-10",
+      "sequence_sha256": "413e831251174fdab5feaa395c820f56d666d932d207600db6d99f2525599d18",
+      "text_sha256": "7f6ac75e33a43a32805cc724ece06af1722947dddeb5cd0a14bcd344d4dc0502",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-11",
+      "sequence_sha256": "dd7561f32267bdd9332fffb2ba695c2771ce62a749c29a131a72ccf9915ed6b0",
+      "text_sha256": "c4b3ae12284da474fecd126762a343142df4ec3daa6996e03ef8a6ad9bdaef77",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-12",
+      "sequence_sha256": "5a951e09c78134ad4cfa9f3eb4d08966e3ac919a68f3b38642f875d46a04bb2d",
+      "text_sha256": "eb2e7c29538dc64b99a82b33b8a690696380eb0044ba04a3128ebf8d1ad000b4",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-13",
+      "sequence_sha256": "eb0b4ae95c8794fb2382493a94304ada5e88066b1c6767b889fa14599eced3db",
+      "text_sha256": "8df2c7894efb952754dba8fc8d78536e5655eafdb03aa3b2581ba35f2d38da5d",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-14",
+      "sequence_sha256": "2c87d332dba32fc29979e3c521dee9aaa45a811abd451814b63b546b9b7108ca",
+      "text_sha256": "19e0de2ee170b9e40482fc8c8ed69308399a5e340f610ad4835d62f81400c9fd",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-15",
+      "sequence_sha256": "4bdb5d2fcf454adcbedf3f35a717d5a59b98b07e9662571683df164fdbbf1286",
+      "text_sha256": "023f4a97f452915582f3fc40f98a0fdfb7b1c08af2ad2a69520b0a0eb36027d9",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-16",
+      "sequence_sha256": "52937e09623f904767246511dd92251516d90e5af0418331bbd70f1dd62084f3",
+      "text_sha256": "52937e09623f904767246511dd92251516d90e5af0418331bbd70f1dd62084f3",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-17",
+      "sequence_sha256": "ca1cec49e39ecbe460091fbacc504563416f4e1bb52bfe260ced7530a3747e86",
+      "text_sha256": "ca1cec49e39ecbe460091fbacc504563416f4e1bb52bfe260ced7530a3747e86",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-18",
+      "sequence_sha256": "ea90808327e412c4615ddcdd2c0428be4b374ffc3181785b528584e33afeec97",
+      "text_sha256": "ea90808327e412c4615ddcdd2c0428be4b374ffc3181785b528584e33afeec97",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-19",
+      "sequence_sha256": "49521c445f233e8be85abbdbc454038e3753f8ad4d470c292651bc63f501859f",
+      "text_sha256": "e75cec5da630cac35d9b0c2f4c56e7ce500ed88399bf28c3433997be86aba57f",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-20",
+      "sequence_sha256": "9ac5732b121041aa6b0d34a2f04b8d409fb5190d4e1760707cc64361bd8d9e70",
+      "text_sha256": "5e604120c6034553d12dbe9b259e52b4964d3f58688739e6a254a393a6e6e65c",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-21",
+      "sequence_sha256": "da2ea5a265527c493b0f37774b589e8f98fbbc6a4da0078f1741fafa829e367f",
+      "text_sha256": "53703b9383c421ba2e1d77cc2770a78e0ee92db7868297d0a439780f0d9315d7",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-22",
+      "sequence_sha256": "19b786bd5ea4e9f7c689d3742e5bae6356f53e6b635f22a1a16d49c2de50fc78",
+      "text_sha256": "81cabca6c3848089a3d29689a470096f1ff6f0959d392abad932975c13154c7d",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-23",
+      "sequence_sha256": "02aaee676f378e4566f1c925b9cecd06dcd37530ca61584b5a10b501ef9f7db9",
+      "text_sha256": "3c75b4e2982bc3c1dcab0753d3cfc540922cc8c48770b0ea94cf0069d4d2f998",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-24",
+      "sequence_sha256": "c22e154b67b6f7e378a9aedafc8b44baedc4bb4f5478bdeaaddfde0ee0a60f03",
+      "text_sha256": "672322c23364db2698bb4aa242e95196c56cfe6d2a49fc7bbf2d52d8c31ffadc",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-25",
+      "sequence_sha256": "f4db377bc0219f61db96c240fa9f9b387d6e4df95b584f2039957878da9d9add",
+      "text_sha256": "e16a696e6e7671591c9936d20cd51e684b8177e6299c7ebd40b2209594722100",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-26",
+      "sequence_sha256": "3eb6956607c267aaa9bcdca456338d272e419eab36edeaa817d4e23ae22e9620",
+      "text_sha256": "b6de2626a51699ff4e2bea825dcca4affb99f10c3727cf11ad37a7cadd97b94f",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-27",
+      "sequence_sha256": "96698b2b9ebf7a94d9ffe7987aaedd127b308cd134ca1e248dc568bec532f818",
+      "text_sha256": "a57bc6550d66ee7474da0c48f081c0f6e8c0b1ce859f4e6ed42773026cdd85a0",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-28",
+      "sequence_sha256": "704489900fc02ff996f5ffea44934f09e8ada669fb7f5ea4f223a2b7b4d511cc",
+      "text_sha256": "a6facfb3712ef47b2da7524282e8b0f592d14c3631739ab903713813c11af140",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-29",
+      "sequence_sha256": "e9144af967ea7c818e6c24f19b41dadd427add8b1a02ce150e144ab1ea50bfe3",
+      "text_sha256": "bd0b9d832f6d399291f18a2da539e08f4258b38c5623f5c599ae79b5ae1d33f8",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-30",
+      "sequence_sha256": "b9f07adc89e7a5fce267b32e9f97acd7610f6b6e9cd7b8b14c969179074d3afa",
+      "text_sha256": "a623215e95d6738215fa9bc635a9c6b9146c21ea879dec5313554437819b2d35",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-31",
+      "sequence_sha256": "c031379e917ee2dfc151c1863101976a94c7dad87fe2e329e7549f29656e0374",
+      "text_sha256": "7e7bc101b9644c0b93efb0942a658576c0f54c4947ecc9f13cd1d7e34f8eee0c",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-32",
+      "sequence_sha256": "3d6004721aef28961363caa2425219f2a835309cdc1c24cc1aed750f2d8909a2",
+      "text_sha256": "bbcad3ca06483e86cc903b52d723d380430c4f60f6b47ce647e3958078115e4a",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-33",
+      "sequence_sha256": "227ecec900395aa8f3479591972cca1637a3efb2f38c8c649a13c9ab4360e670",
+      "text_sha256": "37879946ec53feb2b19381641e0486231aeb77e9987a4bc910a1cf6381e573db",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-34",
+      "sequence_sha256": "18a252d5a671d2fbfed130d5243fc3973e29bd9dfecd43b93487dfb4b02cf5a8",
+      "text_sha256": "9bbd763cd06c7bc62b516b422f49c027ce8d9464c99f378c75cbee0563b9111b",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-35",
+      "sequence_sha256": "05963c4b40a89ae3f99179bca15d238bdc6a61edffba988649cf063ba362fb8e",
+      "text_sha256": "5624c8fc18e2b81c144e7d7ae95c93d22b7727f933c20e4cb0105315f6eed9eb",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    },
+    {
+      "model": "gemini-4-neon",
+      "sample_id": "cd47941e-14c3-4f73-9119-204c84e7930a:query-36",
+      "sequence_sha256": "1827d0e312ead05ce31587fb7bcfde8c034d7c2432887eecbe287d348b1b982f",
+      "text_sha256": "5f9e71fb94d8698a0b03a6b1b5590f8af774b161f6f89df0dc96f5e2ffb32b36",
+      "source_line": 172,
+      "request_model": "gemini-4-neon",
+      "response_model": "google/gemini-4-neon",
+      "completion": "complete"
+    }
+  ],
+  "notes": [
+    "Original source labels and output text retained; model identity has not been independently authenticated.",
+    "No synthetic numbers, padding, truncation, shuffling or cross-model sample substitution.",
+    "Samples with legacy unknown completion status are retained only when their original integer run meets the import minimum."
+  ]
+}

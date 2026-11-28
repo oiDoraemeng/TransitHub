@@ -134,7 +134,7 @@ func TestFingerprintAllPinnedTemplatesAndAdversarialRequests(t *testing.T) {
 
 func TestFingerprintReferenceIntegrityAndAliases(t *testing.T) {
 	b := fingerprintTestBank(t)
-	if len(b.Samples) != 2290 || len(b.models) != 26 {
+	if len(b.Samples) != 2679 || len(b.models) != 37 {
 		t.Fatal("unexpected reference library size")
 	}
 	for _, s := range b.Samples {
@@ -158,6 +158,10 @@ func TestFingerprintReferenceIntegrityAndAliases(t *testing.T) {
 		"anthropic/claude-sonnet-4-6": "claude-sonnet-4.6",
 		"gpt-4o-mini":                 "", "gpt-6.1": "", "gpt-99": "",
 		"openai/claude-sonnet-4.6": "", "anthropic/gpt-6-sol": "",
+		"google/gemini-3.8-flash": "gemini-3.8-flash", " GEMINI-2-5-PRO ": "gemini-2.5-pro",
+		"google/gemini-3-1-pro-preview": "gemini-3.1-pro-preview",
+		"google/gpt-6-sol":              "", "openai/gemini-3.8-flash": "", "anthropic/gemini-3.8-flash": "",
+		"gemini-99": "", "gemini-pro": "", "gemini-3.1-pro": "",
 	} {
 		if got := b.canonicalModel(alias); got != want {
 			t.Fatalf("canonical model %q = %q, want %q", alias, got, want)
@@ -174,6 +178,69 @@ func TestFingerprintReferenceIntegrityAndAliases(t *testing.T) {
 	}
 	if len(counts) != 13 {
 		t.Fatalf("GPT models = %d", len(counts))
+	}
+}
+
+func TestFingerprintGeminiSourceIntegrity(t *testing.T) {
+	b := fingerprintTestBank(t)
+	raw, err := os.ReadFile("fingerprints/gemini-source-manifest.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Samples int
+		Models  map[string]int
+		Source  struct{ Revision, SHA256 string }
+		Records []struct {
+			Model          string
+			SequenceSHA256 string `json:"sequence_sha256"`
+			TextSHA256     string `json:"text_sha256"`
+			Completion     string
+		}
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Source.Revision != "643587185bf9c54b0c94ec6b2bed600f764177ec" || manifest.Source.SHA256 != "eadd1d25f5232b6e4b65152b5d953d2656e4372327c2c41754486ca80f880765" {
+		t.Fatal("unexpected public source")
+	}
+	if manifest.Samples != 389 || len(manifest.Records) != 389 || len(manifest.Models) != 11 {
+		t.Fatal("unexpected Gemini source inventory")
+	}
+	seen := make(map[string]bool)
+	for _, record := range manifest.Records {
+		if !strings.HasPrefix(record.Model, "gemini-") || record.Completion == "truncated" {
+			t.Fatal("invalid Gemini source record")
+		}
+		key := record.Model + ":" + record.SequenceSHA256
+		if seen[key] {
+			t.Fatal("duplicate Gemini source record")
+		}
+		seen[key] = true
+		found := false
+		for _, sample := range b.models[record.Model] {
+			if sample.ID == record.SequenceSHA256 {
+				sum := sha256.Sum256([]byte(sample.Text))
+				if hex.EncodeToString(sum[:]) != record.TextSHA256 {
+					t.Fatal("original source text changed")
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatal("source record missing from embedded bank")
+		}
+	}
+	for model, count := range manifest.Models {
+		if len(b.models[model]) != count || count <= fingerprintHistorySize {
+			t.Fatalf("insufficient or incorrect Gemini pool for %s", model)
+		}
+		for _, alias := range []string{model, "google/" + model, strings.ReplaceAll(model, ".", "-")} {
+			if b.canonicalModel(alias) != model {
+				t.Fatalf("Gemini alias did not share canonical history: %s", alias)
+			}
+		}
 	}
 }
 
@@ -287,10 +354,10 @@ func TestFingerprintToggleFailuresAndCancellation(t *testing.T) {
 	}
 }
 
-func TestFingerprintGPTRepliesUseRequestedModelPool(t *testing.T) {
+func TestFingerprintGPTAndGeminiRepliesUseRequestedModelPool(t *testing.T) {
 	b := fingerprintTestBank(t)
 	for model, samples := range b.models {
-		if !strings.HasPrefix(model, "gpt-") {
+		if !strings.HasPrefix(model, "gpt-") && !strings.HasPrefix(model, "gemini-") {
 			continue
 		}
 		for _, path := range []string{"/v1/chat/completions", "/v1/responses", "/v1/messages"} {
@@ -305,6 +372,9 @@ func TestFingerprintGPTRepliesUseRequestedModelPool(t *testing.T) {
 							}
 						}
 						requested := "openai/" + model
+						if strings.HasPrefix(model, "gemini-") {
+							requested = "google/" + model
+						}
 						body := map[string]any{"model": requested, "stream": streaming}
 						if path == "/v1/responses" {
 							body["input"] = prompt
@@ -332,7 +402,7 @@ func TestFingerprintGPTRepliesUseRequestedModelPool(t *testing.T) {
 						}
 						w := httptest.NewRecorder()
 						if !serveFingerprintReply(w, httptest.NewRequest("POST", path, nil), SmartGroup{FingerprintReplyEnabled: true}, replay, requested, reserve, func(context.Context) error { return nil }) || calls != 1 || w.Code != 200 {
-							t.Fatalf("local GPT reply failed: %d", w.Code)
+							t.Fatalf("local reference reply failed: %d", w.Code)
 						}
 						if w.Header().Get("X-TransitHub-Reference-Model") != model || w.Header().Get("X-TransitHub-Reference-Sample") != samples[0].ID || w.Header().Get("X-TransitHub-Response-Source") != "reference-replay" {
 							t.Fatal("reference provenance missing")

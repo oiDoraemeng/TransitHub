@@ -13,7 +13,7 @@
 
 ## 样本与去重
 
-内置 26 个模型标签共 2,290 条公开样本：13 个 Claude 型号的 652 条，以及 13 个 GPT 型号的 1,638 条。模型标签沿用原始采样请求，未独立验证这些标签对应的真实模型。破折号版本别名与点号版本共用历史，Haiku 4.5 日期别名也共用历史；支持 GPT 的 `openai/` 前缀和 Claude 的 `anthropic/` 前缀，不会猜测未知版本或用其他型号替代。
+内置 37 个模型标签共 2,679 条公开样本：13 个 Claude 型号的 652 条、13 个 GPT 型号的 1,638 条，以及 11 个 Gemini 型号的 389 条。模型标签沿用原始采样请求，未独立验证这些标签对应的真实模型。破折号版本别名与点号版本共用历史，Haiku 4.5 日期别名也共用历史；支持 GPT 的 `openai/`、Claude 的 `anthropic/` 和 Gemini 的 `google/` 前缀，不会猜测未知版本或用其他型号替代。
 
 GPT 来源固定为 lm-detector `643587185bf9c54b0c94ec6b2bed600f764177ec` 和 ModelTrace `09a0ae5009d943aa6cb5dd3c914b83b7e70826ac` 的公开参考记录；详细来源及 SHA-256 见 `fingerprints/gpt-source-manifest.json`。导入时剔除 11 条截断记录，没有补数、截取或重新排列整数。lm-detector 合并展示的 `gpt-6-astra/6.1-sol` 按原始请求中的模型字段分别归入 `gpt-6-astra` 与 `gpt-6.1-sol`，不互相设为别名。
 
@@ -32,6 +32,24 @@ GPT 来源固定为 lm-detector `643587185bf9c54b0c94ec6b2bed600f764177ec` 和 M
 | gpt-6.1-terra | 54 |
 | gpt-6.2-astra | 57 |
 | gpt-6.2-sol | 57 |
+
+Gemini 来源固定为 lm-detector 同一版本 `643587185bf9c54b0c94ec6b2bed600f764177ec` 的公开参考记录；文件摘要、原始样本 ID、逐条文本及序列摘要见 `fingerprints/gemini-source-manifest.json`。396 条候选中排除了 7 条标记为截断的记录，保留 389 条。历史记录中完成状态为 `unknown` 的样本按原样保留并在清单中注明，均满足导入的整数数量门槛；没有补数或改写。ModelTrace 当前公开库未提供 Gemini，这些样本全部来自 lm-detector。
+
+| Gemini 型号 | 可用样本 |
+|---|---:|
+| gemini-2.5-pro | 36 |
+| gemini-3.1-pro-preview | 36 |
+| gemini-3.5-flash | 36 |
+| gemini-3.5-flash-lite | 33 |
+| gemini-3.6-flash | 36 |
+| gemini-3.7-flash | 36 |
+| gemini-3.8-flash | 36 |
+| gemini-4-argon | 33 |
+| gemini-4-carbon | 36 |
+| gemini-4-hydrogen | 35 |
+| gemini-4-neon | 36 |
+
+使用 `python scripts/prepare-gemini-fingerprint-assets.py /path/to/unified_reference.jsonl` 可校验固定源文件并重建 Gemini 子集，保留已有 GPT、Claude 和题面数据。导入不会自动开启任何分组开关。
 
 样本保留原整数序列和原文本；JSON 数组题只调整序列的序列化格式，不补数、截断或重排。部分公开样本少于题面要求数量，沿用源库原样返回；因此不承诺所有第三方检测版本都判定有效。
 
